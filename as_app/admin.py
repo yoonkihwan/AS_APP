@@ -29,6 +29,7 @@ from .models import (
     InboundBatch,
     InboundTicket,
     OutboundTicket,
+    OutsourceCompany,
     Part,
     RepairTicket,
     Tool,
@@ -135,6 +136,18 @@ class PartAdmin(NoRelatedButtonsMixin, ModelAdmin):
     @admin.display(description="적용 장비")
     def display_tools(self, obj):
         return obj.tool_list()
+
+
+# ──────────────────────────────────────────────
+# 의뢰업체 Admin
+# ──────────────────────────────────────────────
+
+@admin.register(OutsourceCompany)
+class OutsourceCompanyAdmin(ModelAdmin):
+    """의뢰업체 관리"""
+    list_display = ["name", "contact", "memo"]
+    search_fields = ["name"]
+    list_per_page = 20
 
 
 # ──────────────────────────────────────────────
@@ -388,19 +401,25 @@ class InboundTicketAdmin(ModelAdmin):
 
 @admin.register(RepairTicket)
 class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
-    """수리 기록 전용 Admin"""
+    """수리 기록 등록 - 목록에서 바로 편집 가능"""
 
     list_display = [
         "inbound_date",
         "company",
         "tool",
         "serial_number",
+        "display_repair_content",
         "status",
-        "repair_cost",
     ]
-    list_filter = ["status"]
+    list_display_links = ["serial_number"]
+    list_editable = ["status"]
+    list_filter = ["status", "company"]
     search_fields = ["serial_number", "company__name", "tool__model_name"]
-    list_per_page = 20
+    list_per_page = 30
+    actions = ["mark_as_waiting", "mark_as_repaired", "mark_as_outsourced", "mark_as_disposed"]
+
+    class Media:
+        css = {"all": ("as_app/css/inline_fix.css?v=2",)}
 
     fieldsets = (
         (
@@ -409,7 +428,6 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
                 "fields": (
                     "inbound_date",
                     "company",
-                    "manager",
                     "tool",
                     "serial_number",
                     "symptom",
@@ -417,14 +435,22 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
             },
         ),
         (
-            "수리 정보",
+            "수리 내역",
             {
                 "fields": (
-                    "repair_content",
                     "used_parts",
                     "repair_cost",
+                    "repair_content",
                     "status",
                 ),
+                "description": "사용한 부품/공임을 선택하면 AS 비용이 자동 계산됩니다.",
+            },
+        ),
+        (
+            "수리 의뢰",
+            {
+                "fields": ("outsource_company",),
+                "description": "외부 업체에 수리를 의뢰하는 경우 의뢰업체를 선택하고 상태를 '수리의뢰'로 변경하세요.",
             },
         ),
     )
@@ -432,67 +458,104 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
     readonly_fields = [
         "inbound_date",
         "company",
-        "manager",
         "tool",
         "serial_number",
         "symptom",
+        "repair_cost",
     ]
     filter_horizontal = ["used_parts"]
 
+    @admin.display(description="수리 내역")
+    def display_repair_content(self, obj):
+        parts = obj.used_parts.all()
+        if parts:
+            names = ", ".join(p.name for p in parts)
+            return names[:50] + "…" if len(names) > 50 else names
+        return "-"
+
     def get_queryset(self, request):
-        """입고 또는 수리중 상태인 티켓만 표시"""
+        """입고 상태인 티켓만 표시"""
         return (
             super()
             .get_queryset(request)
-            .filter(
-                status__in=[
-                    ASTicket.Status.INBOUND,
-                    ASTicket.Status.WAITING,
-                ]
-            )
+            .filter(status=ASTicket.Status.INBOUND)
+            .prefetch_related("used_parts")
         )
+
+    def save_related(self, request, form, formsets, change):
+        """M2M 저장 후 사용 부품/공임 단가 합산으로 AS 비용 자동 계산"""
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        total = sum(part.price for part in obj.used_parts.all())
+        if obj.repair_cost != total:
+            obj.repair_cost = total
+            obj.save(update_fields=["repair_cost"])
+
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        context["show_save_and_add_another"] = False
+        context["show_save_and_continue"] = False
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def response_change(self, request, obj):
+        from django.contrib import messages
+        messages.success(request, "수리 정보가 저장되었습니다. (%s)" % obj)
+        return HttpResponseRedirect(
+            reverse("admin:as_app_repairticket_changelist")
+        )
+
+    @unfold_action(description="선택된 항목 → 수리대기로 변경")
+    def mark_as_waiting(self, request, queryset):
+        updated = queryset.update(status=ASTicket.Status.WAITING)
+        self.message_user(request, "%d건이 수리대기로 변경되었습니다." % updated)
+
+    @unfold_action(description="선택된 항목 → 수리완료로 변경")
+    def mark_as_repaired(self, request, queryset):
+        updated = queryset.update(status=ASTicket.Status.REPAIRED)
+        self.message_user(request, "%d건이 수리완료 처리되었습니다." % updated)
+
+    @unfold_action(description="선택된 항목 → 수리의뢰로 변경")
+    def mark_as_outsourced(self, request, queryset):
+        updated = queryset.update(status=ASTicket.Status.OUTSOURCED)
+        self.message_user(request, "%d건이 수리의뢰로 변경되었습니다." % updated)
+
+    @unfold_action(description="선택된 항목 → 자체폐기 처리")
+    def mark_as_disposed(self, request, queryset):
+        updated = queryset.update(status=ASTicket.Status.DISPOSED)
+        self.message_user(request, "%d건이 자체폐기 처리되었습니다." % updated)
 
 
 @admin.register(OutboundTicket)
 class OutboundTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
-    """출고 처리 전용 Admin"""
+    """출고 등록 - 목록에서 바로 편집 가능"""
 
     list_display = [
         "inbound_date",
         "company",
         "tool",
         "serial_number",
-        "status",
+        "display_repair_summary",
         "outbound_date",
         "estimate_status",
         "tax_invoice",
     ]
-    list_filter = ["status", "estimate_status", "tax_invoice"]
+    list_display_links = ["serial_number"]
+    list_editable = ["outbound_date", "estimate_status", "tax_invoice"]
+    list_filter = ["estimate_status", "tax_invoice"]
     search_fields = ["serial_number", "company__name", "tool__model_name"]
-    list_per_page = 20
+    list_per_page = 30
     actions = ["mark_as_shipped"]
 
     fieldsets = (
         (
-            "입고 정보 (읽기 전용)",
+            "장비 정보 (읽기 전용)",
             {
                 "fields": (
                     "inbound_date",
                     "company",
-                    "manager",
                     "tool",
                     "serial_number",
-                ),
-            },
-        ),
-        (
-            "수리 정보 (읽기 전용)",
-            {
-                "fields": (
                     "repair_content",
-                    "used_parts",
                     "repair_cost",
-                    "status",
                 ),
             },
         ),
@@ -511,13 +574,17 @@ class OutboundTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
     readonly_fields = [
         "inbound_date",
         "company",
-        "manager",
         "tool",
         "serial_number",
         "repair_content",
-        "used_parts",
         "repair_cost",
     ]
+
+    @admin.display(description="수리 내용")
+    def display_repair_summary(self, obj):
+        if obj.repair_content:
+            return obj.repair_content[:25] + "…" if len(obj.repair_content) > 25 else obj.repair_content
+        return "-"
 
     def get_queryset(self, request):
         """수리완료 상태인 티켓만 표시"""
@@ -525,6 +592,18 @@ class OutboundTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
             super()
             .get_queryset(request)
             .filter(status=ASTicket.Status.REPAIRED)
+        )
+
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        context["show_save_and_add_another"] = False
+        context["show_save_and_continue"] = False
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def response_change(self, request, obj):
+        from django.contrib import messages
+        messages.success(request, "출고 정보가 저장되었습니다. (%s)" % obj)
+        return HttpResponseRedirect(
+            reverse("admin:as_app_outboundticket_changelist")
         )
 
     @unfold_action(description="선택된 항목 출고 처리")

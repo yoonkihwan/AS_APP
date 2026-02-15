@@ -19,3 +19,14 @@
 .field-tool .related-widget-wrapper {
     width: 100% !important;
 }
+
+/* ── 메인 레이아웃 여백 축소 (50px) ── */
+/* Unfold wrapper: div.px-4 > #content.container */
+#main>.px-4 {
+    padding-left: 50px !important;
+    padding-right: 50px !important;
+}
+
+#content.container {
+    max-width: 100% !important;
+}

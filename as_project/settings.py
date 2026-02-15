@@ -195,6 +195,11 @@ UNFOLD = {
                         "icon": "settings",
                         "link": reverse_lazy("admin:as_app_part_changelist"),
                     },
+                    {
+                        "title": "의뢰업체 관리",
+                        "icon": "handshake",
+                        "link": reverse_lazy("admin:as_app_outsourcecompany_changelist"),
+                    },
                 ],
             },
         ],

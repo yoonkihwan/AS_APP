@@ -105,6 +105,7 @@ class Part(models.Model):
     class PartType(models.TextChoices):
         DEDICATED = "dedicated", "전용"
         COMMON = "common", "공용"
+        LABOR = "labor", "공임"
 
     tools = models.ManyToManyField(
         Tool,
@@ -130,7 +131,7 @@ class Part(models.Model):
 
     def __str__(self):
         type_label = self.get_part_type_display()
-        return f"[{type_label}] {self.name}"
+        return f"[{type_label}] {self.name} ({self.price:,}원)"
 
     def tool_list(self):
         """적용 장비 목록 표시용"""
@@ -172,14 +173,32 @@ class InboundBatch(models.Model):
         return self.tickets.count()
 
 
+class OutsourceCompany(models.Model):
+    """의뢰업체 - AS 수리를 외주 의뢰하는 업체"""
+
+    name = models.CharField("의뢰업체명", max_length=200, unique=True)
+    contact = models.CharField("연락처", max_length=100, blank=True)
+    memo = models.TextField("메모", blank=True)
+
+    class Meta:
+        verbose_name = "의뢰업체"
+        verbose_name_plural = "의뢰업체 관리"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class ASTicket(models.Model):
     """​AS 접수 및 이력 - 입고부터 출고까지 하나의 티켓"""
 
     class Status(models.TextChoices):
         INBOUND = "inbound", "입고"
         WAITING = "waiting", "수리대기"
+        OUTSOURCED = "outsourced", "수리의뢰"
         REPAIRED = "repaired", "수리완료"
         SHIPPED = "shipped", "출고"
+        DISPOSED = "disposed", "자체폐기"
 
     # ── 입고 정보 ──
     inbound_batch = models.ForeignKey(
@@ -208,19 +227,29 @@ class ASTicket(models.Model):
     symptom = models.TextField("요청사항 및 증상", blank=True)
 
     # ── 수리 정보 ──
-    repair_content = models.TextField("AS 내용 (수리 내역)", blank=True)
+    repair_content = models.TextField("비고", blank=True, help_text="추가 메모 (선택사항)")
     used_parts = models.ManyToManyField(
         Part,
-        verbose_name="사용 부품",
+        verbose_name="사용 부품/공임",
         related_name="tickets",
         blank=True,
     )
-    repair_cost = models.PositiveIntegerField("AS 비용", default=0)
+    repair_cost = models.PositiveIntegerField("AS 비용", default=0, help_text="사용 부품/공임 단가 합산 (자동 계산)")
     status = models.CharField(
         "상태",
-        max_length=10,
+        max_length=15,
         choices=Status.choices,
         default=Status.INBOUND,
+    )
+
+    # ── 의뢰 정보 ──
+    outsource_company = models.ForeignKey(
+        OutsourceCompany,
+        on_delete=models.SET_NULL,
+        verbose_name="의뢰업체",
+        related_name="tickets",
+        null=True,
+        blank=True,
     )
 
     # ── 출고 및 정산 ──
