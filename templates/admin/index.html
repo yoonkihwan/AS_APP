@@ -1,0 +1,57 @@
+{% extends 'admin/base.html' %}
+
+{% load i18n %}
+
+{% block title %}대시보드 | {{ site_title }}{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+<!-- ── KPI 카드 ── -->
+{% if kpi %}
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    {% for item in kpi %}
+    <div style="
+        background: var(--color-bg, #fff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    ">
+        <span style="
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted, #6b7280);
+        ">{{ item.title }}</span>
+        <span style="
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-color, #111827);
+            line-height: 1.2;
+        ">{{ item.metric }}건</span>
+        <span style="
+            font-size: 0.8rem;
+            color: var(--text-muted, #9ca3af);
+            margin-top: 0.25rem;
+        ">{{ item.footer }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- ── 기본 앱 목록 + 최근 활동 ── -->
+<div class="flex flex-col lg:flex-row lg:gap-8">
+    <div class="grow">
+        {% include "unfold/helpers/app_list_default.html" %}
+    </div>
+
+    {% include "unfold/helpers/history.html" %}
+</div>
+{% endblock %}

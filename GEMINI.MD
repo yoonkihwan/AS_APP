@@ -87,7 +87,7 @@
 | `repair_content`  | Text        | AS 내용 (수리 내역)     |                           |
 | `used_parts`      | M2M         | 사용 부품 (마스터 연동) | 다중 선택 가능            |
 | `repair_cost`     | Integer     | AS 비용 (부품비 + 공임) | 자동 계산 권장            |
-| `status`          | Choice      | 상태                    | 입고/수리중/수리완료/출고 |
+| `status`          | Choice      | 상태                    | 입고/수리대기/수리완료/출고 |
 | **출고 및 정산**  |             |                         |                           |
 | `outbound_date`   | Date        | 출고 날짜               | 출고 시 업데이트          |
 | `estimate_status` | Boolean     | 견적서 추출 상태        |                           |

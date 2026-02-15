@@ -60,7 +60,7 @@ ROOT_URLCONF = "as_project.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -134,33 +134,45 @@ UNFOLD = {
     "SITE_TITLE": "AS 관리 시스템",
     "SITE_HEADER": "AS 관리 시스템",
     "SITE_SYMBOL": "build",
+    "DASHBOARD_CALLBACK": "as_app.dashboard.dashboard_callback",
     "SIDEBAR": {
-        "show_search": True,
+        "show_search": False,
         "show_all_applications": False,
         "navigation": [
+            {
+                "title": "대시보드",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "대시보드",
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                ],
+            },
             {
                 "title": "AS 관리",
                 "separator": True,
                 "items": [
+                    {
+                        "title": "통합 이력",
+                        "icon": "history",
+                        "link": reverse_lazy("admin:as_app_ashistory_changelist"),
+                    },
                     {
                         "title": "입고 등록",
                         "icon": "inbox",
                         "link": reverse_lazy("admin:as_app_inboundbatch_add"),
                     },
                     {
-                        "title": "수리 기록",
+                        "title": "수리 기록 등록",
                         "icon": "build",
                         "link": reverse_lazy("admin:as_app_repairticket_changelist"),
                     },
                     {
-                        "title": "출고 처리",
+                        "title": "출고 등록",
                         "icon": "local_shipping",
                         "link": reverse_lazy("admin:as_app_outboundticket_changelist"),
-                    },
-                    {
-                        "title": "통합 이력",
-                        "icon": "history",
-                        "link": reverse_lazy("admin:as_app_ashistory_changelist"),
                     },
                 ],
             },

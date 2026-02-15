@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 from django.utils import timezone
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action as unfold_action
@@ -7,21 +9,16 @@ from unfold.decorators import action as unfold_action
 class NoRelatedButtonsMixin:
     """모든 FK/M2M 드롭다운 옆의 추가/수정/삭제/보기 버튼을 제거"""
 
-    def _remove_related_buttons(self, field):
-        if field and hasattr(field, 'widget'):
-            field.widget.can_add_related = False
-            field.widget.can_change_related = False
-            field.widget.can_delete_related = False
-            field.widget.can_view_related = False
-        return field
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        field = super().formfield_for_foreignkey(db_field, request, **kwargs)
-        return self._remove_related_buttons(field)
-
-    def formfield_for_manytomany(self, db_field, request, **kwargs):
-        field = super().formfield_for_manytomany(db_field, request, **kwargs)
-        return self._remove_related_buttons(field)
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        for field in form.base_fields.values():
+            widget = field.widget
+            if hasattr(widget, "can_add_related"):
+                widget.can_add_related = False
+                widget.can_change_related = False
+                widget.can_delete_related = False
+                widget.can_view_related = False
+        return form
 
 from .models import (
     ASHistory,
@@ -153,7 +150,7 @@ class ASTicketInline(NoRelatedButtonsMixin, TabularInline):
     fk_name = "inbound_batch"
     fields = ["tool", "serial_number"]
     autocomplete_fields = ["tool"]
-    extra = 3
+    extra = 2
     min_num = 1
 
     def get_formset(self, request, obj=None, **kwargs):
@@ -164,6 +161,12 @@ class ASTicketInline(NoRelatedButtonsMixin, TabularInline):
                 field.widget.can_change_related = False
                 field.widget.can_delete_related = False
                 field.widget.can_view_related = False
+                # 브라우저 자동완성 비활성화
+                if hasattr(field.widget, 'attrs'):
+                    field.widget.attrs['autocomplete'] = 'off'
+        # 시리얼번호 안내문을 컬럼 헤더에 직접 표시
+        if 'serial_number' in formset.form.base_fields:
+            formset.form.base_fields['serial_number'].label = "시리얼 번호 (쉼표로 구분 시 다건 등록)"
         return formset
 
     def get_queryset(self, request):
@@ -188,6 +191,26 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
     date_hierarchy = "inbound_date"
     list_per_page = 20
     inlines = [ASTicketInline]
+
+    class Media:
+        css = {"all": ("as_app/css/inline_fix.css",)}
+
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        """저장 부가 버튼 제거"""
+        context["show_save_and_add_another"] = False
+        context["show_save_and_continue"] = False
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        # 담당자/부서 라벨에 안내문 포함
+        if 'manager' in form.base_fields:
+            form.base_fields['manager'].label = "담당자/부서 (필수 아님 · 내부 구분용)"
+        # 브라우저 자동완성 비활성화
+        for field in form.base_fields.values():
+            if hasattr(field.widget, 'attrs'):
+                field.widget.attrs['autocomplete'] = 'off'
+        return form
 
     fieldsets = (
         (
@@ -219,8 +242,30 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
             return ", ".join(items) + suffix
         return "-"
 
+    def response_add(self, request, obj, post_url_continue=None):
+        """저장 후 목록 대신 새 입고 등록 폼으로 리다이렉트"""
+        from django.contrib import messages
+        messages.success(request, "입고 등록이 완료되었습니다. (%s)" % obj)
+        return HttpResponseRedirect(
+            reverse("admin:as_app_inboundbatch_add")
+        )
+
+    def response_change(self, request, obj):
+        """수정 저장 후에도 새 입고 등록 폼으로 리다이렉트"""
+        from django.contrib import messages
+        messages.success(request, "입고 정보가 수정되었습니다. (%s)" % obj)
+        return HttpResponseRedirect(
+            reverse("admin:as_app_inboundbatch_add")
+        )
+
+    def changelist_view(self, request, extra_context=None):
+        """목록 화면 접근 시 새 입고 등록 폼으로 리다이렉트"""
+        return HttpResponseRedirect(
+            reverse("admin:as_app_inboundbatch_add")
+        )
+
     def save_formset(self, request, form, formset, change):
-        """인라인 저장 시 배치의 공통 정보를 각 티켓에 자동 복사 + 중복 검증"""
+        """인라인 저장 시 배치의 공통 정보를 각 티켓에 자동 복사 + 쉼표 시리얼 분리 + 중복 검증"""
         instances = formset.save(commit=False)
 
         for obj in formset.deleted_objects:
@@ -228,11 +273,33 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
         batch = form.instance
 
+        # ── 쉼표로 구분된 시리얼번호를 개별 티켓으로 확장 ──
+        expanded = []
+        for instance in instances:
+            if instance.tool_id and instance.serial_number:
+                serials = [s.strip() for s in instance.serial_number.split(",") if s.strip()]
+                if len(serials) > 1:
+                    # 첫 번째는 원래 인스턴스에 할당
+                    instance.serial_number = serials[0]
+                    expanded.append(instance)
+                    # 나머지는 새 티켓으로 생성
+                    for sn in serials[1:]:
+                        new_ticket = ASTicket(
+                            inbound_batch=batch,
+                            tool=instance.tool,
+                            serial_number=sn,
+                        )
+                        expanded.append(new_ticket)
+                else:
+                    expanded.append(instance)
+            elif instance.tool_id:
+                expanded.append(instance)
+
         # ── 중복 검증 ──
         # 1) 같은 배치 내 중복 체크 (tool + serial_number)
         seen = set()
         duplicates_in_batch = []
-        for instance in instances:
+        for instance in expanded:
             if instance.tool_id and instance.serial_number:
                 key = (instance.tool_id, instance.serial_number.strip())
                 if key in seen:
@@ -252,11 +319,11 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
         # 2) 기존 활성 티켓과 중복 체크
         active_statuses = [
             ASTicket.Status.INBOUND,
-            ASTicket.Status.REPAIRING,
+            ASTicket.Status.WAITING,
             ASTicket.Status.REPAIRED,
         ]
         conflicts = []
-        for instance in instances:
+        for instance in expanded:
             if instance.tool_id and instance.serial_number:
                 qs = ASTicket.objects.filter(
                     tool=instance.tool,
@@ -279,14 +346,26 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
             return
 
         # ── 검증 통과 → 저장 ──
-        for instance in instances:
+        saved_count = 0
+        for instance in expanded:
             instance.inbound_date = batch.inbound_date
             instance.company = batch.company
             instance.manager = batch.manager
             instance.status = ASTicket.Status.INBOUND
             instance.save()
+            saved_count += 1
 
         formset.save_m2m()
+
+        # 쉼표 분리로 추가 생성된 경우 안내 메시지
+        original_count = len(instances)
+        if saved_count > original_count:
+            from django.contrib import messages
+            messages.info(
+                request,
+                "시리얼번호 분리로 총 %d건의 티켓이 등록되었습니다. (입력 %d행 → %d건)"
+                % (saved_count, original_count, saved_count)
+            )
 
 
 @admin.register(InboundTicket)
@@ -368,7 +447,7 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
             .filter(
                 status__in=[
                     ASTicket.Status.INBOUND,
-                    ASTicket.Status.REPAIRING,
+                    ASTicket.Status.WAITING,
                 ]
             )
         )

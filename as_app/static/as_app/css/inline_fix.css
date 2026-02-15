@@ -1,0 +1,21 @@
+/* 입고등록 인라인 - 장비/툴 드롭박스 너비 고정 */
+.djn-inline-form .field-tool,
+.tabular .field-tool {
+    width: 200px !important;
+    min-width: 200px !important;
+    max-width: 200px !important;
+}
+
+/* 입고등록 인라인 - 시리얼번호 입력란 너비 고정 */
+.djn-inline-form .field-serial_number,
+.tabular .field-serial_number {
+    width: 500px !important;
+    min-width: 500px !important;
+    max-width: 500px !important;
+}
+
+/* select2 드롭박스 너비 고정 */
+.field-tool .select2-container,
+.field-tool .related-widget-wrapper {
+    width: 100% !important;
+}

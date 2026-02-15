@@ -155,7 +155,7 @@ class InboundBatch(models.Model):
         verbose_name="업체",
         related_name="inbound_batches",
     )
-    manager = models.CharField("담당자", max_length=100, blank=True)
+    manager = models.CharField("담당자/부서", max_length=100, blank=True)
     memo = models.TextField("메모", blank=True, help_text="이번 입고 건에 대한 참고 메모")
     created_at = models.DateTimeField("생성일", auto_now_add=True)
 
@@ -177,7 +177,7 @@ class ASTicket(models.Model):
 
     class Status(models.TextChoices):
         INBOUND = "inbound", "입고"
-        REPAIRING = "repairing", "수리중"
+        WAITING = "waiting", "수리대기"
         REPAIRED = "repaired", "수리완료"
         SHIPPED = "shipped", "출고"
 
@@ -196,14 +196,14 @@ class ASTicket(models.Model):
         on_delete=models.PROTECT,
         verbose_name="업체",
         related_name="tickets",
-    )
-    manager = models.CharField("담당자", max_length=100, blank=True)
+        )
+    manager = models.CharField("담당자/부서", max_length=100, blank=True)
     tool = models.ForeignKey(
         Tool,
         on_delete=models.PROTECT,
         verbose_name="장비/툴",
         related_name="tickets",
-    )
+        )
     serial_number = models.CharField("시리얼 번호", max_length=200)
     symptom = models.TextField("요청사항 및 증상", blank=True)
 
@@ -243,7 +243,7 @@ class ASTicket(models.Model):
         if self.tool_id and self.serial_number:
             active_statuses = [
                 self.Status.INBOUND,
-                self.Status.REPAIRING,
+                self.Status.WAITING,
                 self.Status.REPAIRED,
             ]
             qs = ASTicket.objects.filter(
