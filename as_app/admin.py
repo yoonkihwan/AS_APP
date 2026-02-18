@@ -265,6 +265,13 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
     def response_add(self, request, obj, post_url_continue=None):
         """저장 후 목록 대신 새 입고 등록 폼으로 리다이렉트"""
+        if getattr(request, "_formset_validation_failed", False):
+            # 검증 실패: 빈 배치 삭제 후 에러 메시지만 표시
+            if obj.pk and obj.tickets.count() == 0:
+                obj.delete()
+            return HttpResponseRedirect(
+                reverse("admin:as_app_inboundbatch_add")
+            )
         from django.contrib import messages
         messages.success(request, "입고 등록이 완료되었습니다. (%s)" % obj)
         return HttpResponseRedirect(
@@ -273,6 +280,10 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
     def response_change(self, request, obj):
         """수정 저장 후에도 새 입고 등록 폼으로 리다이렉트"""
+        if getattr(request, "_formset_validation_failed", False):
+            return HttpResponseRedirect(
+                reverse("admin:as_app_inboundbatch_add")
+            )
         from django.contrib import messages
         messages.success(request, "입고 정보가 수정되었습니다. (%s)" % obj)
         return HttpResponseRedirect(
@@ -284,6 +295,12 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
         return HttpResponseRedirect(
             reverse("admin:as_app_inboundbatch_add")
         )
+
+    def _fail_formset_validation(self, request, form, error_message):
+        """검증 실패 시: 에러 메시지 + 플래그 설정 (배치 삭제는 response_add에서 처리)"""
+        from django.contrib import messages
+        messages.error(request, error_message)
+        request._formset_validation_failed = True
 
     def save_formset(self, request, form, formset, change):
         """인라인 저장 시 배치의 공통 정보를 각 티켓에 자동 복사 + 쉼표 시리얼 분리 + 중복 검증"""
@@ -330,9 +347,8 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
                 seen.add(key)
 
         if duplicates_in_batch:
-            from django.contrib import messages
-            messages.error(
-                request,
+            self._fail_formset_validation(
+                request, form,
                 "같은 배치 내에 중복된 품목이 있습니다: %s" % ", ".join(duplicates_in_batch)
             )
             return
@@ -359,9 +375,8 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
                     )
 
         if conflicts:
-            from django.contrib import messages
-            messages.error(
-                request,
+            self._fail_formset_validation(
+                request, form,
                 "이미 입고/수리 중인 장비가 있어 저장할 수 없습니다: %s" % ", ".join(conflicts)
             )
             return

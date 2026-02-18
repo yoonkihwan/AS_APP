@@ -166,10 +166,14 @@ class InboundBatch(models.Model):
         ordering = ["-inbound_date", "-created_at"]
 
     def __str__(self):
-        return f"{self.inbound_date} | {self.company.name} ({self.ticket_count}건)"
+        company_name = self.company.name if self.company_id else "미지정"
+        count = self.tickets.count() if self.pk else 0
+        return f"{self.inbound_date} | {company_name} ({count}건)"
 
     @property
     def ticket_count(self):
+        if not self.pk:
+            return 0
         return self.tickets.count()
 
 
@@ -290,7 +294,9 @@ class ASTicket(models.Model):
                 )
 
     def __str__(self):
-        return f"[{self.get_status_display()}] {self.company.name} - {self.tool} (S/N: {self.serial_number})"
+        company_name = self.company.name if self.company_id else "미지정 업체"
+        tool_name = str(self.tool) if self.tool_id else "미지정 장비"
+        return f"[{self.get_status_display()}] {company_name} - {tool_name} (S/N: {self.serial_number})"
 
 
 # ──────────────────────────────────────────────
