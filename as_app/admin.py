@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils import timezone
+from django import forms
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action as unfold_action
 
@@ -32,8 +33,10 @@ from .models import (
     OutsourceCompany,
     Part,
     RepairTicket,
+    RepairTicket,
     Tool,
 )
+from .forms import ASTicketForm
 
 
 # ──────────────────────────────────────────────
@@ -157,13 +160,17 @@ class OutsourceCompanyAdmin(ModelAdmin):
 
 # ── 일괄 입고 등록 ──
 
+
+
+
 class ASTicketInline(NoRelatedButtonsMixin, TabularInline):
     """입고 배치 안에서 개별 품목을 행으로 추가"""
     model = ASTicket
     fk_name = "inbound_batch"
-    fields = ["tool", "serial_number"]
-    autocomplete_fields = ["tool"]
-    extra = 2
+    form = ASTicketForm  # 커스텀 폼 적용
+    fields = ["brand", "tool", "serial_number"]  # form에 정의된 순서대로 표시
+    # autocomplete_fields = ["tool"]  # JS Cascading을 위해 일반 Select로 변경 (주석 처리)
+    extra = 0
     min_num = 1
 
     def get_formset(self, request, obj=None, **kwargs):
@@ -206,7 +213,8 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
     inlines = [ASTicketInline]
 
     class Media:
-        css = {"all": ("as_app/css/inline_fix.css",)}
+        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css")}
+        js = ("as_app/js/inbound_form.js",)
 
     def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
         """저장 부가 버튼 제거"""
@@ -419,7 +427,7 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
     actions = ["mark_as_waiting", "mark_as_repaired", "mark_as_outsourced", "mark_as_disposed"]
 
     class Media:
-        css = {"all": ("as_app/css/inline_fix.css?v=2",)}
+        css = {"all": ("as_app/css/inline_fix.css?v=2", "as_app/css/hide_fab.css")}
 
     fieldsets = (
         (
@@ -683,6 +691,9 @@ class ASHistoryAdmin(NoRelatedButtonsMixin, ModelAdmin):
             },
         ),
     )
+
+    class Media:
+        css = {"all": ("as_app/css/hide_fab.css",)}
 
     def has_add_permission(self, request):
         return False

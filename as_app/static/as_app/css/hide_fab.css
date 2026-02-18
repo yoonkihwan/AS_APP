@@ -1,0 +1,4 @@
+/* Unfold FAB 버튼 숨김 */
+.unfold-action-fab {
+    display: none !important;
+}

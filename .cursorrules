@@ -1,0 +1,55 @@
+# 프로젝트 개발 지침 (Development Guidelines) - AS_APP
+
+이 파일은 AI 및 개발자가 프로젝트 작업 시 **무조건 준수해야 하는 규칙과 가이드라인**을 정의합니다.
+
+## 1. 기본 원칙 (Core Principles)
+- **Single Source of Truth:** 기능 명세와 비즈니스 로직에 대한 정의는 `GEMINI.MD`를 최우선으로 참고한다.
+- **User-Centric:** 개발 편의성보다 **실제 사용자의 업무 효율성(빠른 입력, 실수 방지)**을 우선한다.
+- **Safety First:** 데이터 삭제나 변경 작업은 신중하게 처리하며, 특히 `drop`, `delete` 등의 파괴적 작업 전에는 백업이나 확인 절차를 고려한다.
+
+## 2. 기술 스택 및 환경 (Tech & Environment)
+- **Backend:** Python 3.x, Django 5.x
+- **Database:** SQLite (로컬 개발), PostgreSQL (운영 배포 예정)
+- **Admin UI:** **Django Unfold** (필수 사용 - 기본 Django Admin 스타일 사용 지양)
+- **Linting/Formatting:** PEP 8 준수, Flake8/Black 스타일 지향.
+
+## 3. Django 개발 패턴 (Architecture & Patterns)
+### 3.1. Models (Fat Models)
+- 비즈니스 로직의 대부분은 `views.py`가 아닌 **`models.py`의 메서드**로 구현한다. (예: `calculate_cost()`, `is_overdue()`)
+- 모든 필드에는 `verbose_name`과 `help_text`를 명시하여, Admin 화면에서 사용자가 의미를 명확히 알 수 있게 한다.
+- `__str__` 메서드는 객체를 쉽게 식별할 수 있는 포맷으로 반드시 정의한다.
+
+### 3.2. Views & Admin
+- **Class-Based Views (CBV):** 커스텀 뷰가 필요할 경우 FBV보다 CBV를 우선 고려한다. (Admin 커스텀 제외)
+- **N+1 문제 방지:** FK나 M2M 관계 필드 접근 시 `select_related`, `prefetch_related`를 필수적으로 사용하여 쿼리 수를 최적화한다.
+- **Admin Customization:**
+    - `list_display`, `list_filter`, `search_fields`는 사용자 입장에서 자주 쓰는 항목 위주로 구성한다.
+    - `autocomplete_fields`: FK/M2M 필드는 데이터가 많아질 것을 대비해 항상 설정한다.
+    - `inlines`: 부모-자식 관계 데이터 입력 시 적극 활용한다.
+
+## 4. 코드 스타일 및 네이밍 (Naming Convention)
+- **Variables/Functions:** `snake_case` (예: `repair_cost`, `calculate_total_price`)
+- **Classes:** `PascalCase` (예: `RepairTicket`, `InboundBatch`)
+- **Constants:** `UPPER_CASE` (예: `DEFAULT_TAX_RATE`, `STATUS_CHOICES`)
+- **Type Hinting:** 주요 함수 및 메서드에는 Python 3 타입 힌트를 적용한다.
+    ```python
+    def calculate_cost(self, parts: list[Part]) -> int:
+        ...
+    ```
+
+## 5. UI/UX 가이드라인 (Django Unfold)
+- **일관성:** 버튼 색상, 아이콘 등은 Unfold의 [Tailwind CSS 클래스 기반] 디자인 시스템을 따른다.
+- **피드백:** 저장, 수정, 삭제 등의 액션 후에는 반드시 `messages.success` 또는 `messages.error`를 통해 사용자에게 피드백을 제공한다.
+- **안전장치:** 중요한 상태 변경(예: 출고 처리) 시에는 `actions`를 사용하여 한 번 더 확인하거나 일괄 처리하도록 유도한다.
+
+## 6. Git 커밋 컨벤션 (Conventional Commits)
+- 형식: `type: Subject`
+- **feat:** 새로운 기능 추가
+- **fix:** 버그 수정
+- **docs:** 문서 수정
+- **style:** 코드 포맷팅, 세미콜론 누락 등 (로직 변경 없음)
+- **refactor:** 코드 리팩토링 (기능 변경 없음)
+- **chore:** 빌드 업무 수정, 패키지 매니저 설정 등
+
+---
+**주의:** 이 파일의 내용은 개발 진행 상황에 따라 지속적으로 업데이트되어야 합니다.
