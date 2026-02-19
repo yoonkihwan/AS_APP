@@ -89,7 +89,7 @@ class Tool(models.Model):
 
 
 class Part(models.Model):
-    """부품/수리 품목 관리"""
+    """수리부품/공임 관리"""
 
     class PartType(models.TextChoices):
         DEDICATED = "dedicated", "전용"
@@ -114,8 +114,8 @@ class Part(models.Model):
     )
 
     class Meta:
-        verbose_name = "부품"
-        verbose_name_plural = "부품 관리"
+        verbose_name = "수리부품"
+        verbose_name_plural = "수리부품 관리"
         ordering = ["name"]
 
     def __str__(self):

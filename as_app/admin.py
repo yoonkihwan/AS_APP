@@ -116,7 +116,7 @@ class PartAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
     fieldsets = (
         (
-            "부품 기본 정보",
+            "수리부품 기본 정보",
             {
                 "fields": (
                     "name",
@@ -548,64 +548,33 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
 @admin.register(OutboundTicket)
 class OutboundTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
-    """출고 등록 - 목록에서 바로 편집 가능"""
+    """출고 등록 - 수리완료 목록에서 선택하여 출고 처리"""
 
     list_display = [
         "inbound_date",
         "company",
         "tool",
         "serial_number",
-        "display_repair_summary",
-        "outbound_date",
-        "estimate_status",
-        "tax_invoice",
-    ]
-    list_display_links = ["serial_number"]
-    list_editable = ["outbound_date", "estimate_status", "tax_invoice"]
-    list_filter = ["estimate_status", "tax_invoice"]
-    search_fields = ["serial_number", "company__name", "tool__model_name"]
-    list_per_page = 30
-    actions = ["mark_as_shipped"]
-
-    fieldsets = (
-        (
-            "장비 정보 (읽기 전용)",
-            {
-                "fields": (
-                    "inbound_date",
-                    "company",
-                    "tool",
-                    "serial_number",
-                    "repair_content",
-                    "repair_cost",
-                ),
-            },
-        ),
-        (
-            "출고 및 정산",
-            {
-                "fields": (
-                    "outbound_date",
-                    "estimate_status",
-                    "tax_invoice",
-                ),
-            },
-        ),
-    )
-
-    readonly_fields = [
-        "inbound_date",
-        "company",
-        "tool",
-        "serial_number",
-        "repair_content",
+        "display_used_parts",
         "repair_cost",
     ]
+    list_display_links = None  # 행 클릭 시 상세 페이지 이동 안 함 (체크만)
+    list_filter = ["company", "tool__brand"]
+    search_fields = ["serial_number", "company__name", "tool__model_name", "tool__brand__name"]
+    list_per_page = 30
+    actions = ["mark_as_shipped_today", "mark_as_shipped_with_date"]
+    ordering = ["-inbound_date", "-created_at"]
 
-    @admin.display(description="수리 내용")
-    def display_repair_summary(self, obj):
-        if obj.repair_content:
-            return obj.repair_content[:25] + "…" if len(obj.repair_content) > 25 else obj.repair_content
+    class Media:
+        css = {"all": ("as_app/css/hide_fab.css",)}
+        js = ("as_app/js/outbound_row_click.js",)
+
+    @admin.display(description="사용 부품")
+    def display_used_parts(self, obj):
+        parts = obj.used_parts.all()
+        if parts:
+            names = ", ".join(p.name for p in parts)
+            return names[:40] + "…" if len(names) > 40 else names
         return "-"
 
     def get_queryset(self, request):
@@ -614,27 +583,74 @@ class OutboundTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
             super()
             .get_queryset(request)
             .filter(status=ASTicket.Status.REPAIRED)
+            .select_related("company", "tool", "tool__brand")
+            .prefetch_related("used_parts")
         )
 
-    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
-        context["show_save_and_add_another"] = False
-        context["show_save_and_continue"] = False
-        return super().render_change_form(request, context, add, change, form_url, obj)
+    def has_add_permission(self, request):
+        """출고는 '신규 추가'가 아니라 기존 티켓의 상태 변경"""
+        return False
 
-    def response_change(self, request, obj):
-        from django.contrib import messages
-        messages.success(request, "출고 정보가 저장되었습니다. (%s)" % obj)
-        return HttpResponseRedirect(
-            reverse("admin:as_app_outboundticket_changelist")
-        )
+    def has_change_permission(self, request, obj=None):
+        """목록 전용 (개별 편집 불필요)"""
+        if obj is None:
+            return True  # changelist 접근 허용
+        return False
 
-    @unfold_action(description="선택된 항목 출고 처리")
-    def mark_as_shipped(self, request, queryset):
+    @unfold_action(description="✅ 선택 항목 출고 처리 (오늘 날짜)")
+    def mark_as_shipped_today(self, request, queryset):
+        today = timezone.now().date()
         updated = queryset.update(
             status=ASTicket.Status.SHIPPED,
-            outbound_date=timezone.now().date(),
+            outbound_date=today,
         )
-        self.message_user(request, "%d건이 출고 처리되었습니다." % updated)
+        from django.contrib import messages
+        messages.success(
+            request,
+            "%d건이 출고 처리되었습니다. (출고일: %s)" % (updated, today.strftime("%Y-%m-%d"))
+        )
+
+    @unfold_action(description="📅 선택 항목 출고 처리 (날짜 선택)")
+    def mark_as_shipped_with_date(self, request, queryset):
+        """날짜 선택 중간 페이지를 통해 출고 처리"""
+        from django.template.response import TemplateResponse
+        import datetime
+
+        # 중간 페이지에서 날짜를 선택하고 확인 버튼을 눌렀을 때
+        if request.POST.get("confirm") == "yes":
+            date_str = request.POST.get("outbound_date", "")
+            try:
+                outbound_date = datetime.date.fromisoformat(date_str)
+            except (ValueError, TypeError):
+                from django.contrib import messages
+                messages.error(request, "올바른 날짜 형식이 아닙니다.")
+                return None
+
+            updated = queryset.update(
+                status=ASTicket.Status.SHIPPED,
+                outbound_date=outbound_date,
+            )
+            from django.contrib import messages
+            messages.success(
+                request,
+                "%d건이 출고 처리되었습니다. (출고일: %s)" % (updated, outbound_date.strftime("%Y-%m-%d"))
+            )
+            return None
+
+        # 중간 페이지 표시 (날짜 선택 폼)
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "출고 날짜 선택",
+            "ticket_count": queryset.count(),
+            "selected_pks": list(queryset.values_list("pk", flat=True)),
+            "today": timezone.now().date().isoformat(),
+            "opts": self.model._meta,
+        }
+        return TemplateResponse(
+            request,
+            "admin/as_app/outbound_date_select.html",
+            context,
+        )
 
 
 @admin.register(ASHistory)
