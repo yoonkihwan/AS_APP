@@ -22,20 +22,9 @@ class CompanyCategory(models.Model):
 
 
 class Company(models.Model):
-    """업체 관리 - 매출처 및 AS 의뢰 업체"""
-
-    class CompanyType(models.TextChoices):
-        SALES = "sales", "매출처"
-        CLIENT = "client", "의뢰처"
-        BOTH = "both", "매출처/의뢰처"
+    """매출처 관리 - AS 매출 거래처"""
 
     name = models.CharField("업체명", max_length=200)
-    company_type = models.CharField(
-        "업체 구분",
-        max_length=10,
-        choices=CompanyType.choices,
-        default=CompanyType.CLIENT,
-    )
     price_group = models.ForeignKey(
         CompanyCategory,
         on_delete=models.SET_NULL,
@@ -54,8 +43,8 @@ class Company(models.Model):
     address = models.TextField("주소", blank=True)
 
     class Meta:
-        verbose_name = "업체"
-        verbose_name_plural = "업체 관리"
+        verbose_name = "매출처"
+        verbose_name_plural = "매출처 관리"
         ordering = ["name"]
 
     def __str__(self):
@@ -153,7 +142,7 @@ class InboundBatch(models.Model):
     company = models.ForeignKey(
         Company,
         on_delete=models.PROTECT,
-        verbose_name="업체",
+        verbose_name="매출처",
         related_name="inbound_batches",
     )
     manager = models.CharField("담당자/부서", max_length=100, blank=True)
@@ -217,7 +206,7 @@ class ASTicket(models.Model):
     company = models.ForeignKey(
         Company,
         on_delete=models.PROTECT,
-        verbose_name="업체",
+        verbose_name="매출처",
         related_name="tickets",
         )
     manager = models.CharField("담당자/부서", max_length=100, blank=True)

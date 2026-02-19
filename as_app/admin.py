@@ -56,18 +56,17 @@ class CompanyCategoryAdmin(ModelAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(NoRelatedButtonsMixin, ModelAdmin):
-    list_display = ["name", "region", "company_type", "price_group"]
-    list_filter = ["company_type", "price_group", "region"]
+    list_display = ["name", "region", "price_group"]
+    list_filter = ["price_group", "region"]
     search_fields = ["name", "region"]
     list_per_page = 20
 
     fieldsets = (
         (
-            "업체 기본 정보",
+            "매출처 기본 정보",
             {
                 "fields": (
                     "name",
-                    "company_type",
                     "price_group",
                 ),
             },

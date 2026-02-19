@@ -8,50 +8,400 @@
     {% include "unfold/helpers/site_branding.html" %}
 {% endblock %}
 
-{% block content %}
-<!-- ── KPI 카드 ── -->
-{% if kpi %}
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-    {% for item in kpi %}
-    <div style="
+{% block extrahead %}
+{{ block.super }}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+    /* ── 대시보드 전체 스타일 ── */
+    .dash-grid {
+        display: grid;
+        gap: 1rem;
+    }
+    .dash-grid-5 {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .dash-grid-2 {
+        grid-template-columns: 1fr;
+    }
+    @media (min-width: 1024px) {
+        .dash-grid-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    /* ── KPI 카드 ── */
+    .kpi-card {
         background: var(--color-bg, #fff);
         border: 1px solid var(--border-color, #e5e7eb);
         border-radius: 0.75rem;
-        padding: 1.5rem;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .kpi-icon .material-icons-outlined {
+        font-size: 24px;
+        color: #fff;
+    }
+    .kpi-info {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        min-width: 0;
+    }
+    .kpi-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted, #6b7280);
+    }
+    .kpi-metric {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-color, #111827);
+        line-height: 1.2;
+    }
+    .kpi-footer {
+        font-size: 0.7rem;
+        color: var(--text-muted, #9ca3af);
+        margin-top: 2px;
+    }
+
+    /* ── 빠른 작업 버튼 ── */
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.75rem;
+        margin: 1.5rem 0;
+    }
+    .quick-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.875rem 1.25rem;
+        background: var(--color-bg, #fff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.75rem;
+        text-decoration: none;
+        color: var(--text-color, #374151);
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: all 0.15s ease;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .quick-action-btn:hover {
+        border-color: #6366f1;
+        background: linear-gradient(135deg, rgba(99,102,241,0.05), rgba(139,92,246,0.05));
+        color: #6366f1;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(99,102,241,0.12);
+    }
+    .quick-action-btn .material-icons-outlined {
+        font-size: 22px;
+        color: #6366f1;
+    }
+
+    /* ── 데이터 테이블 패널 ── */
+    .dash-panel {
+        background: var(--color-bg, #fff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.75rem;
+        overflow: hidden;
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    ">
-        <span style="
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted, #6b7280);
-        ">{{ item.title }}</span>
-        <span style="
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-color, #111827);
-            line-height: 1.2;
-        ">{{ item.metric }}건</span>
-        <span style="
-            font-size: 0.8rem;
-            color: var(--text-muted, #9ca3af);
-            margin-top: 0.25rem;
-        ">{{ item.footer }}</span>
+    }
+    .dash-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+    }
+    .dash-panel-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-color, #111827);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .dash-panel-title .material-icons-outlined {
+        font-size: 20px;
+    }
+    .dash-panel-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0 0.5rem;
+        color: #fff;
+    }
+    .dash-panel-link {
+        font-size: 0.8rem;
+        color: #6366f1;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .dash-panel-link:hover {
+        text-decoration: underline;
+    }
+
+    /* ── 테이블 ── */
+    .dash-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .dash-table th {
+        text-align: left;
+        padding: 0.625rem 1.25rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted, #6b7280);
+        background: var(--color-bg-secondary, #f9fafb);
+    }
+    .dash-table td {
+        padding: 0.625rem 1.25rem;
+        font-size: 0.8rem;
+        color: var(--text-color, #374151);
+        border-top: 1px solid var(--border-color, #f3f4f6);
+    }
+    .dash-table tr:hover td {
+        background: var(--color-bg-secondary, #f9fafb);
+    }
+    .dash-table .text-muted {
+        color: var(--text-muted, #9ca3af);
+        font-size: 0.75rem;
+    }
+
+    /* ── 상태 뱃지 ── */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .status-inbound   { background: #dbeafe; color: #1d4ed8; }
+    .status-repaired  { background: #d1fae5; color: #065f46; }
+    .status-shipped   { background: #e0e7ff; color: #4338ca; }
+    .status-outsourced { background: #fef3c7; color: #92400e; }
+    .status-disposed  { background: #fee2e2; color: #991b1b; }
+
+    /* ── 빈 상태 ── */
+    .dash-empty {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: var(--text-muted, #9ca3af);
+        font-size: 0.85rem;
+    }
+    .dash-empty .material-icons-outlined {
+        font-size: 40px;
+        display: block;
+        margin-bottom: 0.5rem;
+        opacity: 0.4;
+    }
+
+    /* ── 다크 모드 ── */
+    .dark .kpi-card,
+    .dark .quick-action-btn,
+    .dark .dash-panel {
+        background: #1e293b;
+        border-color: #334155;
+    }
+    .dark .kpi-label,
+    .dark .kpi-footer {
+        color: #94a3b8;
+    }
+    .dark .kpi-metric {
+        color: #f1f5f9;
+    }
+    .dark .quick-action-btn {
+        color: #e2e8f0;
+    }
+    .dark .quick-action-btn:hover {
+        background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15));
+        border-color: #818cf8;
+        color: #a5b4fc;
+    }
+    .dark .dash-panel-title {
+        color: #f1f5f9;
+    }
+    .dark .dash-table th {
+        background: #1a2332;
+        color: #94a3b8;
+    }
+    .dark .dash-table td {
+        color: #cbd5e1;
+        border-color: #334155;
+    }
+    .dark .dash-table tr:hover td {
+        background: #1a2332;
+    }
+    .dark .dash-panel-header {
+        border-color: #334155;
+    }
+
+    .dark .status-inbound   { background: rgba(59,130,246,0.2); color: #93c5fd; }
+    .dark .status-repaired  { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+    .dark .status-shipped   { background: rgba(99,102,241,0.2); color: #a5b4fc; }
+    .dark .status-outsourced { background: rgba(245,158,11,0.2); color: #fcd34d; }
+    .dark .status-disposed  { background: rgba(239,68,68,0.2); color: #fca5a5; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── ① KPI 카드 ── -->
+{% if kpi %}
+<div class="dash-grid dash-grid-5" style="margin-bottom: 1.5rem;">
+    {% for item in kpi %}
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: {{ item.color }};">
+            <span class="material-icons-outlined">{{ item.icon }}</span>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-label">{{ item.title }}</span>
+            <span class="kpi-metric">{{ item.metric }}<span style="font-size: 0.9rem; font-weight: 500;">건</span></span>
+            <span class="kpi-footer">{{ item.footer }}</span>
+        </div>
     </div>
     {% endfor %}
 </div>
 {% endif %}
 
-<!-- ── 기본 앱 목록 + 최근 활동 ── -->
-<div class="flex flex-col lg:flex-row lg:gap-8">
-    <div class="grow">
-        {% include "unfold/helpers/app_list_default.html" %}
+<!-- ── ② 빠른 작업 버튼 ── -->
+<div class="quick-actions">
+    <a href="{% url 'admin:as_app_inboundbatch_add' %}" class="quick-action-btn">
+        <span class="material-icons-outlined">inbox</span>
+        입고 등록
+    </a>
+    <a href="{% url 'admin:as_app_repairticket_changelist' %}" class="quick-action-btn">
+        <span class="material-icons-outlined">build</span>
+        수리 기록
+    </a>
+    <a href="{% url 'admin:as_app_outboundticket_changelist' %}" class="quick-action-btn">
+        <span class="material-icons-outlined">local_shipping</span>
+        출고 등록
+    </a>
+    <a href="{% url 'admin:as_app_ashistory_changelist' %}" class="quick-action-btn">
+        <span class="material-icons-outlined">history</span>
+        통합 이력
+    </a>
+</div>
+
+<!-- ── ③④ 수리 대기 + 최근 출고 ── -->
+<div class="dash-grid dash-grid-2">
+
+    <!-- ③ 수리 대기 목록 -->
+    <div class="dash-panel">
+        <div class="dash-panel-header">
+            <span class="dash-panel-title">
+                <span class="material-icons-outlined" style="color: #f59e0b;">pending_actions</span>
+                수리 대기 목록
+                {% if pending_tickets %}
+                <span class="dash-panel-badge" style="background: #f59e0b;">{{ pending_tickets|length }}</span>
+                {% endif %}
+            </span>
+            <a href="{% url 'admin:as_app_repairticket_changelist' %}" class="dash-panel-link">전체 보기 →</a>
+        </div>
+        {% if pending_tickets %}
+        <table class="dash-table">
+            <thead>
+                <tr>
+                    <th>입고일</th>
+                    <th>매출처</th>
+                    <th>장비</th>
+                    <th>시리얼</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in pending_tickets %}
+                <tr>
+                    <td>{{ ticket.inbound_date|date:"m/d" }}</td>
+                    <td>{{ ticket.company.name }}</td>
+                    <td>
+                        <span class="text-muted">{{ ticket.tool.brand.name }}</span>
+                        {{ ticket.tool.model_name }}
+                    </td>
+                    <td><strong>{{ ticket.serial_number }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="dash-empty">
+            <span class="material-icons-outlined">check_circle</span>
+            현재 수리 대기 중인 장비가 없습니다
+        </div>
+        {% endif %}
     </div>
 
-    {% include "unfold/helpers/history.html" %}
+    <!-- ④ 최근 출고 목록 -->
+    <div class="dash-panel">
+        <div class="dash-panel-header">
+            <span class="dash-panel-title">
+                <span class="material-icons-outlined" style="color: #06b6d4;">local_shipping</span>
+                최근 출고 완료
+                {% if recent_shipped %}
+                <span class="dash-panel-badge" style="background: #06b6d4;">{{ recent_shipped|length }}</span>
+                {% endif %}
+            </span>
+            <a href="{% url 'admin:as_app_ashistory_changelist' %}" class="dash-panel-link">전체 보기 →</a>
+        </div>
+        {% if recent_shipped %}
+        <table class="dash-table">
+            <thead>
+                <tr>
+                    <th>출고일</th>
+                    <th>매출처</th>
+                    <th>장비</th>
+                    <th>시리얼</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in recent_shipped %}
+                <tr>
+                    <td>{{ ticket.outbound_date|date:"m/d" }}</td>
+                    <td>{{ ticket.company.name }}</td>
+                    <td>
+                        <span class="text-muted">{{ ticket.tool.brand.name }}</span>
+                        {{ ticket.tool.model_name }}
+                    </td>
+                    <td><strong>{{ ticket.serial_number }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="dash-empty">
+            <span class="material-icons-outlined">inventory_2</span>
+            아직 출고 완료된 장비가 없습니다
+        </div>
+        {% endif %}
+    </div>
+
 </div>
+
 {% endblock %}

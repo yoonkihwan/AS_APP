@@ -189,7 +189,7 @@ UNFOLD = {
                 "separator": True,
                 "items": [
                     {
-                        "title": "업체 관리",
+                        "title": "매출처 관리",
                         "icon": "business",
                         "link": reverse_lazy("admin:as_app_company_changelist"),
                     },
