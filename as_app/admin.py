@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django import forms
 from unfold.admin import ModelAdmin, TabularInline
-from unfold.decorators import action as unfold_action
+from unfold.decorators import action as unfold_action, display
 
 
 class NoRelatedButtonsMixin:
@@ -491,13 +491,28 @@ class InboundTicketAdmin(ModelAdmin):
         "company",
         "tool",
         "serial_number",
-        "status",
+        "display_status",
     ]
     list_filter = ["status", "inbound_date", "company"]
     search_fields = ["serial_number", "company__name", "tool__model_name"]
 
     def has_module_permission(self, request):
         return False
+
+    @display(
+        description="상태",
+        label={
+            "입고": "warning",
+            "수리대기": "warning",
+            "수리의뢰": "warning",
+            "수리완료": "success",
+            "출고": "info",
+            "자체폐기": "danger",
+        }
+    )
+    def display_status(self, obj):
+        return obj.get_status_display()
+
 
 
 @admin.register(RepairTicket)
@@ -803,7 +818,7 @@ class ASHistoryAdmin(NoRelatedButtonsMixin, ModelAdmin):
         "company",
         "tool",
         "serial_number",
-        "status",
+        "display_status",
         "repair_cost",
         "outbound_date",
         "estimate_status",
@@ -865,6 +880,20 @@ class ASHistoryAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
     class Media:
         css = {"all": ("as_app/css/hide_fab.css",)}
+
+    @display(
+        description="상태",
+        label={
+            "입고": "warning",
+            "수리대기": "warning",
+            "수리의뢰": "warning",
+            "수리완료": "success",
+            "출고": "info",
+            "자체폐기": "danger",
+        }
+    )
+    def display_status(self, obj):
+        return obj.get_status_display()
 
     def has_add_permission(self, request):
         return False
