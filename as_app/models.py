@@ -130,6 +130,38 @@ class Part(models.Model):
         return "공용 (전체 적용)"
 
 
+class RepairPreset(models.Model):
+    """수리 세트 - 자주 사용하는 부품 조합을 프리셋으로 관리"""
+
+    name = models.CharField("세트명", max_length=200)
+    tools = models.ManyToManyField(
+        Tool,
+        verbose_name="적용 장비/툴",
+        related_name="repair_presets",
+        blank=True,
+        help_text="이 세트가 적용되는 장비를 선택하세요. 비워두면 모든 장비에 표시됩니다.",
+    )
+    parts = models.ManyToManyField(
+        Part,
+        verbose_name="포함 부품/공임",
+        related_name="presets",
+        help_text="이 세트에 포함되는 부품과 공임을 선택하세요.",
+    )
+
+    class Meta:
+        verbose_name = "수리 세트"
+        verbose_name_plural = "수리 세트 관리"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.total_price:,}원)"
+
+    @property
+    def total_price(self):
+        """세트에 포함된 부품/공임의 합계 금액"""
+        return sum(p.price for p in self.parts.all())
+
+
 # ──────────────────────────────────────────────
 # AS 프로세스 데이터 (Transaction Data)
 # ──────────────────────────────────────────────

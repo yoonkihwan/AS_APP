@@ -1,7 +1,8 @@
 from django.contrib import admin
-from django.http import HttpResponseRedirect
-from django.urls import reverse
+from django.http import HttpResponseRedirect, JsonResponse
+from django.urls import reverse, path
 from django.utils import timezone
+from django.utils.html import format_html
 from django import forms
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action as unfold_action
@@ -32,7 +33,7 @@ from .models import (
     OutboundTicket,
     OutsourceCompany,
     Part,
-    RepairTicket,
+    RepairPreset,
     RepairTicket,
     Tool,
 )
@@ -113,6 +114,7 @@ class PartAdmin(NoRelatedButtonsMixin, ModelAdmin):
     search_fields = ["name", "code"]
     filter_horizontal = ["tools"]
     list_per_page = 20
+    change_list_template = "admin/as_app/part/change_list.html"
 
     fieldsets = (
         (
@@ -138,6 +140,67 @@ class PartAdmin(NoRelatedButtonsMixin, ModelAdmin):
     @admin.display(description="적용 장비")
     def display_tools(self, obj):
         return obj.tool_list()
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["preset_url"] = reverse("admin:as_app_repairpreset_changelist")
+        extra_context["preset_add_url"] = reverse("admin:as_app_repairpreset_add")
+        extra_context["preset_count"] = RepairPreset.objects.count()
+        return super().changelist_view(request, extra_context)
+
+
+@admin.register(RepairPreset)
+class RepairPresetAdmin(NoRelatedButtonsMixin, ModelAdmin):
+    """수리 세트 관리 - 자주 사용하는 부품 조합을 프리셋으로 관리"""
+    list_display = ["name", "display_parts", "display_total_price", "display_tools"]
+    search_fields = ["name"]
+    filter_horizontal = ["parts", "tools"]
+    list_per_page = 20
+
+    fieldsets = (
+        (
+            "세트 기본 정보",
+            {
+                "fields": ("name",),
+            },
+        ),
+        (
+            "포함 부품/공임",
+            {
+                "fields": ("parts",),
+                "description": "이 세트에 포함할 부품과 공임을 선택하세요.",
+            },
+        ),
+        (
+            "적용 장비",
+            {
+                "fields": ("tools",),
+                "description": "이 세트가 표시될 장비를 선택하세요. 비워두면 모든 장비에 표시됩니다.",
+            },
+        ),
+    )
+
+    @admin.display(description="포함 부품")
+    def display_parts(self, obj):
+        parts = obj.parts.all()
+        if parts:
+            return ", ".join(p.name for p in parts[:4])
+        return "-"
+
+    @admin.display(description="합계 금액")
+    def display_total_price(self, obj):
+        return f"{obj.total_price:,}원"
+
+    @admin.display(description="적용 장비")
+    def display_tools(self, obj):
+        tools = obj.tools.all()
+        if tools:
+            return ", ".join(str(t) for t in tools[:3])
+        return "전체"
+
+    def has_module_permission(self, request):
+        """사이드바에 표시하지 않음 (PartAdmin에서 통합 관리)"""
+        return False
 
 
 # ──────────────────────────────────────────────
@@ -423,56 +486,45 @@ class InboundTicketAdmin(ModelAdmin):
 
 @admin.register(RepairTicket)
 class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
-    """수리 기록 등록 - 목록에서 바로 편집 가능"""
+    """수리 기록 - 목록에서 버튼 클릭으로 수리 등록 페이지 이동"""
 
+    # ── 목록 화면 설정 ──
     list_display = [
         "inbound_date",
         "company",
         "tool",
         "serial_number",
-        "display_repair_content",
-        "status",
+        "display_repair_button",
     ]
-    list_display_links = ["serial_number"]
-    list_editable = ["status"]
-    list_filter = ["status", "company"]
+    list_display_links = None  # 행 클릭 비활성화 (버튼으로만 이동)
     search_fields = ["serial_number", "company__name", "tool__model_name"]
     list_per_page = 30
-    actions = ["mark_as_waiting", "mark_as_repaired", "mark_as_outsourced", "mark_as_disposed"]
+    actions = None  # 체크박스 + 액션 드롭다운 제거 (상태는 자동 관리)
 
     class Media:
         css = {"all": ("as_app/css/inline_fix.css?v=2", "as_app/css/hide_fab.css")}
 
+    # ── 수리 등록 폼 설정 ──
     fieldsets = (
         (
-            "입고 정보 (읽기 전용)",
+            "입고 정보",
             {
                 "fields": (
                     "inbound_date",
                     "company",
                     "tool",
                     "serial_number",
-                    "symptom",
                 ),
             },
         ),
         (
-            "수리 내역",
+            "수리 부품 선택",
             {
                 "fields": (
                     "used_parts",
-                    "repair_cost",
                     "repair_content",
-                    "status",
                 ),
-                "description": "사용한 부품/공임을 선택하면 AS 비용이 자동 계산됩니다.",
-            },
-        ),
-        (
-            "수리 의뢰",
-            {
-                "fields": ("outsource_company",),
-                "description": "외부 업체에 수리를 의뢰하는 경우 의뢰업체를 선택하고 상태를 '수리의뢰'로 변경하세요.",
+                "description": "해당 장비에 적용 가능한 부품/공임이 표시됩니다. 체크하고 저장하면 AS 비용이 자동 계산되며 수리완료 처리됩니다.",
             },
         ),
     )
@@ -482,41 +534,115 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
         "company",
         "tool",
         "serial_number",
-        "symptom",
-        "repair_cost",
     ]
-    filter_horizontal = ["used_parts"]
 
-    @admin.display(description="수리 내역")
-    def display_repair_content(self, obj):
-        parts = obj.used_parts.all()
-        if parts:
-            names = ", ".join(p.name for p in parts)
-            return names[:50] + "…" if len(names) > 50 else names
-        return "-"
+    @admin.display(description="수리 기록")
+    def display_repair_button(self, obj):
+        """목록에서 수리 기록 등록 버튼을 표시"""
+        url = reverse("admin:as_app_repairticket_change", args=[obj.pk])
+        return format_html(
+            '<a href="{}" style="'
+            'display:inline-flex; align-items:center; gap:6px; '
+            'padding:6px 14px; border-radius:6px; font-size:0.8rem; '
+            'font-weight:600; text-decoration:none; '
+            'background:#6366f1; color:#fff; '
+            'transition:all .15s ease;'
+            '" '
+            'onmouseover="this.style.background=\'#4f46e5\'" '
+            'onmouseout="this.style.background=\'#6366f1\'">'
+            '🔧 수리 기록 등록</a>',
+            url
+        )
+
+    def get_form(self, request, obj=None, **kwargs):
+        """수리 편집 폼: 해당 장비 부품만 필터링 + 체크박스 위젯 + 비고 한 줄"""
+        form = super().get_form(request, obj, **kwargs)
+        if obj and obj.tool_id:
+            from django.db.models import Q
+            form.base_fields["used_parts"].queryset = Part.objects.filter(
+                Q(tools=obj.tool) | Q(tools__isnull=True) | Q(part_type=Part.PartType.LABOR)
+            ).distinct().order_by("part_type", "name")
+        # 부품 선택을 체크박스 위젯으로 변경 (빠르고 직관적)
+        if "used_parts" in form.base_fields:
+            form.base_fields["used_parts"].widget = forms.CheckboxSelectMultiple()
+            form.base_fields["used_parts"].help_text = "사용한 부품/공임을 체크하세요. 저장 시 자동으로 비용이 계산되고 수리완료 처리됩니다."
+        # 비고 필드를 한 줄 입력으로 축소
+        if "repair_content" in form.base_fields:
+            form.base_fields["repair_content"].widget = forms.TextInput(
+                attrs={"placeholder": "추가 메모가 있으면 입력하세요 (선택사항)", "style": "width:100%"}
+            )
+        return form
 
     def get_queryset(self, request):
-        """입고 상태인 티켓만 표시"""
+        """입고/수리대기/수리의뢰 상태인 티켓만 표시 (수리 전 단계)"""
         return (
             super()
             .get_queryset(request)
-            .filter(status=ASTicket.Status.INBOUND)
+            .filter(
+                status__in=[
+                    ASTicket.Status.INBOUND,
+                    ASTicket.Status.WAITING,
+                    ASTicket.Status.OUTSOURCED,
+                ]
+            )
+            .select_related("company", "tool", "tool__brand")
             .prefetch_related("used_parts")
         )
 
+    # ── 권한 제어 ──
+    def has_add_permission(self, request):
+        """수리 기록은 신규 추가가 아닌 기존 입고 티켓에서 편집"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """삭제 버튼 제거 — 입고 데이터 보호 (Safety First)"""
+        return False
+
+    # ── 저장 로직 ──
     def save_related(self, request, form, formsets, change):
-        """M2M 저장 후 사용 부품/공임 단가 합산으로 AS 비용 자동 계산"""
+        """M2M 저장 후 사용 부품/공임 단가 합산으로 AS 비용 자동 계산 + 수리완료 상태 변경"""
         super().save_related(request, form, formsets, change)
         obj = form.instance
         total = sum(part.price for part in obj.used_parts.all())
+        update_fields = []
         if obj.repair_cost != total:
             obj.repair_cost = total
-            obj.save(update_fields=["repair_cost"])
+            update_fields.append("repair_cost")
+        # 부품이 선택되어 있으면 자동으로 수리완료 상태로 변경
+        if obj.used_parts.exists() and obj.status != ASTicket.Status.REPAIRED:
+            obj.status = ASTicket.Status.REPAIRED
+            update_fields.append("status")
+        if update_fields:
+            obj.save(update_fields=update_fields)
 
+    # ── 화면 커스터마이징 ──
     def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
         context["show_save_and_add_another"] = False
         context["show_save_and_continue"] = False
+        # 프리셋 데이터를 context에 추가
+        if obj and obj.tool_id:
+            from django.db.models import Q
+            presets = RepairPreset.objects.filter(
+                Q(tools=obj.tool) | Q(tools__isnull=True)
+            ).distinct().prefetch_related("parts")
+            preset_data = []
+            for preset in presets:
+                preset_data.append({
+                    "id": preset.id,
+                    "name": preset.name,
+                    "part_ids": list(preset.parts.values_list("id", flat=True)),
+                    "total_price": preset.total_price,
+                })
+            context["repair_presets"] = preset_data
+        else:
+            context["repair_presets"] = []
         return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """히스토리 버튼 제거"""
+        extra_context = extra_context or {}
+        extra_context["show_history"] = False
+        return super().change_view(request, object_id, form_url, extra_context)
 
     def response_change(self, request, obj):
         from django.contrib import messages
@@ -525,25 +651,24 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
             reverse("admin:as_app_repairticket_changelist")
         )
 
-    @unfold_action(description="선택된 항목 → 수리대기로 변경")
-    def mark_as_waiting(self, request, queryset):
-        updated = queryset.update(status=ASTicket.Status.WAITING)
-        self.message_user(request, "%d건이 수리대기로 변경되었습니다." % updated)
+    def get_urls(self):
+        """부품 목록 API 엔드포인트 추가"""
+        custom_urls = [
+            path(
+                "api/parts-for-tool/<int:tool_id>/",
+                self.admin_site.admin_view(self.api_parts_for_tool),
+                name="api_parts_for_tool",
+            ),
+        ]
+        return custom_urls + super().get_urls()
 
-    @unfold_action(description="선택된 항목 → 수리완료로 변경")
-    def mark_as_repaired(self, request, queryset):
-        updated = queryset.update(status=ASTicket.Status.REPAIRED)
-        self.message_user(request, "%d건이 수리완료 처리되었습니다." % updated)
-
-    @unfold_action(description="선택된 항목 → 수리의뢰로 변경")
-    def mark_as_outsourced(self, request, queryset):
-        updated = queryset.update(status=ASTicket.Status.OUTSOURCED)
-        self.message_user(request, "%d건이 수리의뢰로 변경되었습니다." % updated)
-
-    @unfold_action(description="선택된 항목 → 자체폐기 처리")
-    def mark_as_disposed(self, request, queryset):
-        updated = queryset.update(status=ASTicket.Status.DISPOSED)
-        self.message_user(request, "%d건이 자체폐기 처리되었습니다." % updated)
+    def api_parts_for_tool(self, request, tool_id):
+        """특정 장비에 적용 가능한 부품 목록을 JSON으로 반환"""
+        from django.db.models import Q
+        parts = Part.objects.filter(
+            Q(tools__id=tool_id) | Q(tools__isnull=True) | Q(part_type=Part.PartType.LABOR)
+        ).distinct().values("id", "name", "code", "price", "part_type")
+        return JsonResponse({"parts": list(parts)})
 
 
 @admin.register(OutboundTicket)

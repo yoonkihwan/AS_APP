@@ -1,0 +1,109 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block after_field_sets %}
+{{ block.super }}
+
+{% if repair_presets %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const presets = {{ repair_presets|safe }};
+    if (!presets.length) return;
+
+    // 부품 체크박스 영역 찾기
+    const partsField = document.querySelector('.field-used_parts');
+    if (!partsField) return;
+
+    // 프리셋 컨테이너 생성
+    const container = document.createElement('div');
+    container.id = 'preset-container';
+    container.style.cssText = 'margin-bottom:16px; padding:16px; background:linear-gradient(135deg, #f8f7ff 0%, #f0eeff 100%); border-radius:10px; border:1px solid #e0ddf5;';
+
+    // 헤더
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:0.85rem; font-weight:700; color:#4338ca; margin-bottom:10px; display:flex; align-items:center; gap:6px;';
+    header.innerHTML = '📦 수리 세트 빠른 적용';
+    container.appendChild(header);
+
+    // 버튼 영역
+    const btnGroup = document.createElement('div');
+    btnGroup.style.cssText = 'display:flex; flex-wrap:wrap; gap:8px;';
+
+    presets.forEach(function(preset) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.presetId = preset.id;
+        btn.dataset.partIds = JSON.stringify(preset.part_ids);
+        btn.textContent = preset.name + ' (' + preset.total_price.toLocaleString() + '원)';
+        btn.style.cssText = 'padding:8px 16px; border-radius:8px; border:2px solid #6366f1; background:#fff; color:#4338ca; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all .2s ease;';
+
+        btn.addEventListener('mouseenter', function() {
+            if (!this.classList.contains('active')) {
+                this.style.background = '#eef2ff';
+            }
+        });
+        btn.addEventListener('mouseleave', function() {
+            if (!this.classList.contains('active')) {
+                this.style.background = '#fff';
+            }
+        });
+
+        btn.addEventListener('click', function() {
+            const partIds = JSON.parse(this.dataset.partIds);
+
+            // 모든 체크박스 해제
+            const checkboxes = partsField.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(function(cb) { cb.checked = false; });
+
+            // 프리셋 부품만 체크
+            partIds.forEach(function(id) {
+                const cb = partsField.querySelector('input[value="' + id + '"]');
+                if (cb) cb.checked = true;
+            });
+
+            // 버튼 활성화 표시
+            btnGroup.querySelectorAll('button').forEach(function(b) {
+                b.classList.remove('active');
+                b.style.background = '#fff';
+                b.style.color = '#4338ca';
+                b.style.borderColor = '#6366f1';
+            });
+            this.classList.add('active');
+            this.style.background = '#6366f1';
+            this.style.color = '#fff';
+            this.style.borderColor = '#6366f1';
+        });
+
+        btnGroup.appendChild(btn);
+    });
+
+    // "초기화" 버튼
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.textContent = '✕ 전체 해제';
+    resetBtn.style.cssText = 'padding:8px 16px; border-radius:8px; border:2px solid #d1d5db; background:#fff; color:#6b7280; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all .2s ease;';
+    resetBtn.addEventListener('click', function() {
+        const checkboxes = partsField.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(function(cb) { cb.checked = false; });
+        btnGroup.querySelectorAll('button').forEach(function(b) {
+            b.classList.remove('active');
+            b.style.background = '#fff';
+            b.style.color = b === resetBtn ? '#6b7280' : '#4338ca';
+            b.style.borderColor = b === resetBtn ? '#d1d5db' : '#6366f1';
+        });
+    });
+    btnGroup.appendChild(resetBtn);
+
+    container.appendChild(btnGroup);
+
+    // 부품 필드 앞에 삽입
+    const fieldLabel = partsField.querySelector('label, .flex');
+    if (fieldLabel) {
+        fieldLabel.parentNode.insertBefore(container, fieldLabel.nextSibling);
+    } else {
+        partsField.insertBefore(container, partsField.firstChild);
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
