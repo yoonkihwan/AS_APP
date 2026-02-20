@@ -80,7 +80,7 @@ class Tool(models.Model):
 
     class Meta:
         verbose_name = "장비/툴"
-        verbose_name_plural = "툴 관리"
+        verbose_name_plural = "브랜드 & 툴 관리"
         ordering = ["brand__name", "model_name"]
         unique_together = ["brand", "model_name"]
 
@@ -339,8 +339,8 @@ class RepairTicket(ASTicket):
 
     class Meta:
         proxy = True
-        verbose_name = "수리 기록"
-        verbose_name_plural = "수리 기록"
+        verbose_name = "수리 기록 등록"
+        verbose_name_plural = "수리 기록 등록"
 
 
 class OutboundTicket(ASTicket):
@@ -348,8 +348,8 @@ class OutboundTicket(ASTicket):
 
     class Meta:
         proxy = True
-        verbose_name = "출고 처리"
-        verbose_name_plural = "출고 처리"
+        verbose_name = "출고 등록"
+        verbose_name_plural = "출고 등록"
 
 
 class ASHistory(ASTicket):

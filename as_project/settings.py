@@ -139,8 +139,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Django Unfold 설정
 # ──────────────────────────────────────────────
 UNFOLD = {
-    "SITE_TITLE": "AS 관리 시스템",
-    "SITE_HEADER": "AS 관리 시스템",
+    "SITE_TITLE": "대시보드",
+    "SITE_HEADER": "대시보드",
     "SITE_SYMBOL": "build",
     "DASHBOARD_CALLBACK": "as_app.dashboard.dashboard_callback",
     "SIDEBAR": {

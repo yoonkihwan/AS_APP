@@ -15,12 +15,14 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
-
 from django.contrib import admin
 from django.urls import path
+from django.views.generic.base import RedirectView
 from as_app import views as as_views
 
 urlpatterns = [
+    # /admin/as_app/ 클릭 시 대시보드(메인)로 바로 리다이렉트
+    path("admin/as_app/", RedirectView.as_view(url="/admin/", permanent=False)),
     path("admin/", admin.site.urls),
     path("api/tools-by-brand/", as_views.get_tools_by_brand, name="api_tools_by_brand"),
 ]
