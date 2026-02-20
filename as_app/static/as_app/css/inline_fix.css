@@ -1,20 +1,35 @@
-/* 입고등록 인라인 - 장비/툴 드롭박스 너비 고정 */
-.djn-inline-form .field-tool,
-.tabular .field-tool {
-    width: 200px !important;
-    min-width: 200px !important;
-    max-width: 200px !important;
-}
+/* 입고등록 인라인 - 컨테이너 flex 처리(선택적) 또는 기본 너비 설정 */
 
-/* 입고등록 인라인 - 시리얼번호 입력란 너비 고정 */
-.djn-inline-form .field-serial_number,
-.tabular .field-serial_number {
+/* 브랜드 드롭박스 너비 고정 */
+.djn-inline-form .field-brand,
+.tabular .field-brand {
     width: 500px !important;
     min-width: 500px !important;
     max-width: 500px !important;
 }
 
-/* select2 드롭박스 너비 고정 */
+/* 장비/툴 드롭박스 너비 고정 */
+.djn-inline-form .field-tool,
+.tabular .field-tool {
+    width: 500px !important;
+    min-width: 500px !important;
+    max-width: 500px !important;
+}
+
+/* 입고등록 인라인 - 시리얼번호 입력란은 나머지 공간 전체 차지 */
+.djn-inline-form .field-serial_number,
+.tabular .field-serial_number {
+    width: auto !important;
+    max-width: none !important;
+}
+.tabular .field-serial_number input[type="text"] {
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* select2 드롭박스 너비 고정 보장 */
+.field-brand .select2-container,
+.field-brand .related-widget-wrapper,
 .field-tool .select2-container,
 .field-tool .related-widget-wrapper {
     width: 100% !important;

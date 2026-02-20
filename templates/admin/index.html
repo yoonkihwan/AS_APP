@@ -5,7 +5,7 @@
 {% block title %}대시보드 | {{ site_title }}{% endblock %}
 
 {% block branding %}
-    {% include "unfold/helpers/site_branding.html" %}
+{% include "unfold/helpers/site_branding.html" %}
 {% endblock %}
 
 {% block extrahead %}
@@ -17,12 +17,19 @@
         display: grid;
         gap: 1rem;
     }
+
     .dash-grid-5 {
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     }
+
+    .dash-grid-4 {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
     .dash-grid-2 {
         grid-template-columns: 1fr;
     }
+
     @media (min-width: 1024px) {
         .dash-grid-2 {
             grid-template-columns: 1fr 1fr;
@@ -38,13 +45,15 @@
         display: flex;
         align-items: center;
         gap: 1rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
         transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
+
     .kpi-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
+
     .kpi-icon {
         width: 48px;
         height: 48px;
@@ -54,15 +63,18 @@
         justify-content: center;
         flex-shrink: 0;
     }
+
     .kpi-icon .material-icons-outlined {
         font-size: 24px;
         color: #fff;
     }
+
     .kpi-info {
         display: flex;
         flex-direction: column;
         min-width: 0;
     }
+
     .kpi-label {
         font-size: 0.75rem;
         font-weight: 600;
@@ -70,12 +82,14 @@
         letter-spacing: 0.05em;
         color: var(--text-muted, #6b7280);
     }
+
     .kpi-metric {
         font-size: 1.75rem;
         font-weight: 700;
         color: var(--text-color, #111827);
         line-height: 1.2;
     }
+
     .kpi-footer {
         font-size: 0.7rem;
         color: var(--text-muted, #9ca3af);
@@ -89,6 +103,7 @@
         gap: 0.75rem;
         margin: 1.5rem 0;
     }
+
     .quick-action-btn {
         display: flex;
         align-items: center;
@@ -102,15 +117,17 @@
         font-weight: 600;
         font-size: 0.875rem;
         transition: all 0.15s ease;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }
+
     .quick-action-btn:hover {
         border-color: #6366f1;
-        background: linear-gradient(135deg, rgba(99,102,241,0.05), rgba(139,92,246,0.05));
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
         color: #6366f1;
         transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(99,102,241,0.12);
+        box-shadow: 0 4px 8px rgba(99, 102, 241, 0.12);
     }
+
     .quick-action-btn .material-icons-outlined {
         font-size: 22px;
         color: #6366f1;
@@ -122,8 +139,9 @@
         border: 1px solid var(--border-color, #e5e7eb);
         border-radius: 0.75rem;
         overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     }
+
     .dash-panel-header {
         display: flex;
         align-items: center;
@@ -131,6 +149,7 @@
         padding: 1rem 1.25rem;
         border-bottom: 1px solid var(--border-color, #e5e7eb);
     }
+
     .dash-panel-title {
         font-size: 0.9rem;
         font-weight: 700;
@@ -139,9 +158,11 @@
         align-items: center;
         gap: 0.5rem;
     }
+
     .dash-panel-title .material-icons-outlined {
         font-size: 20px;
     }
+
     .dash-panel-badge {
         display: inline-flex;
         align-items: center;
@@ -154,12 +175,14 @@
         padding: 0 0.5rem;
         color: #fff;
     }
+
     .dash-panel-link {
         font-size: 0.8rem;
         color: #6366f1;
         text-decoration: none;
         font-weight: 500;
     }
+
     .dash-panel-link:hover {
         text-decoration: underline;
     }
@@ -169,6 +192,7 @@
         width: 100%;
         border-collapse: collapse;
     }
+
     .dash-table th {
         text-align: left;
         padding: 0.625rem 1.25rem;
@@ -179,15 +203,18 @@
         color: var(--text-muted, #6b7280);
         background: var(--color-bg-secondary, #f9fafb);
     }
+
     .dash-table td {
         padding: 0.625rem 1.25rem;
         font-size: 0.8rem;
         color: var(--text-color, #374151);
         border-top: 1px solid var(--border-color, #f3f4f6);
     }
+
     .dash-table tr:hover td {
         background: var(--color-bg-secondary, #f9fafb);
     }
+
     .dash-table .text-muted {
         color: var(--text-muted, #9ca3af);
         font-size: 0.75rem;
@@ -203,11 +230,31 @@
         font-weight: 600;
         white-space: nowrap;
     }
-    .status-inbound   { background: #dbeafe; color: #1d4ed8; }
-    .status-repaired  { background: #d1fae5; color: #065f46; }
-    .status-shipped   { background: #e0e7ff; color: #4338ca; }
-    .status-outsourced { background: #fef3c7; color: #92400e; }
-    .status-disposed  { background: #fee2e2; color: #991b1b; }
+
+    .status-inbound {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .status-repaired {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-shipped {
+        background: #e0e7ff;
+        color: #4338ca;
+    }
+
+    .status-outsourced {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .status-disposed {
+        background: #fee2e2;
+        color: #991b1b;
+    }
 
     /* ── 빈 상태 ── */
     .dash-empty {
@@ -216,6 +263,7 @@
         color: var(--text-muted, #9ca3af);
         font-size: 0.85rem;
     }
+
     .dash-empty .material-icons-outlined {
         font-size: 40px;
         display: block;
@@ -230,44 +278,72 @@
         background: #1e293b;
         border-color: #334155;
     }
+
     .dark .kpi-label,
     .dark .kpi-footer {
         color: #94a3b8;
     }
+
     .dark .kpi-metric {
         color: #f1f5f9;
     }
+
     .dark .quick-action-btn {
         color: #e2e8f0;
     }
+
     .dark .quick-action-btn:hover {
-        background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15));
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
         border-color: #818cf8;
         color: #a5b4fc;
     }
+
     .dark .dash-panel-title {
         color: #f1f5f9;
     }
+
     .dark .dash-table th {
         background: #1a2332;
         color: #94a3b8;
     }
+
     .dark .dash-table td {
         color: #cbd5e1;
         border-color: #334155;
     }
+
     .dark .dash-table tr:hover td {
         background: #1a2332;
     }
+
     .dark .dash-panel-header {
         border-color: #334155;
     }
 
-    .dark .status-inbound   { background: rgba(59,130,246,0.2); color: #93c5fd; }
-    .dark .status-repaired  { background: rgba(16,185,129,0.2); color: #6ee7b7; }
-    .dark .status-shipped   { background: rgba(99,102,241,0.2); color: #a5b4fc; }
-    .dark .status-outsourced { background: rgba(245,158,11,0.2); color: #fcd34d; }
-    .dark .status-disposed  { background: rgba(239,68,68,0.2); color: #fca5a5; }
+    .dark .status-inbound {
+        background: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+    }
+
+    .dark .status-repaired {
+        background: rgba(16, 185, 129, 0.2);
+        color: #6ee7b7;
+    }
+
+    .dark .status-shipped {
+        background: rgba(99, 102, 241, 0.2);
+        color: #a5b4fc;
+    }
+
+    .dark .status-outsourced {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+    }
+
+    .dark .status-disposed {
+        background: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+    }
 </style>
 {% endblock %}
 
@@ -291,25 +367,25 @@
 </div>
 {% endif %}
 
-<!-- ── ② 빠른 작업 버튼 ── -->
-<div class="quick-actions">
-    <a href="{% url 'admin:as_app_inboundbatch_add' %}" class="quick-action-btn">
-        <span class="material-icons-outlined">inbox</span>
-        입고 등록
-    </a>
-    <a href="{% url 'admin:as_app_repairticket_changelist' %}" class="quick-action-btn">
-        <span class="material-icons-outlined">build</span>
-        수리 기록
-    </a>
-    <a href="{% url 'admin:as_app_outboundticket_changelist' %}" class="quick-action-btn">
-        <span class="material-icons-outlined">local_shipping</span>
-        출고 등록
-    </a>
-    <a href="{% url 'admin:as_app_ashistory_changelist' %}" class="quick-action-btn">
-        <span class="material-icons-outlined">history</span>
-        통합 이력
-    </a>
+
+<!-- ── ② 수리 매출 요약 ── -->
+{% if revenue_data %}
+<div class="dash-grid dash-grid-4" style="margin-bottom: 1.5rem;">
+    {% for item in revenue_data %}
+    <div class="kpi-card" style="padding: 1rem 1.25rem;">
+        <div class="kpi-icon" style="background: {{ item.color }}; width: 44px; height: 44px;">
+            <span class="material-icons-outlined" style="font-size: 24px;">{{ item.icon }}</span>
+        </div>
+        <div class="kpi-info" style="justify-content: center;">
+            <span class="kpi-label" style="font-size: 0.70rem;">{{ item.title }}</span>
+            <span class="kpi-metric" style="font-size: 1.35rem;">{{ item.amount }}<span
+                    style="font-size: 0.85rem; font-weight: 500; margin-left: 2px;">원</span></span>
+        </div>
+    </div>
+    {% endfor %}
 </div>
+{% endif %}
+
 
 <!-- ── ③④ 수리 대기 + 최근 출고 ── -->
 <div class="dash-grid dash-grid-2">

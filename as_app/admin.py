@@ -518,7 +518,7 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
     actions = None  # 체크박스 + 액션 드롭다운 제거 (상태는 자동 관리)
 
     class Media:
-        css = {"all": ("as_app/css/inline_fix.css?v=2", "as_app/css/hide_fab.css")}
+        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css")}
 
     # ── 수리 등록 폼 설정 ──
     fieldsets = (
