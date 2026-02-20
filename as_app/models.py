@@ -359,3 +359,13 @@ class ASHistory(ASTicket):
         proxy = True
         verbose_name = "AS 이력"
         verbose_name_plural = "통합 이력"
+
+
+class EstimateTicket(ASTicket):
+    """견적서 발행 전용 프록시 모델 (데모)"""
+
+    class Meta:
+        proxy = True
+        verbose_name = "견적서 발행 (데모)"
+        verbose_name_plural = "견적서 발행 (데모)"
+

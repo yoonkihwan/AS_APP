@@ -28,6 +28,7 @@ from .models import (
     Brand,
     Company,
     CompanyCategory,
+    EstimateTicket,
     InboundBatch,
     InboundTicket,
     OutboundTicket,
@@ -634,10 +635,11 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
         """M2M 저장 후 사용 부품/공임 단가 합산으로 AS 비용 자동 계산 + 수리완료 상태 변경"""
         super().save_related(request, form, formsets, change)
         obj = form.instance
-        total = sum(part.price for part in obj.used_parts.all())
+        total_parts = sum(part.price for part in obj.used_parts.all())
+        total_with_vat = int(total_parts * 1.1)  # 부품비용에 부가세 10% 포함
         update_fields = []
-        if obj.repair_cost != total:
-            obj.repair_cost = total
+        if obj.repair_cost != total_with_vat:
+            obj.repair_cost = total_with_vat
             update_fields.append("repair_cost")
         # 부품이 선택되어 있으면 자동으로 수리완료 상태로 변경
         if obj.used_parts.exists() and obj.status != ASTicket.Status.REPAIRED:
@@ -894,6 +896,148 @@ class ASHistoryAdmin(NoRelatedButtonsMixin, ModelAdmin):
     )
     def display_status(self, obj):
         return obj.get_status_display()
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(EstimateTicket)
+class EstimateTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
+    """견적서 발행 기능 (데모 버전)"""
+
+    list_display = [
+        "inbound_date",
+        "company",
+        "tool",
+        "serial_number",
+        "repair_cost",
+        "display_status",
+    ]
+    list_filter = ["status", "company"]
+    search_fields = ["serial_number", "company__name", "tool__model_name"]
+    list_per_page = 30
+    actions = ["export_estimate"]
+
+    class Media:
+        css = {"all": ("as_app/css/hide_fab.css",)}
+
+    @display(
+        description="상태",
+        label={
+            "입고": "warning",
+            "수리대기": "warning",
+            "수리의뢰": "warning",
+            "수리완료": "success",
+            "출고": "info",
+            "자체폐기": "danger",
+        }
+    )
+    def display_status(self, obj):
+        return obj.get_status_display()
+
+    @unfold_action(description="📄 선택 항목 견적서 출력 (PDF 다운로드)")
+    def export_estimate(self, request, queryset):
+        import io
+        from django.http import HttpResponse
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import os
+        
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        
+        # Windows 환경의 맑은 고딕 글꼴 시도, 실패 시 기본 폰트 사용
+        font_name = 'Helvetica'
+        try:
+            # 윈도우 폰트 경로를 직접 지정해줄 수도 있지만, 'malgun.ttf'로 보통 로드됨
+            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('Malgun', font_path))
+                font_name = 'Malgun'
+        except Exception:
+            pass
+            
+        c.setFont(font_name, 16)
+        c.drawString(50, 800, "AS 견적서 (Quotation)")
+        
+        c.setFont(font_name, 12)
+        y = 750
+        for idx, ticket in enumerate(queryset, 1):
+            if y < 150:
+                c.showPage()
+                c.setFont(font_name, 12)
+                y = 800
+                
+            company_name = ticket.company.name if ticket.company else "미지정"
+            tool_name = str(ticket.tool) if ticket.tool else "미지정"
+            c.setFont(font_name, 12)
+            c.drawString(50, y, f"{idx}. 업체: {company_name} / 장비: {tool_name} / S/N: {ticket.serial_number}")
+            y -= 25
+            
+            parts = ticket.used_parts.all()
+            if not parts:
+                c.setFont(font_name, 10)
+                c.drawString(70, y, "- 사용 품목 없음")
+                y -= 20
+            else:
+                c.setFont(font_name, 10)
+                c.drawString(70, y, "품목 (부품/공임)")
+                c.drawRightString(320, y, "단가")
+                c.drawRightString(420, y, "부가세(10%)")
+                c.drawRightString(500, y, "합계")
+                c.line(70, y-5, 500, y-5)
+                y -= 20
+                
+                for part in parts:
+                    if y < 100:
+                        c.showPage()
+                        c.setFont(font_name, 10)
+                        y = 800
+                        c.drawString(70, y, "품목 (부품/공임)")
+                        c.drawRightString(320, y, "단가")
+                        c.drawRightString(420, y, "부가세(10%)")
+                        c.drawRightString(500, y, "합계")
+                        c.line(70, y-5, 500, y-5)
+                        y -= 20
+                    
+                    part_vat = int(part.price * 0.1)
+                    subtotal = part.price + part_vat
+                    
+                    part_name = part.name[:25] + "..." if len(part.name) > 25 else part.name
+                    c.drawString(70, y, f"- {part_name}")
+                    c.drawRightString(320, y, f"{part.price:,} 원")
+                    c.drawRightString(420, y, f"{part_vat:,} 원")
+                    c.drawRightString(500, y, f"{subtotal:,} 원")
+                    y -= 15
+                
+                c.line(70, y+5, 500, y+5)
+            
+            if y < 100:
+                c.showPage()
+                y = 800
+                
+            c.setFont(font_name, 11)
+            c.drawString(70, y, f"▶ 총합계 (VAT 10% 포함): {ticket.repair_cost:,} 원")
+            y -= 40
+            
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
+            c.line(50, y+20, 500, y+20)
+            c.setStrokeColorRGB(0, 0, 0)
+            
+        c.save()
+        buffer.seek(0)
+        
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = 'inline; filename="estimate.pdf"'
+        return response
 
     def has_add_permission(self, request):
         return False

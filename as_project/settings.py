@@ -61,7 +61,12 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "as_project.urls"
 
-CSRF_TRUSTED_ORIGINS = ["https://*.onrender.com"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.onrender.com",
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "https://*.trycloudflare.com",
+]
 
 TEMPLATES = [
     {
@@ -181,6 +186,11 @@ UNFOLD = {
                         "title": "출고 등록",
                         "icon": "local_shipping",
                         "link": reverse_lazy("admin:as_app_outboundticket_changelist"),
+                    },
+                    {
+                        "title": "견적서 발행 (데모)",
+                        "icon": "request_quote",
+                        "link": reverse_lazy("admin:as_app_estimateticket_changelist"),
                     },
                 ],
             },
