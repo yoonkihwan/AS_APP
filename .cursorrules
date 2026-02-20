@@ -9,8 +9,9 @@
 
 ## 2. 기술 스택 및 환경 (Tech & Environment)
 - **Backend:** Python 3.x, Django 5.x
-- **Database:** SQLite (로컬 개발), PostgreSQL (운영 배포 예정)
+- **Database:** SQLite (로컬 개발), PostgreSQL (Render 운영 배포)
 - **Admin UI:** **Django Unfold** (필수 사용 - 기본 Django Admin 스타일 사용 지양)
+- **Static Files:** WhiteNoise (운영 환경 정적 파일 서빙)
 - **Linting/Formatting:** PEP 8 준수, Flake8/Black 스타일 지향.
 
 ## 3. Django 개발 패턴 (Architecture & Patterns)
@@ -18,6 +19,7 @@
 - 비즈니스 로직의 대부분은 `views.py`가 아닌 **`models.py`의 메서드**로 구현한다. (예: `calculate_cost()`, `is_overdue()`)
 - 모든 필드에는 `verbose_name`과 `help_text`를 명시하여, Admin 화면에서 사용자가 의미를 명확히 알 수 있게 한다.
 - `__str__` 메서드는 객체를 쉽게 식별할 수 있는 포맷으로 반드시 정의한다.
+- **프록시 모델:** Admin 뷰를 분리할 때 `proxy = True` 모델을 활용한다 (예: RepairTicket, OutboundTicket, ASHistory).
 
 ### 3.2. Views & Admin
 - **Class-Based Views (CBV):** 커스텀 뷰가 필요할 경우 FBV보다 CBV를 우선 고려한다. (Admin 커스텀 제외)
@@ -26,6 +28,9 @@
     - `list_display`, `list_filter`, `search_fields`는 사용자 입장에서 자주 쓰는 항목 위주로 구성한다.
     - `autocomplete_fields`: FK/M2M 필드는 데이터가 많아질 것을 대비해 항상 설정한다.
     - `inlines`: 부모-자식 관계 데이터 입력 시 적극 활용한다.
+    - `NoRelatedButtonsMixin`: FK/M2M 드롭다운 옆의 추가/수정/삭제 버튼을 제거하여 입력 실수 방지.
+    - 사이드바 숨김: 통합 관리 시 `has_module_permission = False`로 불필요한 메뉴 숨김.
+    - 커스텀 템플릿: `change_list_template`로 탭 네비게이션, 바로가기 버튼 등 추가.
 
 ## 4. 코드 스타일 및 네이밍 (Naming Convention)
 - **Variables/Functions:** `snake_case` (예: `repair_cost`, `calculate_total_price`)
@@ -39,8 +44,11 @@
 
 ## 5. UI/UX 가이드라인 (Django Unfold)
 - **일관성:** 버튼 색상, 아이콘 등은 Unfold의 [Tailwind CSS 클래스 기반] 디자인 시스템을 따른다.
+- **Material Icons:** 사이드바 및 탭 아이콘은 `material-symbols-outlined` (Google Material Symbols) 사용.
 - **피드백:** 저장, 수정, 삭제 등의 액션 후에는 반드시 `messages.success` 또는 `messages.error`를 통해 사용자에게 피드백을 제공한다.
 - **안전장치:** 중요한 상태 변경(예: 출고 처리) 시에는 `actions`를 사용하여 한 번 더 확인하거나 일괄 처리하도록 유도한다.
+- **탭 네비게이션:** 관련 모델을 하나의 메뉴로 통합할 때 탭 방식 사용 (예: 업체관리 → 매출처업체/의뢰업체).
+- **저장 후 리다이렉트:** `response_add`/`response_change`를 오버라이드하여 사용자 워크플로우에 맞는 페이지로 이동.
 
 ## 6. Git 커밋 컨벤션 (Conventional Commits)
 - 형식: `type: Subject`
