@@ -189,14 +189,9 @@ UNFOLD = {
                 "separator": True,
                 "items": [
                     {
-                        "title": "매출처 관리",
+                        "title": "업체관리",
                         "icon": "business",
                         "link": reverse_lazy("admin:as_app_company_changelist"),
-                    },
-                    {
-                        "title": "의뢰업체 관리",
-                        "icon": "handshake",
-                        "link": reverse_lazy("admin:as_app_outsourcecompany_changelist"),
                     },
                     {
                         "title": "수리부품 관리",

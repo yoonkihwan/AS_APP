@@ -61,6 +61,7 @@ class CompanyAdmin(NoRelatedButtonsMixin, ModelAdmin):
     list_filter = ["price_group", "region"]
     search_fields = ["name", "region"]
     list_per_page = 20
+    change_list_template = "admin/as_app/company/change_list.html"
 
     fieldsets = (
         (
@@ -82,6 +83,11 @@ class CompanyAdmin(NoRelatedButtonsMixin, ModelAdmin):
             },
         ),
     )
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["active_tab"] = "company"
+        return super().changelist_view(request, extra_context)
 
 
 # ── 브랜드 + 툴 관리 ──
@@ -213,6 +219,16 @@ class OutsourceCompanyAdmin(ModelAdmin):
     list_display = ["name", "contact", "memo"]
     search_fields = ["name"]
     list_per_page = 20
+    change_list_template = "admin/as_app/outsourcecompany/change_list.html"
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["active_tab"] = "outsource"
+        return super().changelist_view(request, extra_context)
+
+    def has_module_permission(self, request):
+        """사이드바에 표시하지 않음 (업체관리 탭에서 통합 관리)"""
+        return False
 
 
 # ──────────────────────────────────────────────
