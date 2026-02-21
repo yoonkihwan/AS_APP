@@ -1,0 +1,18 @@
+/* Unfold FAB 버튼 및 헤더 더하기(새로 만들기) 버튼 숨김 */
+.unfold-action-fab {
+    display: none !important;
+}
+
+/* 화면 상단(헤더 영역 등)에 나타나는 보라색 더하기 아이콘 버튼 숨김 */
+header .addlink {
+    display: none !important;
+}
+
+a.addlink {
+    display: none !important;
+}
+
+/* Unfold 테마 헤더 우측 상단 더하기 버튼 특화 선택자 (경로 기반) */
+header a[href*="/add/"] {
+    display: none !important;
+}

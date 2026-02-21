@@ -148,6 +148,9 @@ UNFOLD = {
     "SITE_HEADER": "AS 관리",
     "SITE_SYMBOL": "build",
     "DASHBOARD_CALLBACK": "as_app.dashboard.dashboard_callback",
+    "STYLES": [
+        lambda request: static("as_app/css/mobile_fix.css"),
+    ],
     "SIDEBAR": {
         "show_search": False,
         "show_all_applications": False,
@@ -187,6 +190,17 @@ UNFOLD = {
                         "icon": "local_shipping",
                         "link": reverse_lazy("admin:as_app_outboundticket_changelist"),
                     },
+                    {
+                        "title": "세금계산서 등록",
+                        "icon": "receipt_long",
+                        "link": reverse_lazy("admin:as_app_taxinvoiceticket_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "추출",
+                "separator": True,
+                "items": [
                     {
                         "title": "견적서 발행 (데모)",
                         "icon": "request_quote",

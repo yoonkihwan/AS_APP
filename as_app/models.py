@@ -219,8 +219,6 @@ class ASTicket(models.Model):
 
     class Status(models.TextChoices):
         INBOUND = "inbound", "입고"
-        WAITING = "waiting", "수리대기"
-        OUTSOURCED = "outsourced", "수리의뢰"
         REPAIRED = "repaired", "수리완료"
         SHIPPED = "shipped", "출고"
         DISPOSED = "disposed", "자체폐기"
@@ -297,7 +295,6 @@ class ASTicket(models.Model):
         if self.tool_id and self.serial_number:
             active_statuses = [
                 self.Status.INBOUND,
-                self.Status.WAITING,
                 self.Status.REPAIRED,
             ]
             qs = ASTicket.objects.filter(
@@ -368,4 +365,13 @@ class EstimateTicket(ASTicket):
         proxy = True
         verbose_name = "견적서 발행 (데모)"
         verbose_name_plural = "견적서 발행 (데모)"
+
+
+class TaxInvoiceTicket(ASTicket):
+    """세금계산서 발행 처리 전용 프록시 모델"""
+
+    class Meta:
+        proxy = True
+        verbose_name = "세금계산서 등록"
+        verbose_name_plural = "세금계산서 등록"
 

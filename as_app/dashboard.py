@@ -21,12 +21,12 @@ def dashboard_callback(request, context):
     # 1. 장기 미처리 (10일 이상 경과)
     long_pending_count = ASTicket.objects.filter(
         inbound_date__lte=ten_days_ago,
-        status__in=[ASTicket.Status.INBOUND, ASTicket.Status.WAITING, ASTicket.Status.OUTSOURCED],
+        status=ASTicket.Status.INBOUND,
     ).count()
 
     # 2. 수리 대기 (입고 상태이거나 수리대기 상태)
     waiting_count = ASTicket.objects.filter(
-        status__in=[ASTicket.Status.INBOUND, ASTicket.Status.WAITING],
+        status=ASTicket.Status.INBOUND,
     ).count()
 
     # 3. 이번 달 입고 누적
@@ -102,7 +102,7 @@ def dashboard_callback(request, context):
 
     # ── ③ 수리 대기 목록 (최근 10건) ──
     pending_tickets = (
-        ASTicket.objects.filter(status__in=[ASTicket.Status.INBOUND, ASTicket.Status.WAITING])
+        ASTicket.objects.filter(status=ASTicket.Status.INBOUND)
         .select_related("company", "tool", "tool__brand")
         .order_by("inbound_date", "created_at")[:10]
     )

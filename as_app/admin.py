@@ -72,6 +72,7 @@ from .models import (
     Part,
     RepairPreset,
     RepairTicket,
+    TaxInvoiceTicket,
     Tool,
 )
 from .forms import ASTicketForm
@@ -475,7 +476,6 @@ class InboundBatchAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
         # 2) 기존 활성 티켓과 중복 체크
         active_statuses = [
             ASTicket.Status.INBOUND,
-            ASTicket.Status.WAITING,
             ASTicket.Status.REPAIRED,
         ]
         conflicts = []
@@ -642,8 +642,6 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
             .filter(
                 status__in=[
                     ASTicket.Status.INBOUND,
-                    ASTicket.Status.WAITING,
-                    ASTicket.Status.OUTSOURCED,
                 ]
             )
             .select_related("company", "tool", "tool__brand")
@@ -854,7 +852,10 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "company",
         "tool",
         "serial_number",
+        "used_parts_summary",
         "repair_cost",
+        "estimate_status",
+        "tax_invoice",
     ]
     list_filter = [
         "status",
@@ -871,7 +872,6 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "symptom",
         "repair_content",
     ]
-    date_hierarchy = "inbound_date"
     list_per_page = 30
 
     fieldsets = (
@@ -930,6 +930,16 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
     def has_delete_permission(self, request, obj=None):
         return False
 
+    @admin.display(description="사용 부품 요약")
+    def used_parts_summary(self, obj):
+        parts = obj.used_parts.all()
+        if parts:
+            part_names = [p.name for p in parts[:2]]
+            if parts.count() > 2:
+                return f"{', '.join(part_names)} 외 {parts.count() - 2}건"
+            return ", ".join(part_names)
+        return "-"
+
 
 @admin.register(EstimateTicket)
 class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
@@ -960,7 +970,6 @@ class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
         "symptom",
         "repair_content",
     ]
-    date_hierarchy = "inbound_date"
     list_per_page = 30
     actions = ["export_estimate"]
 
@@ -1067,8 +1076,11 @@ class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
         c.save()
         buffer.seek(0)
         
-        response = HttpResponse(buffer, content_type='application/pdf')
-        response['Content-Disposition'] = 'inline; filename="estimate.pdf"'
+        # 견적서 추출 상태 업데이트
+        queryset.update(estimate_status=True)
+        
+        from django.http import FileResponse
+        response = FileResponse(buffer, as_attachment=True, filename="estimate_demo.pdf")
         return response
 
     def has_add_permission(self, request):
@@ -1079,3 +1091,60 @@ class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(TaxInvoiceTicket)
+class TaxInvoiceTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "세금계산서 등록"
+    
+    list_display = [
+        "display_status",
+        "inbound_date",
+        "outbound_date",
+        "company",
+        "tool",
+        "serial_number",
+        "repair_cost",
+        "tax_invoice",
+    ]
+    list_editable = ["tax_invoice"]
+    list_filter = [
+        "status",
+        "company",
+        "tool__brand",
+        ("inbound_date", RangeDateFilter),
+        ("outbound_date", RangeDateFilter),
+        "tax_invoice",
+    ]
+    search_fields = [
+        "serial_number",
+        "company__name",
+        "tool__model_name",
+        "tool__brand__name",
+        "symptom",
+        "repair_content",
+    ]
+    list_per_page = 30
+
+    class Media:
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css")}
+
+    def get_queryset(self, request):
+        """출고 상태인 데이터만 표시"""
+        return super().get_queryset(request).filter(
+            status=ASTicket.Status.SHIPPED
+        )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            fields = [f.name for f in self.model._meta.fields]
+            if 'tax_invoice' in fields:
+                fields.remove('tax_invoice')
+            return fields
+        return []

@@ -1,0 +1,51 @@
+/* Global mobile optimizations for AS Dashboard */
+
+@media (max-width: 767px) {
+
+    /* 1. 테이블 가로 스크롤 허용 (모바일에서 짤리지 않게) */
+    #changelist .results,
+    .object-tools,
+    .inline-group .tabular {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        display: block;
+        width: 100%;
+    }
+
+    /* 2. Select2 자동완성 모바일 최적화 (화면을 넘어가지 않게) */
+    .select2-container,
+    .select2-container--admin-autocomplete {
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+
+    /* select2 드롭다운 메뉴도 모바일 대응 */
+    .select2-dropdown {
+        width: auto !important;
+        max-width: 90vw !important;
+    }
+
+    /* 3. 모바일 레이아웃 패딩 여백 좁히기 (화면을 더 넓게 활용) */
+    body.unfold main>.px-4,
+    #main>.px-4 {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    /* 4. 등록 폼 내부 인풋 너비 100% */
+    .form-row input[type="text"],
+    .form-row input[type="number"],
+    .form-row input[type="email"],
+    .form-row select,
+    .form-row textarea {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* 5. 빵부스러기(Breadcrumbs) 모바일 스크롤 가능하게 */
+    .breadcrumbs {
+        white-space: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
