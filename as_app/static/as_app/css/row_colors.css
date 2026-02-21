@@ -1,0 +1,66 @@
+/* Row background styling based on status for ASHistory list view */
+
+/* Light Mode Colors */
+tr:has(.status-marker[data-status="inbound"]) {
+    background-color: rgba(234, 179, 8, 0.1) !important;
+    /* Yellow */
+}
+
+tr:has(.status-marker[data-status="waiting"]) {
+    background-color: rgba(234, 179, 8, 0.05) !important;
+    /* Lighter Yellow */
+}
+
+tr:has(.status-marker[data-status="outsourced"]) {
+    background-color: rgba(249, 115, 22, 0.1) !important;
+    /* Orange */
+}
+
+tr:has(.status-marker[data-status="repaired"]) {
+    background-color: rgba(34, 197, 94, 0.1) !important;
+    /* Green */
+}
+
+tr:has(.status-marker[data-status="shipped"]) {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+    /* Blue */
+}
+
+tr:has(.status-marker[data-status="disposed"]) {
+    background-color: rgba(239, 68, 68, 0.1) !important;
+    /* Red */
+}
+
+/* Dark Mode Colors */
+html.dark tr:has(.status-marker[data-status="inbound"]) {
+    background-color: rgba(234, 179, 8, 0.15) !important;
+}
+
+html.dark tr:has(.status-marker[data-status="waiting"]) {
+    background-color: rgba(234, 179, 8, 0.08) !important;
+}
+
+html.dark tr:has(.status-marker[data-status="outsourced"]) {
+    background-color: rgba(249, 115, 22, 0.15) !important;
+}
+
+html.dark tr:has(.status-marker[data-status="repaired"]) {
+    background-color: rgba(34, 197, 94, 0.15) !important;
+}
+
+html.dark tr:has(.status-marker[data-status="shipped"]) {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+html.dark tr:has(.status-marker[data-status="disposed"]) {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Maintain hover effect brightness */
+tr:has(.status-marker):hover {
+    filter: brightness(0.95);
+}
+
+html.dark tr:has(.status-marker):hover {
+    filter: brightness(1.1);
+}

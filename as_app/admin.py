@@ -6,6 +6,7 @@ from django.utils.html import format_html
 from django import forms
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action as unfold_action, display
+from unfold.contrib.filters.admin import RangeDateFilter
 
 
 class NoRelatedButtonsMixin:
@@ -21,6 +22,41 @@ class NoRelatedButtonsMixin:
                 widget.can_delete_related = False
                 widget.can_view_related = False
         return form
+
+
+
+class StatusColorMixin:
+    """행 전체에 상태별 배경색을 적용하기 위해 HTML 마커를 삽입하는 믹스인"""
+    
+    @display(description="상태")
+    def display_status(self, obj):
+        return format_html(
+            '<span class="status-marker" data-status="{}">{}</span>',
+            obj.status,
+            obj.get_status_display(),
+        )
+
+class CustomTitleMixin:
+    """브라우저 탭 및 화면의 메인 제목을 깔끔하게 표기하기 위한 믹스인"""
+    custom_title = None
+
+    def get_custom_title(self):
+        return self.custom_title or self.model._meta.verbose_name_plural
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['title'] = self.get_custom_title()
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def add_view(self, request, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['title'] = self.get_custom_title()
+        return super().add_view(request, form_url, extra_context=extra_context)
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['title'] = self.get_custom_title()
+        return super().change_view(request, object_id, form_url, extra_context=extra_context)
 
 from .models import (
     ASHistory,
@@ -57,7 +93,8 @@ class CompanyCategoryAdmin(ModelAdmin):
 
 
 @admin.register(Company)
-class CompanyAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class CompanyAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "업체관리"
     list_display = ["name", "region", "price_group"]
     list_filter = ["price_group", "region"]
     search_fields = ["name", "region"]
@@ -105,7 +142,8 @@ class BrandAdmin(ModelAdmin):
 
 
 @admin.register(Tool)
-class ToolAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class ToolAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "브랜드 & 툴 관리"
     """브랜드 & 툴 관리 - 메인 리스트"""
     list_display = ["brand", "model_name"]
     list_filter = ["brand"]
@@ -115,7 +153,8 @@ class ToolAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
 
 @admin.register(Part)
-class PartAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "수리부품 관리"
     list_display = ["name", "code", "part_type", "display_tools", "price"]
     list_filter = ["part_type", "tools__brand"]
     search_fields = ["name", "code"]
@@ -273,7 +312,8 @@ class ASTicketInline(NoRelatedButtonsMixin, TabularInline):
 
 
 @admin.register(InboundBatch)
-class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class InboundBatchAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "입고 등록"
     """일괄 입고 등록 - 공통 정보 1번 입력 + 품목별 행 추가"""
 
     list_display = [
@@ -484,7 +524,7 @@ class InboundBatchAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
 
 @admin.register(InboundTicket)
-class InboundTicketAdmin(ModelAdmin):
+class InboundTicketAdmin(StatusColorMixin, ModelAdmin):
     """개별 입고 티켓 관리 (사이드바 숨김)"""
 
     list_display = [
@@ -500,28 +540,17 @@ class InboundTicketAdmin(ModelAdmin):
     def has_module_permission(self, request):
         return False
 
-    @display(
-        description="상태",
-        label={
-            "입고": "warning",
-            "수리대기": "warning",
-            "수리의뢰": "warning",
-            "수리완료": "success",
-            "출고": "info",
-            "자체폐기": "danger",
-        }
-    )
-    def display_status(self, obj):
-        return obj.get_status_display()
-
-
+    class Media:
+        css = {"all": ("as_app/css/row_colors.css",)}
 
 @admin.register(RepairTicket)
-class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "수리 기록 등록"
     """수리 기록 - 목록에서 버튼 클릭으로 수리 등록 페이지 이동"""
 
     # ── 목록 화면 설정 ──
     list_display = [
+        "display_status",
         "inbound_date",
         "company",
         "tool",
@@ -534,7 +563,7 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
     actions = None  # 체크박스 + 액션 드롭다운 제거 (상태는 자동 관리)
 
     class Media:
-        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css")}
+        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/row_colors.css")}
 
     # ── 수리 등록 폼 설정 ──
     fieldsets = (
@@ -705,10 +734,12 @@ class RepairTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
 
 @admin.register(OutboundTicket)
-class OutboundTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class OutboundTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "출고 등록"
     """출고 등록 - 수리완료 목록에서 선택하여 출고 처리"""
 
     list_display = [
+        "display_status",
         "inbound_date",
         "company",
         "tool",
@@ -724,7 +755,7 @@ class OutboundTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
     ordering = ["-inbound_date", "-created_at"]
 
     class Media:
-        css = {"all": ("as_app/css/hide_fab.css",)}
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css")}
         js = ("as_app/js/outbound_row_click.js",)
 
     @admin.display(description="사용 부품")
@@ -812,33 +843,33 @@ class OutboundTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
 
 @admin.register(ASHistory)
-class ASHistoryAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "통합 이력"
     """AS 통합 이력 조회 (Read-Only)"""
 
     list_display = [
+        "display_status",
         "inbound_date",
+        "outbound_date",
         "company",
         "tool",
         "serial_number",
-        "display_status",
         "repair_cost",
-        "outbound_date",
-        "estimate_status",
-        "tax_invoice",
     ]
     list_filter = [
         "status",
         "company",
         "tool__brand",
-        "inbound_date",
-        "estimate_status",
-        "tax_invoice",
+        ("inbound_date", RangeDateFilter),
+        ("outbound_date", RangeDateFilter),
     ]
     search_fields = [
         "serial_number",
         "company__name",
         "tool__model_name",
         "tool__brand__name",
+        "symptom",
+        "repair_content",
     ]
     date_hierarchy = "inbound_date"
     list_per_page = 30
@@ -881,21 +912,14 @@ class ASHistoryAdmin(NoRelatedButtonsMixin, ModelAdmin):
     )
 
     class Media:
-        css = {"all": ("as_app/css/hide_fab.css",)}
-
-    @display(
-        description="상태",
-        label={
-            "입고": "warning",
-            "수리대기": "warning",
-            "수리의뢰": "warning",
-            "수리완료": "success",
-            "출고": "info",
-            "자체폐기": "danger",
+        css = {
+            "all": (
+                "as_app/css/hide_fab.css",
+                "as_app/css/row_colors.css",
+            )
         }
-    )
-    def display_status(self, obj):
-        return obj.get_status_display()
+
+
 
     def has_add_permission(self, request):
         return False
@@ -908,38 +932,46 @@ class ASHistoryAdmin(NoRelatedButtonsMixin, ModelAdmin):
 
 
 @admin.register(EstimateTicket)
-class EstimateTicketAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "견적서 발행"
     """견적서 발행 기능 (데모 버전)"""
 
     list_display = [
+        "display_status",
         "inbound_date",
+        "outbound_date",
         "company",
         "tool",
         "serial_number",
         "repair_cost",
-        "display_status",
     ]
-    list_filter = ["status", "company"]
-    search_fields = ["serial_number", "company__name", "tool__model_name"]
+    list_filter = [
+        "status",
+        "company",
+        "tool__brand",
+        ("inbound_date", RangeDateFilter),
+        ("outbound_date", RangeDateFilter),
+    ]
+    search_fields = [
+        "serial_number",
+        "company__name",
+        "tool__model_name",
+        "tool__brand__name",
+        "symptom",
+        "repair_content",
+    ]
+    date_hierarchy = "inbound_date"
     list_per_page = 30
     actions = ["export_estimate"]
 
     class Media:
-        css = {"all": ("as_app/css/hide_fab.css",)}
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css")}
 
-    @display(
-        description="상태",
-        label={
-            "입고": "warning",
-            "수리대기": "warning",
-            "수리의뢰": "warning",
-            "수리완료": "success",
-            "출고": "info",
-            "자체폐기": "danger",
-        }
-    )
-    def display_status(self, obj):
-        return obj.get_status_display()
+    def get_queryset(self, request):
+        """견적서 발행은 수리완료 또는 출고 상태인 데이터만 표시"""
+        return super().get_queryset(request).filter(
+            status__in=[ASTicket.Status.REPAIRED, ASTicket.Status.SHIPPED]
+        )
 
     @unfold_action(description="📄 선택 항목 견적서 출력 (PDF 다운로드)")
     def export_estimate(self, request, queryset):

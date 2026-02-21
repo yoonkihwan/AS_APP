@@ -21,8 +21,14 @@ from django.views.generic.base import RedirectView
 from as_app import views as as_views
 
 urlpatterns = [
+    path("", RedirectView.as_view(url="/admin/", permanent=False)),
     # /admin/as_app/ 클릭 시 대시보드(메인)로 바로 리다이렉트
     path("admin/as_app/", RedirectView.as_view(url="/admin/", permanent=False)),
     path("admin/", admin.site.urls),
     path("api/tools-by-brand/", as_views.get_tools_by_brand, name="api_tools_by_brand"),
 ]
+
+admin.site.site_header = "AS 관리"
+admin.site.site_title = "AS 관리"
+admin.site.index_title = "AS 관리"
+
