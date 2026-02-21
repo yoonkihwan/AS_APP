@@ -14,7 +14,7 @@
 | :-------------- | :---------------- | :-------------------------------------------------------------- |
 | **Language**    | **Python**        | 전체 비즈니스 로직 처리 및 백엔드 구현                          |
 | **Framework**   | **Django 5.x**    | 웹 애플리케이션 프레임워크 (MVT 패턴, ORM 활용)                 |
-| **Database**    | **SQLite** (로컬) / **PostgreSQL** (운영) | 로컬 개발용 SQLite, Render 배포용 PostgreSQL |
+| **Database**    | **PostgreSQL**    | 로컬 개발 및 운영 배포용 PostgreSQL |
 | **Frontend/UI** | **Django Unfold** | Django Admin을 현대적인 UI로 커스터마이징하여 대시보드 구축     |
 | **Import/Export** | **django-import-export** | 데이터 일괄 가져오기/내보내기 지원                        |
 | **Hosting**     | **Render**        | 운영 환경 호스팅 (WhiteNoise 정적 파일 서빙)                   |

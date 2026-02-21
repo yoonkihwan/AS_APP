@@ -9,7 +9,7 @@
 
 ## 2. 기술 스택 및 환경 (Tech & Environment)
 - **Backend:** Python 3.x, Django 5.x
-- **Database:** SQLite (로컬 개발), PostgreSQL (Render 운영 배포)
+- **Database:** PostgreSQL (로컬 개발 및 운영 배포 모두 사용)
 - **Admin UI:** **Django Unfold** (필수 사용 - 기본 Django Admin 스타일 사용 지양)
 - **Static Files:** WhiteNoise (운영 환경 정적 파일 서빙)
 - **Linting/Formatting:** PEP 8 준수, Flake8/Black 스타일 지향.
