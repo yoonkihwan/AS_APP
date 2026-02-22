@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "import_export",
     "as_app",
+    "tool_inventory",
 ]
 
 MIDDLEWARE = [
@@ -143,21 +144,84 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ──────────────────────────────────────────────
 # Django Unfold 설정
 # ──────────────────────────────────────────────
-UNFOLD = {
-    "SITE_TITLE": "AS 관리",
-    "SITE_HEADER": "AS 관리",
-    "SITE_SYMBOL": "build",
-    "DASHBOARD_CALLBACK": "as_app.dashboard.dashboard_callback",
-    "STYLES": [
-        lambda request: static("as_app/css/mobile_fix.css"),
-    ],
-    "SIDEBAR": {
-        "show_search": False,
-        "show_all_applications": False,
-        "navigation": [
+from unfold.sites import UnfoldAdminSite
+
+def dashboard_callback(request, context):
+    if request.path.startswith('/inventory/'):
+        from tool_inventory.dashboard import dashboard_callback as inv_callback
+        return inv_callback(request, context)
+    else:
+        from as_app.dashboard import dashboard_callback as as_callback
+        return as_callback(request, context)
+
+def sidebar_callback(request):
+    if request.path.startswith('/inventory/'):
+        return [
+            {
+                "title": "내비게이션",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "포탈 (홈) 으로 돌아가기",
+                        "icon": "home",
+                        "link": "/",
+                    },
+                ],
+            },
+            {
+                "title": "툴 장비 관리",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "대시보드",
+                        "icon": "dashboard",
+                        "link": reverse_lazy("tool_admin:index"),
+                    },
+                    {
+                        "title": "툴/장비 인벤토리",
+                        "icon": "inventory_2",
+                        "link": reverse_lazy("tool_admin:tool_inventory_inventory_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "기준 정보",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "입고처",
+                        "icon": "store",
+                        "link": reverse_lazy("tool_admin:tool_inventory_supplier_changelist"),
+                    },
+                    {
+                        "title": "출고처",
+                        "icon": "local_shipping",
+                        "link": reverse_lazy("tool_admin:tool_inventory_releasesupplier_changelist"),
+                    },
+                    {
+                        "title": "품목명",
+                        "icon": "category",
+                        "link": reverse_lazy("tool_admin:tool_inventory_itemname_changelist"),
+                    },
+                ],
+            },
+        ]
+    else:
+        return [
+            {
+                "title": "내비게이션",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "포탈 (홈) 으로 돌아가기",
+                        "icon": "home",
+                        "link": "/",
+                    },
+                ],
+            },
             {
                 "title": "대시보드",
-                "separator": False,
+                "separator": True,
                 "items": [
                     {
                         "title": "대시보드",
@@ -229,6 +293,34 @@ UNFOLD = {
                     },
                 ],
             },
-        ],
+        ]
+
+def site_title_callback(request):
+    if request.path.startswith('/inventory/'):
+        return "장비/툴 관리"
+    return "AS 관리"
+
+def site_header_callback(request):
+    if request.path.startswith('/inventory/'):
+        return "장비/툴 관리 대시보드"
+    return "AS 시스템"
+
+def site_symbol_callback(request):
+    if request.path.startswith('/inventory/'):
+        return "inventory_2"
+    return "build"
+
+UNFOLD = {
+    "SITE_TITLE": "as_project.settings.site_title_callback",
+    "SITE_HEADER": "as_project.settings.site_header_callback",
+    "SITE_SYMBOL": "as_project.settings.site_symbol_callback",
+    "DASHBOARD_CALLBACK": "as_project.settings.dashboard_callback",
+    "STYLES": [
+        lambda request: static("as_app/css/mobile_fix.css"),
+    ],
+    "SIDEBAR": {
+        "show_search": False,
+        "show_all_applications": False,
+        "navigation": "as_project.settings.sidebar_callback",
     },
 }

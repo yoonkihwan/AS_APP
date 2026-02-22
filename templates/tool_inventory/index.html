@@ -1,0 +1,329 @@
+{% extends 'admin/base.html' %}
+
+{% load i18n %}
+
+{% block title %}대시보드 | {{ site_title }}{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+    /* ── 대시보드 전체 스타일 ── */
+    .dash-grid {
+        display: grid;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .dash-grid-4 {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .dash-grid-2 {
+        grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 1024px) {
+        .dash-grid-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    /* ── KPI 카드 ── */
+    .kpi-card {
+        background: var(--color-bg, #fff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.75rem;
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .kpi-icon .material-icons-outlined {
+        font-size: 24px;
+        color: #fff;
+    }
+
+    .kpi-info {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .kpi-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-muted, #6b7280);
+    }
+
+    .kpi-metric {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-color, #111827);
+        line-height: 1.2;
+    }
+
+    /* ── 데이터 테이블 패널 ── */
+    .dash-panel {
+        background: var(--color-bg, #fff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.75rem;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .dash-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+    }
+
+    .dash-panel-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-color, #111827);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .dash-panel-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0 0.5rem;
+        color: #fff;
+    }
+
+    .dash-panel-link {
+        font-size: 0.8rem;
+        color: #6366f1;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .dash-panel-link:hover {
+        text-decoration: underline;
+    }
+
+    /* ── 테이블 ── */
+    .dash-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .dash-table th {
+        text-align: left;
+        padding: 0.625rem 1.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-muted, #6b7280);
+        background: var(--color-bg-secondary, #f9fafb);
+    }
+
+    .dash-table td {
+        padding: 0.625rem 1.25rem;
+        font-size: 0.85rem;
+        color: var(--text-color, #374151);
+        border-top: 1px solid var(--border-color, #f3f4f6);
+    }
+
+    .dash-table tr:hover td {
+        background: var(--color-bg-secondary, #f9fafb);
+    }
+
+    .text-muted {
+        color: var(--text-muted, #9ca3af);
+        font-size: 0.8rem;
+    }
+
+    .dash-empty {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: var(--text-muted, #9ca3af);
+        font-size: 0.85rem;
+    }
+
+    /* ── 다크 모드 ── */
+    .dark .kpi-card,
+    .dark .dash-panel {
+        background: #1e293b;
+        border-color: #334155;
+    }
+
+    .dark .kpi-label {
+        color: #94a3b8;
+    }
+
+    .dark .kpi-metric {
+        color: #f1f5f9;
+    }
+
+    .dark .dash-panel-title {
+        color: #f1f5f9;
+    }
+
+    .dark .dash-table th {
+        background: #1a2332;
+        color: #94a3b8;
+    }
+
+    .dark .dash-table td {
+        color: #cbd5e1;
+        border-color: #334155;
+    }
+
+    .dark .dash-table tr:hover td {
+        background: #1a2332;
+    }
+
+    .dark .dash-panel-header {
+        border-color: #334155;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ① KPI 요약 영역 -->
+<div class="dash-grid dash-grid-4">
+    <!-- 보유 재고 총계 -->
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <span class="material-icons-outlined">inventory</span>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-label">현재 보유 재고</span>
+            <span class="kpi-metric">{{ total_inventory|default:"0" }}<span
+                    style="font-size: 0.9rem; font-weight: 500; margin-left: 2px;">개</span></span>
+        </div>
+    </div>
+
+    <!-- 출고 장비 총계 -->
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">
+            <span class="material-icons-outlined">local_shipping</span>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-label">누적 출고된 툴</span>
+            <span class="kpi-metric">{{ total_released|default:"0" }}<span
+                    style="font-size: 0.9rem; font-weight: 500; margin-left: 2px;">개</span></span>
+        </div>
+    </div>
+</div>
+
+<!-- ② 최신 데이터 패널 모음 -->
+<div class="dash-grid dash-grid-2">
+
+    <!-- 최근 입고 처리 내역 -->
+    <div class="dash-panel">
+        <div class="dash-panel-header">
+            <span class="dash-panel-title">
+                <span class="material-icons-outlined" style="color: #10b981;">move_to_inbox</span>
+                최근 입고된 장비
+            </span>
+            <a href="{% url 'tool_admin:tool_inventory_inventory_changelist' %}?status__exact=재고"
+                class="dash-panel-link">재고 전체 보기 →</a>
+        </div>
+        {% if recent_in %}
+        <table class="dash-table">
+            <thead>
+                <tr>
+                    <th>입고일</th>
+                    <th>품목명</th>
+                    <th>매입처</th>
+                    <th>시리얼</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in recent_in %}
+                <tr>
+                    <td>{{ item.date|date:"Y-m-d" }}</td>
+                    <td><strong>{{ item.name.name }}</strong></td>
+                    <td class="text-muted">{{ item.supplier.name|default:"-" }}</td>
+                    <td>{{ item.serial|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="dash-empty">
+            <span class="material-icons-outlined">inbox</span>
+            최근 입고된 내역이 없습니다.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 최근 출고 완료 -->
+    <div class="dash-panel">
+        <div class="dash-panel-header">
+            <span class="dash-panel-title">
+                <span class="material-icons-outlined" style="color: #3b82f6;">flight_takeoff</span>
+                최근 출고된 장비
+            </span>
+            <a href="{% url 'tool_admin:tool_inventory_inventory_changelist' %}?status__exact=출고"
+                class="dash-panel-link">출고 내역 전체 보기 →</a>
+        </div>
+        {% if recent_out %}
+        <table class="dash-table">
+            <thead>
+                <tr>
+                    <th>출고일</th>
+                    <th>품목명</th>
+                    <th>출고 현장</th>
+                    <th>시리얼</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in recent_out %}
+                <tr>
+                    <td>{{ item.release_date|date:"Y-m-d" }}</td>
+                    <td><strong>{{ item.name.name }}</strong></td>
+                    <td class="text-muted">{{ item.release_supplier.name|default:"-" }}</td>
+                    <td>{{ item.serial|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="dash-empty">
+            <span class="material-icons-outlined">flight_land</span>
+            최근 출고된 장비가 없습니다.
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+{% endblock %}
