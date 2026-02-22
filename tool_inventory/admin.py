@@ -194,33 +194,108 @@ class InventoryBatchAdmin(ModelAdmin):
             from django.contrib import messages
             messages.info(request, f"시리얼번호 분리로 총 {saved_count}건의 툴장비가 등록되었습니다.")
 
+from .models import Inventory, InventoryBatch, InboundInventory, OutboundInventory, OutboundBatch, OutboundTicket
+from .forms import InventoryForm, OutboundTicketForm
+
+class OutboundTicketInline(TabularInline):
+    model = OutboundTicket
+    fk_name = "batch"
+    form = OutboundTicketForm
+    fields = ["brand", "tool", "current_stock", "quantity", "inventories"]
+    verbose_name = "출고등록 티켓"
+    verbose_name_plural = "출고등록 티켓"
+    extra = 0
+    min_num = 1
+
+@admin.register(OutboundBatch, site=tool_admin_site)
+class OutboundBatchAdmin(ModelAdmin):
+    list_display = ["release_date", "release_company", "created_at"]
+    list_filter = ["release_date", "release_company"]
+    search_fields = ["release_company__name"]
+    autocomplete_fields = ["release_company"]
+    list_per_page = 20
+    inlines = [OutboundTicketInline]
+
+    class Media:
+        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/outbound_form.css")}
+        js = ("as_app/js/outbound_form.js",)
+
+    def get_model_perms(self, request):
+        return {}
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        
+    def save_formset(self, request, form, formset, change):
+        super().save_formset(request, form, formset, change)
+        if formset.model == OutboundTicket:
+            for instance in formset.instances:
+                if instance in formset.deleted_objects:
+                    continue
+                
+                selected_inventories = list(instance.inventories.all())
+                
+                # 시리얼 번호가 골라지지 않았을 때는 선입선출 자동 배정
+                if not selected_inventories:
+                    qty = instance.quantity or 1
+                    auto_inventories = Inventory.objects.filter(
+                        tool=instance.tool, 
+                        status='재고'
+                    ).order_by('date')[:qty]
+                    
+                    for inv in auto_inventories:
+                        inv.release_date = instance.batch.release_date
+                        inv.release_company = instance.batch.release_company
+                        inv.status = '출고'
+                        inv.save()
+                        instance.inventories.add(inv)
+                else:
+                    # 유저가 직접 다중 선택한 경우
+                    for inv in selected_inventories:
+                        inv.release_date = instance.batch.release_date
+                        inv.release_company = instance.batch.release_company
+                        inv.status = '출고'
+                        inv.save()
+                        
+                instance.quantity = instance.inventories.count()
+                instance.save()
+
 @admin.register(OutboundInventory, site=tool_admin_site)
 class OutboundInventoryAdmin(ModelAdmin):
-    list_display = ["tool", "serial", "supplier", "date", "status"]
+    list_display = (
+        'display_status', 'date', 'supplier', 'tool', 'serial'
+    )
     list_display_links = None
     list_filter = ["supplier", "tool__brand", "tool"]
     search_fields = ["serial", "supplier__name", "tool__model_name", "tool__brand__name"]
     list_per_page = 30
-    actions = ["mark_as_released_today"]
-    ordering = ["-date"]
+    
+    def changelist_view(self, request, extra_context=None):
+        return HttpResponseRedirect(reverse("tool_admin:tool_inventory_outboundbatch_add"))
+    list_display = (
+        'display_status', 'date', 'supplier', 'tool', 'serial'
+    )
+    list_display_links = None
+    list_filter = ["supplier", "tool__brand", "tool"]
+    search_fields = ["serial", "supplier__name", "tool__model_name", "tool__brand__name"]
+    list_per_page = 30
+
+    class Media:
+        css = {"all": ("as_app/css/row_colors.css",)}
+
+    @display(description="상태")
+    def display_status(self, obj):
+        css_status = "inbound" if obj.status == "재고" else "shipped"
+        return format_html(
+            '<span class="status-marker" data-status="{}">{}</span>',
+            css_status,
+            obj.get_status_display(),
+        )
 
     def get_queryset(self, request):
+        # '재고' 상태인 데이터만 표시
         return super().get_queryset(request).filter(status='재고')
 
-    def has_add_permission(self, request):
-        return False
-        
-    def has_change_permission(self, request, obj=None):
-        if obj is None:
-            return True
-        return False
-
-    @unfold_action(description="✅ 선택 항목 출고 처리 (오늘 날짜)")
-    def mark_as_released_today(self, request, queryset):
-        today = timezone.now().date()
-        updated = queryset.update(
-            status='출고',
-            release_date=today,
-        )
-        from django.contrib import messages
-        messages.success(request, f"{updated}건이 출고 처리되었습니다. (출고일: {today.strftime('%Y-%m-%d')})")
+    def add_view(self, request, form_url='', extra_context=None):
+        # "추가" 버튼 클릭 시 OutboundBatch 생성 화면으로 리다이렉트
+        return HttpResponseRedirect(reverse("tool_admin:tool_inventory_outboundbatch_add"))

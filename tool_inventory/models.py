@@ -21,6 +21,56 @@ class InventoryBatch(models.Model):
     def __str__(self):
         return f"{self.inbound_date} | {self.supplier.name} ({self.inventories.count()}건)"
 
+class OutboundBatch(models.Model):
+    """출고 배치 - 한 번에 여러 툴/장비를 출고 등록"""
+    release_date = models.DateField("출고 날짜")
+    release_company = models.ForeignKey(
+        'as_app.Company',
+        on_delete=models.PROTECT,
+        verbose_name="출고업체",
+        related_name="tool_outbound_batches",
+    )
+    created_at = models.DateTimeField("생성일", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "일괄 출고 등록"
+        verbose_name_plural = "일괄 출고 등록"
+        ordering = ["-release_date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.release_date} | {self.release_company.name} ({self.tickets.count()}건)"
+
+class OutboundTicket(models.Model):
+    batch = models.ForeignKey(
+        OutboundBatch,
+        on_delete=models.CASCADE,
+        verbose_name="출고 배치",
+        related_name="tickets"
+    )
+    tool = models.ForeignKey(
+        'as_app.Tool',
+        on_delete=models.PROTECT,
+        verbose_name="대상 장비"
+    )
+    quantity = models.PositiveIntegerField(
+        "출고 수량",
+        default=1,
+        help_text="시리얼 미선택 시, 이 수량만큼 선입선출 출고"
+    )
+    inventories = models.ManyToManyField(
+        'Inventory',
+        blank=True,
+        verbose_name="출고 대상 (시리얼 다중선택)",
+        limit_choices_to={'status': '재고'}
+    )
+
+    class Meta:
+        verbose_name = "출고등록 티켓"
+        verbose_name_plural = "출고등록 티켓"
+        
+    def __str__(self):
+        return f"{self.tool.model_name} ({self.quantity}개)"
+
 class Inventory(models.Model):
     """메인 방비/툴 재고 리스트"""
     STATUS_CHOICES = [

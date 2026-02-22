@@ -22,6 +22,8 @@ from as_app import views as as_views
 from as_project import views as as_project_views
 from tool_inventory.admin import tool_admin_site
 from as_project.sysadmin import sysadmin_site
+from tool_inventory import views as tool_views
+
 urlpatterns = [
     path("", as_project_views.portal_view, name="portal_view"),
     # /admin/as_app/ 클릭 시 대시보드(메인)로 바로 리다이렉트
@@ -31,6 +33,7 @@ urlpatterns = [
     path("sysadmin/", sysadmin_site.urls),
     path("signup/", as_project_views.signup_view, name="signup_view"),
     path("api/tools-by-brand/", as_views.get_tools_by_brand, name="api_tools_by_brand"),
+    path("api/inventory-by-tool/", tool_views.get_inventory_by_tool, name="api_inventory_by_tool"),
 ]
 
 admin.site.site_header = "AS 관리"

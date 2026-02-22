@@ -1,0 +1,78 @@
+/* 출고업체 및 모델 드롭다운 옆 관련 버튼(+, 수정, 보기) 삭제 */
+.field-release_company .related-widget-wrapper-link,
+.field-tool .related-widget-wrapper-link,
+.field-brand .related-widget-wrapper-link {
+    display: none !important;
+}
+
+/* 최하단 저장 옵션 중 "저장 및 다른 이름으로 추가", "저장 및 편집 계속" 버튼 삭제 */
+input[name="_addanother"],
+input[name="_continue"],
+button[name="_addanother"],
+button[name="_continue"] {
+    display: none !important;
+}
+
+/* 입고등록 인라인 폼(단일 시리얼)과 출고등록 인라인 폼 배열 너비 맞춤 */
+@media (min-width: 768px) {
+
+    /* 브랜드 드롭박스 너비 고정 */
+    .djn-inline-form .field-brand,
+    .tabular .field-brand {
+        width: 300px !important;
+        min-width: 300px !important;
+        max-width: 300px !important;
+    }
+
+    /* 대상 장비 드롭박스 너비 고정 */
+    .djn-inline-form .field-tool,
+    .tabular .field-tool {
+        width: 300px !important;
+        min-width: 300px !important;
+        max-width: 300px !important;
+    }
+
+    /* 출고 수량 너비 고정 */
+    .tabular .field-quantity {
+        width: 150px !important;
+        min-width: 150px !important;
+        max-width: 150px !important;
+    }
+}
+
+@media (max-width: 767px) {
+
+    /* 모바일 플렉시블 */
+    .djn-inline-form .field-brand,
+    .tabular .field-brand,
+    .djn-inline-form .field-tool,
+    .tabular .field-tool,
+    .tabular .field-quantity {
+        width: 100% !important;
+        min-width: auto !important;
+        max-width: 100% !important;
+    }
+}
+
+/* 다중선택 Select 폼 공간을 나머지 넓이로 꽉차게 */
+.tabular .field-inventories {
+    width: auto !important;
+    max-width: none !important;
+}
+
+/* 다중 재고선택(inventories) 위젯이 길게 잘 보이도록 설정 */
+.tabular .field-inventories select {
+    width: 100% !important;
+    min-height: 80px;
+    height: auto !important;
+}
+
+/* 관련 위젯 컨테이너 100% 채움 */
+.field-brand .select2-container,
+.field-brand .related-widget-wrapper,
+.field-tool .select2-container,
+.field-tool .related-widget-wrapper,
+.field-inventories .select2-container,
+.field-inventories .related-widget-wrapper {
+    width: 100% !important;
+}
