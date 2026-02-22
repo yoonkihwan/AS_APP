@@ -1,7 +1,12 @@
 from django import forms
 from .models import Inventory
 from as_app.models import Brand, Tool
-from unfold.widgets import UnfoldAdminSelectWidget
+from unfold.widgets import (
+    UnfoldAdminSelectWidget,
+    UnfoldBooleanWidget,
+    UnfoldAdminIntegerFieldWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 class InventoryForm(forms.ModelForm):
     """Inventory Inline용 커스텀 폼 - 브랜드 필드 추가"""
@@ -11,14 +16,28 @@ class InventoryForm(forms.ModelForm):
         label="브랜드",
         required=False,
         empty_label="---------",
-        widget=UnfoldAdminSelectWidget(),
+        widget=UnfoldAdminSelectWidget(attrs={'style': 'width: 100px; min-width: 100px;'}),
+    )
+
+    no_serial = forms.BooleanField(
+        label="시리얼번호 없음",
+        required=False,
+        widget=UnfoldBooleanWidget(),
+    )
+
+    quantity = forms.IntegerField(
+        label="수량",
+        min_value=1,
+        required=False,
+        widget=UnfoldAdminIntegerFieldWidget(attrs={'style': 'width: 80px;', 'placeholder': '1'}),
     )
 
     class Meta:
         model = Inventory
-        fields = ["brand", "tool", "serial"]
+        fields = ["brand", "tool", "no_serial", "quantity", "serial"]
         widgets = {
-            "tool": UnfoldAdminSelectWidget(),
+            "tool": UnfoldAdminSelectWidget(attrs={'style': 'width: 125px; min-width: 125px;'}),
+            "serial": UnfoldAdminTextInputWidget(attrs={'style': 'width: 100%; min-width: 200px;'}),
         }
 
     def __init__(self, *args, **kwargs):

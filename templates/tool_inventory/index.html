@@ -270,7 +270,7 @@
                 {% for item in recent_in %}
                 <tr>
                     <td>{{ item.date|date:"Y-m-d" }}</td>
-                    <td><strong>{{ item.name.name }}</strong></td>
+                    <td><strong>{{ item.tool.model_name }}</strong></td>
                     <td class="text-muted">{{ item.supplier.name|default:"-" }}</td>
                     <td>{{ item.serial|default:"-" }}</td>
                 </tr>
@@ -309,8 +309,8 @@
                 {% for item in recent_out %}
                 <tr>
                     <td>{{ item.release_date|date:"Y-m-d" }}</td>
-                    <td><strong>{{ item.name.name }}</strong></td>
-                    <td class="text-muted">{{ item.release_supplier.name|default:"-" }}</td>
+                    <td><strong>{{ item.tool.model_name }}</strong></td>
+                    <td class="text-muted">{{ item.release_company.name|default:"-" }}</td>
                     <td>{{ item.serial|default:"-" }}</td>
                 </tr>
                 {% endfor %}

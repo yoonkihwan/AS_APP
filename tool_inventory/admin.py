@@ -52,6 +52,7 @@ class InventoryAdmin(ModelAdmin):
         'release_company', 'release_date', 'display_edit_button'
     )
     list_display_links = None
+    actions = ['cancel_outbound']
     list_filter = ('status', 'supplier', 'release_company')
     search_fields = ('tool__model_name', 'tool__brand__name', 'serial', 'supplier__name', 'release_company__name')
     list_per_page = 50
@@ -59,9 +60,63 @@ class InventoryAdmin(ModelAdmin):
 
     class Media:
         css = {"all": ("as_app/css/row_colors.css",)}
+        js = ("as_app/js/inventory_change.js",)
+
+    @unfold_action(description="↩️ 선택한 장비 출고 취소 (재고로 원복)")
+    def cancel_outbound(self, request, queryset):
+        qs = queryset.filter(status='출고')
+        count = qs.count()
+        if count == 0:
+            from django.contrib import messages
+            messages.warning(request, "선택한 항목 중 '출고' 상태인 장비가 없습니다.")
+            return
+
+        for obj in qs:
+            obj.status = '재고'
+            obj.release_date = None
+            obj.release_company = None
+            obj.save(update_fields=['status', 'release_date', 'release_company'])
+            
+        from django.contrib import messages
+        messages.success(request, f"총 {count}개의 장비가 성공적으로 재고로 원복되었습니다.")
 
     def has_add_permission(self, request):
         return False
+
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        context["show_save_and_continue"] = False
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    fields = (
+        'id', 'date', 'supplier_text', 'tool_text', 'serial',
+        'release_date', 'release_company', 'status'
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            # 수정 모드: 'serial', 'release_company', 'release_date' 수정 가능
+            # 입고배치(batch)는 fields에서 제외하여 보이지 않게 함
+            # 품목(tool) 및 입고처(supplier)는 단순 텍스트로 표시되어 링크 이동 방지
+            return ['id', 'date', 'supplier_text', 'tool_text', 'status']
+        return super().get_readonly_fields(request, obj)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if 'release_company' in form.base_fields:
+            widget = form.base_fields['release_company'].widget
+            widget.can_add_related = False
+            widget.can_change_related = False
+            widget.can_delete_related = False
+            widget.can_view_related = False
+        return form
+
+    @display(description="입고처")
+    def supplier_text(self, obj):
+        return str(obj.supplier) if obj.supplier else "-"
+
+    @display(description="품목명")
+    def tool_text(self, obj):
+        return str(obj.tool) if obj.tool else "-"
 
     @display(description="상태")
     def display_status(self, obj):
@@ -93,7 +148,7 @@ class InventoryInline(TabularInline):
     model = Inventory
     fk_name = "batch"
     form = InventoryForm
-    fields = ["brand", "tool", "serial"]
+    fields = ["brand", "tool", "no_serial", "quantity", "serial"]
     verbose_name = "입고등록 티켓"
     verbose_name_plural = "입고등록 티켓"
     extra = 0
@@ -165,8 +220,29 @@ class InventoryBatchAdmin(ModelAdmin):
         batch = form.instance
         
         expanded = []
-        for instance in instances:
-            if instance.tool_id and instance.serial:
+        for inline_form in formset.forms:
+            if inline_form.instance in formset.deleted_objects or getattr(inline_form, 'cleaned_data', None) is None:
+                continue
+            if not inline_form.has_changed() and not inline_form.instance.pk:
+                continue
+                
+            instance = inline_form.instance
+            no_serial = inline_form.cleaned_data.get('no_serial', False)
+            quantity = inline_form.cleaned_data.get('quantity', 1) or 1
+            
+            if no_serial:
+                for _ in range(quantity):
+                    if _ == 0:
+                        instance.serial = None
+                        expanded.append(instance)
+                    else:
+                        new_inv = Inventory(
+                            batch=batch,
+                            tool=instance.tool,
+                            serial=None,
+                        )
+                        expanded.append(new_inv)
+            elif instance.tool_id and instance.serial:
                 serials = [s.strip() for s in instance.serial.split(",") if s.strip()]
                 if len(serials) > 1:
                     instance.serial = serials[0]
@@ -176,7 +252,6 @@ class InventoryBatchAdmin(ModelAdmin):
                             batch=batch,
                             tool=instance.tool,
                             serial=sn,
-                            # status is '재고' by default
                         )
                         expanded.append(new_inv)
                 else:
