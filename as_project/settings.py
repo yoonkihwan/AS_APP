@@ -171,17 +171,28 @@ def sidebar_callback(request):
                 ],
             },
             {
-                "title": "업무 메뉴",
+                "title": "대시보드",
                 "separator": True,
                 "items": [
                     {
-                        "title": "메인 대시보드",
+                        "title": "대시보드",
                         "icon": "dashboard",
                         "link": reverse_lazy("tool_admin:index"),
                     },
+                ],
+            },
+            {
+                "title": "툴 입출고 관리",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "통합 재고 리스트",
+                        "icon": "history",
+                        "link": reverse_lazy("tool_admin:tool_inventory_inventory_changelist"),
+                    },
                     {
                         "title": "입고 등록",
-                        "icon": "add_circle_outline",
+                        "icon": "inbox",
                         "link": reverse_lazy("tool_admin:tool_inventory_inventorybatch_add"),
                     },
                     {
@@ -189,31 +200,26 @@ def sidebar_callback(request):
                         "icon": "local_shipping",
                         "link": reverse_lazy("tool_admin:tool_inventory_outboundinventory_changelist"),
                     },
-                    {
-                        "title": "툴 인벤토리 리스트",
-                        "icon": "inventory_2",
-                        "link": reverse_lazy("tool_admin:tool_inventory_inventory_changelist"),
-                    },
                 ],
             },
             {
-                "title": "기준 정보",
+                "title": "기준 정보 (AS관리 연동)",
                 "separator": True,
                 "items": [
                     {
-                        "title": "입고처",
+                        "title": "의뢰 업체 (입고처)",
                         "icon": "store",
-                        "link": reverse_lazy("tool_admin:tool_inventory_supplier_changelist"),
+                        "link": reverse_lazy("admin:as_app_outsourcecompany_changelist"),
                     },
                     {
-                        "title": "출고처",
+                        "title": "매출처 (현장출고처)",
                         "icon": "local_shipping",
-                        "link": reverse_lazy("tool_admin:tool_inventory_releasesupplier_changelist"),
+                        "link": reverse_lazy("admin:as_app_company_changelist"),
                     },
                     {
-                        "title": "품목명",
+                        "title": "툴 장비 모델정보",
                         "icon": "category",
-                        "link": reverse_lazy("tool_admin:tool_inventory_itemname_changelist"),
+                        "link": reverse_lazy("admin:as_app_tool_changelist"),
                     },
                 ],
             },

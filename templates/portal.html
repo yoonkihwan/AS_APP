@@ -336,9 +336,18 @@
         <div class="cards">
             <!-- AS 업무 시스템 카드 -->
             <a href="/admin/" class="card as-app {% if not user.is_authenticated %}disabled-card{% endif %}">
-                <div class="icon">🔧</div>
-                <div class="title">AS 관리 시스템</div>
-                <div class="desc">AS 장비 입고, 수리 기록, 출고, 이력 관리 업무</div>
+                <div class="icon">🚧</div>
+                <div class="title" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    AS 관리 시스템
+                    <span
+                        style="font-size: 0.7rem; background-color: #fef08a; color: #854d0e; padding: 2px 6px; border-radius: 4px; font-weight: 700;">개발중</span>
+                </div>
+                <div class="desc">
+                    AS 장비 입고, 수리 기록, 출고, 이력 관리<br>
+                    <span
+                        style="color: #ef4444; font-size: 0.8rem; font-weight: 500; margin-top: 4px; display: inline-block;">(현재
+                        시스템 구축 중)</span>
+                </div>
             </a>
 
             <!-- 툴/장비 인벤토리 시스템 카드 -->

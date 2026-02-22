@@ -6,7 +6,8 @@ from unfold.admin import ModelAdmin, TabularInline
 from unfold.sites import UnfoldAdminSite
 from unfold.decorators import action as unfold_action, display
 from django.utils import timezone
-from .models import Supplier, ReleaseSupplier, ItemName, Inventory, InventoryBatch, InboundInventory, OutboundInventory
+from .models import Inventory, InventoryBatch, InboundInventory, OutboundInventory
+from as_app.models import OutsourceCompany, Company, Tool, Brand
 
 class ToolInventoryAdminSite(UnfoldAdminSite):
     site_title = "장비/툴 관리 시스템"
@@ -17,34 +18,41 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
 
 tool_admin_site = ToolInventoryAdminSite(name='tool_admin')
 
-@admin.register(Supplier, site=tool_admin_site)
-class SupplierAdmin(ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+# ── Register AS_APP models for autocomplete functionality in Tool Inventory ──
+@admin.register(OutsourceCompany, site=tool_admin_site)
+class ToolOutsourceCompanyAdmin(ModelAdmin):
+    search_fields = ["name"]
+    def has_module_permission(self, request): return False
 
-@admin.register(ReleaseSupplier, site=tool_admin_site)
-class ReleaseSupplierAdmin(ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+@admin.register(Company, site=tool_admin_site)
+class ToolCompanyAdmin(ModelAdmin):
+    search_fields = ["name"]
+    def has_module_permission(self, request): return False
 
-@admin.register(ItemName, site=tool_admin_site)
-class ItemNameAdmin(ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+@admin.register(Brand, site=tool_admin_site)
+class ToolBrandAdmin(ModelAdmin):
+    search_fields = ["name"]
+    def has_module_permission(self, request): return False
+
+@admin.register(Tool, site=tool_admin_site)
+class ToolToolAdmin(ModelAdmin):
+    search_fields = ["model_name", "brand__name"]
+    autocomplete_fields = ["brand"]
+    def has_module_permission(self, request): return False
 
 @admin.register(Inventory, site=tool_admin_site)
 class InventoryAdmin(ModelAdmin):
-    list_display = ('name', 'serial', 'supplier', 'date', 'release_supplier', 'release_date', 'status')
-    list_filter = ('status', 'supplier', 'release_supplier')
-    search_fields = ('name__name', 'serial', 'supplier__name', 'release_supplier__name')
+    list_display = ('tool', 'serial', 'supplier', 'date', 'release_company', 'release_date', 'status')
+    list_filter = ('status', 'supplier', 'release_company')
+    search_fields = ('tool__model_name', 'tool__brand__name', 'serial', 'supplier__name', 'release_company__name')
     date_hierarchy = 'date'
     list_per_page = 50
-    autocomplete_fields = ('name', 'supplier', 'release_supplier')
+    autocomplete_fields = ('tool', 'supplier', 'release_company')
 
 class InventoryInline(TabularInline):
     model = Inventory
     fk_name = "batch"
-    fields = ["name", "serial", "status"]
+    fields = ["tool", "serial", "status"]
     extra = 0
     min_num = 1
 
@@ -99,7 +107,7 @@ class InventoryBatchAdmin(ModelAdmin):
         
         expanded = []
         for instance in instances:
-            if instance.name_id and instance.serial:
+            if instance.tool_id and instance.serial:
                 serials = [s.strip() for s in instance.serial.split(",") if s.strip()]
                 if len(serials) > 1:
                     instance.serial = serials[0]
@@ -107,14 +115,14 @@ class InventoryBatchAdmin(ModelAdmin):
                     for sn in serials[1:]:
                         new_inv = Inventory(
                             batch=batch,
-                            name=instance.name,
+                            tool=instance.tool,
                             serial=sn,
                             status=instance.status
                         )
                         expanded.append(new_inv)
                 else:
                     expanded.append(instance)
-            elif instance.name_id:
+            elif instance.tool_id:
                 expanded.append(instance)
 
         saved_count = 0
@@ -132,10 +140,10 @@ class InventoryBatchAdmin(ModelAdmin):
 
 @admin.register(OutboundInventory, site=tool_admin_site)
 class OutboundInventoryAdmin(ModelAdmin):
-    list_display = ["name", "serial", "supplier", "date", "status"]
+    list_display = ["tool", "serial", "supplier", "date", "status"]
     list_display_links = None
-    list_filter = ["supplier", "name"]
-    search_fields = ["serial", "supplier__name", "name__name"]
+    list_filter = ["supplier", "tool__brand", "tool"]
+    search_fields = ["serial", "supplier__name", "tool__model_name", "tool__brand__name"]
     list_per_page = 30
     actions = ["mark_as_released_today"]
     ordering = ["-date"]

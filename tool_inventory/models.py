@@ -1,57 +1,15 @@
 import uuid
 from django.db import models
-
-class Supplier(models.Model):
-    """입고처 (매입처) 마스터 데이터"""
-    name = models.CharField("입고처명", max_length=100, unique=True, primary_key=True)
-
-    class Meta:
-        verbose_name = "입고처"
-        verbose_name_plural = "입고처 목록"
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
-
-class ReleaseSupplier(models.Model):
-    """출고처 (현장) 마스터 데이터"""
-    name = models.CharField("출고처명", max_length=100, unique=True, primary_key=True)
-
-    class Meta:
-        verbose_name = "출고처"
-        verbose_name_plural = "출고처 목록"
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
-
-class ItemName(models.Model):
-    """품목 이름 마스터 데이터"""
-    name = models.CharField("품목명", max_length=200, unique=True, primary_key=True)
-
-    class Meta:
-        verbose_name = "품목명"
-        verbose_name_plural = "품목 관리"
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
+# Removing legacy Supplier, ReleaseSupplier, ItemName classes since we map to as_app models now.
 
 class InventoryBatch(models.Model):
     """입고 배치 - 한 번에 여러 툴/장비를 입고 등록"""
     inbound_date = models.DateField("입고 날짜")
     supplier = models.ForeignKey(
-        Supplier,
+        'as_app.OutsourceCompany',
         on_delete=models.PROTECT,
         verbose_name="입고업체",
         related_name="inbound_batches",
-        null=True,
-    )
-    as_supplier = models.ForeignKey(
-        'as_app.OutsourceCompany',
-        on_delete=models.PROTECT,
-        null=True, blank=True,
-        verbose_name="입고처(AS앱)",
     )
     manager = models.CharField("담당자/부서", max_length=100, blank=True)
     memo = models.TextField("메모", blank=True)
@@ -92,41 +50,23 @@ class Inventory(models.Model):
     )
     
     supplier = models.ForeignKey(
-        Supplier, 
-        on_delete=models.RESTRICT, 
-        verbose_name="입고처",
-        null=True,
-    )
-    as_supplier = models.ForeignKey(
         'as_app.OutsourceCompany',
         on_delete=models.PROTECT,
-        null=True, blank=True,
+        verbose_name="입고처",
     )
     date = models.DateField("입고일 자")
-    name = models.ForeignKey(
-        ItemName, 
-        on_delete=models.RESTRICT, 
-        verbose_name="품목명",
-        null=True,
-    )
-    as_tool = models.ForeignKey(
+    tool = models.ForeignKey(
         'as_app.Tool',
         on_delete=models.PROTECT,
-        null=True, blank=True,
+        verbose_name="품목명",
     )
     serial = models.CharField("시리얼 번호", max_length=100, blank=True, null=True)
     
     release_date = models.DateField("출고일자", blank=True, null=True)
-    release_supplier = models.ForeignKey(
-        ReleaseSupplier, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        verbose_name="출고처"
-    )
-    as_release_company = models.ForeignKey(
+    release_company = models.ForeignKey(
         'as_app.Company',
         on_delete=models.SET_NULL,
+        verbose_name="출고처",
         null=True, blank=True,
     )
     
@@ -138,7 +78,7 @@ class Inventory(models.Model):
         ordering = ['-date']
 
     def __str__(self):
-        base_str = f"[{self.status}] {self.name.name}"
+        base_str = f"[{self.status}] {self.tool.model_name}"
         if self.serial:
             base_str += f" (S/N: {self.serial})"
         return base_str
