@@ -10,16 +10,16 @@
 
         body {
             font-family: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f1f5f9;
-            /* slate-100 */
+            background-color: #0f172a;
+            /* slate-900 */
             margin: 0;
             padding: 0;
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            color: #0f172a;
-            /* slate-900 */
+            color: #f1f5f9;
+            /* slate-100 */
         }
 
         .container {
@@ -30,7 +30,7 @@
         }
 
         h1 {
-            color: #0f172a;
+            color: #f8fafc;
             font-size: 2.25rem;
             margin-bottom: 2.5rem;
             font-weight: 700;
@@ -39,21 +39,22 @@
 
         /* ── 로그인 폼 스타일 ── */
         .login-wrapper {
-            background: #ffffff;
+            background: #1e293b;
+            /* slate-800 */
             border-radius: 12px;
             padding: 2.5rem 2rem;
             margin: 0 auto 3rem auto;
             max-width: 400px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e2e8f0;
-            /* slate-200 */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155;
+            /* slate-700 */
         }
 
         .login-wrapper h2 {
             margin-top: 0;
             margin-bottom: 1.5rem;
             font-size: 1.5rem;
-            color: #0f172a;
+            color: #f8fafc;
             font-weight: 600;
             letter-spacing: -0.02em;
         }
@@ -66,28 +67,29 @@
             width: 100%;
             box-sizing: border-box;
             padding: 0.75rem 1rem;
-            border: 1px solid #cbd5e1;
-            /* slate-300 */
+            border: 1px solid #475569;
+            /* slate-600 */
             border-radius: 8px;
             font-size: 0.95rem;
-            color: #1e293b;
-            /* slate-800 */
+            color: #f1f5f9;
+            /* slate-100 */
             transition: all 0.2s ease-in-out;
-            background-color: #f8fafc;
-            /* slate-50 */
+            background-color: #0f172a;
+            /* slate-900 */
         }
 
         .input-group input:focus {
             outline: none;
             border-color: #9333ea;
             /* purple-600 */
-            background-color: #ffffff;
-            box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.15);
+            background-color: #1e293b;
+            /* slate-800 */
+            box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.25);
         }
 
         .input-group input::placeholder {
-            color: #94a3b8;
-            /* slate-400 */
+            color: #64748b;
+            /* slate-500 */
         }
 
         .login-btn {
@@ -102,12 +104,12 @@
             border-radius: 8px;
             cursor: pointer;
             transition: background-color 0.2s ease, transform 0.1s ease;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
 
         .login-btn:hover {
-            background-color: #7e22ce;
-            /* purple-700 */
+            background-color: #a855f7;
+            /* purple-500 */
         }
 
         .login-btn:active {
@@ -116,7 +118,8 @@
 
         /* ── 로그인 완료 후 환영 ── */
         .user-wrapper {
-            background: #ffffff;
+            background: #1e293b;
+            /* slate-800 */
             border-radius: 10px;
             padding: 1rem 1.5rem;
             margin: 0 auto 2.5rem auto;
@@ -124,30 +127,31 @@
             align-items: center;
             justify-content: center;
             gap: 1.25rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155;
+            /* slate-700 */
         }
 
         .user-info {
             font-size: 0.95rem;
             font-weight: 500;
-            color: #334155;
-            /* slate-700 */
+            color: #cbd5e1;
+            /* slate-300 */
         }
 
         .user-info b {
-            color: #0f172a;
-            /* slate-900 */
+            color: #f8fafc;
+            /* slate-50 */
             font-weight: 600;
         }
 
         .logout-btn {
-            background-color: #f1f5f9;
-            /* slate-100 */
-            color: #475569;
-            /* slate-600 */
-            border: 1px solid #cbd5e1;
+            background-color: #334155;
+            /* slate-700 */
+            color: #cbd5e1;
             /* slate-300 */
+            border: 1px solid #475569;
+            /* slate-600 */
             padding: 0.4rem 0.8rem;
             border-radius: 6px;
             cursor: pointer;
@@ -157,10 +161,10 @@
         }
 
         .logout-btn:hover {
-            background-color: #e2e8f0;
-            /* slate-200 */
-            color: #0f172a;
-            /* slate-900 */
+            background-color: #475569;
+            /* slate-600 */
+            color: #f8fafc;
+            /* slate-50 */
         }
 
         /* ── 포탈 카드 스타일 ── */
@@ -172,18 +176,20 @@
         }
 
         .card {
-            background: #ffffff;
+            background: #1e293b;
+            /* slate-800 */
             border-radius: 12px;
             padding: 2rem 1.5rem;
             width: 260px;
             text-decoration: none;
-            color: #0f172a;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            color: #f8fafc;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
             align-items: center;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #334155;
+            /* slate-700 */
             position: relative;
             overflow: hidden;
         }
@@ -201,8 +207,9 @@
 
         .card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
-            border-color: #cbd5e1;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+            border-color: #64748b;
+            /* slate-500 */
         }
 
         .card.as-app:hover::before {
@@ -230,14 +237,14 @@
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 0.5rem;
-            color: #1e293b;
-            /* slate-800 */
+            color: #f8fafc;
+            /* slate-50 */
         }
 
         .desc {
             font-size: 0.85rem;
-            color: #64748b;
-            /* slate-500 */
+            color: #94a3b8;
+            /* slate-400 */
             line-height: 1.4;
         }
 
@@ -250,12 +257,12 @@
 
         .signup-btn {
             width: 100%;
-            background-color: #f8fafc;
-            /* slate-50 */
-            color: #475569;
-            /* slate-600 */
-            border: 1px solid #cbd5e1;
+            background-color: #334155;
+            /* slate-700 */
+            color: #cbd5e1;
             /* slate-300 */
+            border: 1px solid #475569;
+            /* slate-600 */
             padding: 0.85rem;
             font-size: 0.95rem;
             font-weight: 600;
@@ -265,16 +272,16 @@
             text-decoration: none;
             display: inline-block;
             box-sizing: border-box;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
 
         .signup-btn:hover {
-            background-color: #f1f5f9;
-            /* slate-100 */
-            color: #0f172a;
-            /* slate-900 */
-            border-color: #94a3b8;
-            /* slate-400 */
+            background-color: #475569;
+            /* slate-600 */
+            color: #f8fafc;
+            /* slate-50 */
+            border-color: #64748b;
+            /* slate-500 */
         }
 
         /* 비로그인 시 카드 비활성화 기법 (선택사항) */

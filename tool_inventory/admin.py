@@ -15,8 +15,11 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
     site_title = "장비/툴 관리 시스템"
     site_header = "장비/툴 관리 대시보드"
     site_url = None
-    index_title = "현황판"
+    index_title = "대시보드"
     index_template = "tool_inventory/index.html"
+
+    def app_index(self, request, app_label, extra_context=None):
+        return HttpResponseRedirect(reverse('tool_admin:index'))
 
 tool_admin_site = ToolInventoryAdminSite(name='tool_admin')
 

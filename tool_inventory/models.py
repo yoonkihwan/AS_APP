@@ -14,7 +14,7 @@ class InventoryBatch(models.Model):
     created_at = models.DateTimeField("생성일", auto_now_add=True)
 
     class Meta:
-        verbose_name = "입고 배치"
+        verbose_name = "입고 등록"
         verbose_name_plural = "입고 등록"
         ordering = ["-inbound_date", "-created_at"]
 
@@ -33,8 +33,8 @@ class OutboundBatch(models.Model):
     created_at = models.DateTimeField("생성일", auto_now_add=True)
 
     class Meta:
-        verbose_name = "일괄 출고 등록"
-        verbose_name_plural = "일괄 출고 등록"
+        verbose_name = "출고 등록"
+        verbose_name_plural = "출고 등록"
         ordering = ["-release_date", "-created_at"]
 
     def __str__(self):
@@ -121,8 +121,8 @@ class Inventory(models.Model):
     status = models.CharField("상태", max_length=10, choices=STATUS_CHOICES, default='재고')
 
     class Meta:
-        verbose_name = "툴/장비 인벤토리"
-        verbose_name_plural = "툴/장비 인벤토리 관리"
+        verbose_name = "통합 재고 리스트"
+        verbose_name_plural = "통합 재고 리스트"
         ordering = ['-date']
 
     def __str__(self):

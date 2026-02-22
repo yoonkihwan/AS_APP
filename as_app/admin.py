@@ -132,10 +132,17 @@ class CompanyAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 # ── 브랜드 + 툴 관리 ──
 
 @admin.register(Brand)
-class BrandAdmin(ModelAdmin):
-    """브랜드 Admin - autocomplete 검색용"""
+class BrandAdmin(CustomTitleMixin, ModelAdmin):
+    custom_title = "브랜드 관리"
+    """브랜드 관리 - autocomplete 검색용 및 탭 연결"""
     list_display = ["name"]
     search_fields = ["name"]
+    change_list_template = "admin/as_app/brand/change_list.html"
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["active_tab"] = "brand"
+        return super().changelist_view(request, extra_context)
 
     def has_module_permission(self, request):
         """사이드바에 표시하지 않음 (Tool Admin에서 통합 관리)"""
@@ -144,13 +151,19 @@ class BrandAdmin(ModelAdmin):
 
 @admin.register(Tool)
 class ToolAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
-    custom_title = "브랜드 & 툴 관리"
-    """브랜드 & 툴 관리 - 메인 리스트"""
+    custom_title = "장비/툴 관리"
+    """장비/툴 관리 - 브랜드 & 툴 메인 탭 리스트"""
     list_display = ["brand", "model_name"]
     list_filter = ["brand"]
     search_fields = ["model_name", "brand__name"]
     autocomplete_fields = ["brand"]
     list_per_page = 20
+    change_list_template = "admin/as_app/tool/change_list.html"
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["active_tab"] = "tool"
+        return super().changelist_view(request, extra_context)
 
 
 @admin.register(Part)

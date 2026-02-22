@@ -164,7 +164,7 @@ def sidebar_callback(request):
                 "separator": False,
                 "items": [
                     {
-                        "title": "포탈 (홈) 으로 돌아가기",
+                        "title": "포탈로 돌아가기",
                         "icon": "home",
                         "link": "/",
                     },
@@ -196,28 +196,28 @@ def sidebar_callback(request):
                         "link": reverse_lazy("tool_admin:tool_inventory_inventorybatch_add"),
                     },
                     {
-                        "title": "출고 처리",
+                        "title": "출고 등록",
                         "icon": "local_shipping",
                         "link": reverse_lazy("tool_admin:tool_inventory_outboundinventory_changelist"),
                     },
                 ],
             },
             {
-                "title": "기준 정보 (AS관리 연동)",
+                "title": "기준 정보 (AS관리 와 연동됨)",
                 "separator": True,
                 "items": [
                     {
-                        "title": "의뢰 업체 (입고처)",
-                        "icon": "store",
-                        "link": reverse_lazy("admin:as_app_outsourcecompany_changelist"),
-                    },
-                    {
-                        "title": "매출처 (현장출고처)",
+                        "title": "매출처",
                         "icon": "local_shipping",
                         "link": reverse_lazy("admin:as_app_company_changelist"),
                     },
                     {
-                        "title": "툴 장비 모델정보",
+                        "title": "입고업체",
+                        "icon": "store",
+                        "link": reverse_lazy("admin:as_app_outsourcecompany_changelist"),
+                    },
+                    {
+                        "title": "브랜드/툴 관리",
                         "icon": "category",
                         "link": reverse_lazy("admin:as_app_tool_changelist"),
                     },
@@ -231,7 +231,7 @@ def sidebar_callback(request):
                 "separator": False,
                 "items": [
                     {
-                        "title": "포탈 (홈) 으로 돌아가기",
+                        "title": "포탈로 돌아가기",
                         "icon": "home",
                         "link": "/",
                     },
@@ -261,7 +261,7 @@ def sidebar_callback(request):
                 "separator": False,
                 "items": [
                     {
-                        "title": "포탈 (홈) 으로 돌아가기",
+                        "title": "포탈로 돌아가기",
                         "icon": "home",
                         "link": "/",
                     },
@@ -352,7 +352,7 @@ def site_title_callback(request):
 
 def site_header_callback(request):
     if request.path.startswith('/inventory/'):
-        return "장비/툴 관리 대시보드"
+        return "TOOL 입출고 관리"
     elif request.path.startswith('/sysadmin/'):
         return "시스템 권한 승인 센터"
     return "AS 시스템"
@@ -365,6 +365,7 @@ def site_symbol_callback(request):
     return "build"
 
 UNFOLD = {
+    "THEME": "dark",
     "SITE_TITLE": "as_project.settings.site_title_callback",
     "SITE_HEADER": "as_project.settings.site_header_callback",
     "SITE_SYMBOL": "as_project.settings.site_symbol_callback",
