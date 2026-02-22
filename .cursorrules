@@ -50,7 +50,13 @@
 - **탭 네비게이션:** 관련 모델을 하나의 메뉴로 통합할 때 탭 방식 사용 (예: 업체관리 → 매출처업체/의뢰업체).
 - **저장 후 리다이렉트:** `response_add`/`response_change`를 오버라이드하여 사용자 워크플로우에 맞는 페이지로 이동.
 
-## 6. Git 커밋 컨벤션 (Conventional Commits)
+## 6. 다중 사이트 분리 아키텍처 (Multi-Admin Sites)
+프로젝트는 기능별로 독립된 Admin Site를 통해 뷰를 분리한다.
+- **AS 시스템 (`as_app`):** 기본 관리자 페이지 (`/admin/`). AS 프로세스와 마스터 데이터의 메인 컨트롤러.
+- **시스템 관리 (`sysadmin`):** 사용자 계정 및 권한 부여 전용 페이지 (`/sysadmin/`). 일괄 권한 부여 액션 탑재.
+- **장비/툴 관리 (`tool_inventory`):** 입출고 및 재고 데이터 전용 페이지 (`/inventory/`). 
+
+## 7. Git 커밋 컨벤션 (Conventional Commits)
 - 형식: `type: Subject`
 - **feat:** 새로운 기능 추가
 - **fix:** 버그 수정

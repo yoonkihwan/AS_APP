@@ -3,10 +3,9 @@
 이 파일은 AI 및 개발자가 **tool_inventory** 앱 작업 시 무조건 준수해야 하는 규칙과 가이드라인을 정의합니다. `TOOL_INVENTORY` 앱은 `AS_APP`과 동일한 웹 서버 상에 존재하지만, 서로 영향을 미쳐서는 안 되는 독립된 시스템입니다.
 
 ## 1. 기본 원칙 (Core Principles)
-- **독립적 환경 보장 (Isolation):** 본 앱은 다른 앱(`as_app`)의 데이터 테이블이나 Admin 뷰, 기능 로직과 절대 간섭하지 않아야 합니다. URL도 완전히 분리하여 운영합니다 (Multi-Admin Site 구성).
-- **Single Source of Truth:** `tool_inventory`의 기능 명세와 비즈니스 로직에 대한 정의는 오로지 `TOOL_INVENTORY.MD`를 최우선으로 참고합니다.
-- **원형 복원 (Data Integrity):** 데스크톱 앱에서 사용되던 기존 `inventory.db` 파일의 데이터를 100% 무손실로 이전하는 마이그레이션을 보장해야 합니다.
-- **User-Centric:** 기존 exe 파일을 다루던 사용자(실무자) 입장에서 직관성을 잃지 않도록, 빠르고 간결하게 입력 및 출고 처리가 가능하도록 UI를 구성합니다.
+- **독립적 환경 보장 (Isolation):** 본 앱은 다른 앱(`as_app`)의 트랜잭션 데이터 관리 로직과 절대 간섭하지 않아야 합니다. URL도 완전히 분리하여 운영합니다 (Multi-Admin Site 구성).
+- **Single Source of Truth (기준 정보 통합):** AS 관리와 장비 자원명이 파편화 되는 것을 막기 위해 `Brand`, `Tool` 마스터 모델은 **`as_app.models`**의 것을 직접 차용(Foreign Key)하여 사용해야 합니다.
+- **User-Centric:** 기존 exe 파일을 다루던 사용자(실무자) 입장에서 직관성을 잃지 않도록, 빠르고 간결하게 입력 및 출고 처리가 가능하도록 UI를 구성합니다. 인라인 수정 + 비동기 JS 방식 등을 활용해야 합니다.
 
 ## 2. 기술 스택 및 환경 (Tech & Environment)
 - **Backend/App:** Python 3.x, Django 5.x
@@ -15,12 +14,12 @@
 
 ## 3. Django 개발 패턴 (Architecture & Patterns)
 ### 3.1. Models
-- 과거 SQLite의 직관적 테이블 구조를 기반으로 필드를 매핑하되, 확장성을 위해 Django의 외래키(Foreign Key) 모델을 적용합니다 (`Supplier`, `ReleaseSupplier`, `ItemName`).
+- 과거 SQLite의 테이블 구조를 객체지향에 맞게 분해하여 관리합니다. 입/출고 각각 배치(Batch) 단위를 그룹핑하는 헤더를 생성하여 사용합니다. 
 - 메인 `Inventory` 테이블의 PK는 기존 데이터와 호환성을 유지하기 위해 반드시 `UUIDField`를 사용합니다.
 
 ### 3.2. Views & Admin
 - **분리형 대시보드:** Django Unfold의 Custom Admin Site를 생성하여, 로그인 화면과 대시보드 화면이 `as_app`과 완전히 다르게 보이도록 렌더링합니다.
-- **빠른 데이터 탐색:** 품목명 검색, 입출고 일자 필터, 업체 필터를 관리자 UI 목록 상단과 측면에 직관적으로 배치합니다.
+- **JS 동적 제어:** `OutboundTicket` 생성과 같이 복잡한 조회와 체크 처리가 필요한 필드는 순수 자바스크립트(`fetch`)로 해당 기능을 지원하도록 구현합니다.
 
 ## 4. 코드 스타일 및 네이밍 (Naming Convention)
 - **Variables/Functions:** `snake_case` (예: `import_old_data`)
