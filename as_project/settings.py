@@ -171,16 +171,26 @@ def sidebar_callback(request):
                 ],
             },
             {
-                "title": "툴 장비 관리",
+                "title": "업무 메뉴",
                 "separator": True,
                 "items": [
                     {
-                        "title": "대시보드",
+                        "title": "메인 대시보드",
                         "icon": "dashboard",
                         "link": reverse_lazy("tool_admin:index"),
                     },
                     {
-                        "title": "툴/장비 인벤토리",
+                        "title": "입고 등록",
+                        "icon": "add_circle_outline",
+                        "link": reverse_lazy("tool_admin:tool_inventory_inventorybatch_add"),
+                    },
+                    {
+                        "title": "출고 처리",
+                        "icon": "local_shipping",
+                        "link": reverse_lazy("tool_admin:tool_inventory_outboundinventory_changelist"),
+                    },
+                    {
+                        "title": "툴 인벤토리 리스트",
                         "icon": "inventory_2",
                         "link": reverse_lazy("tool_admin:tool_inventory_inventory_changelist"),
                     },
