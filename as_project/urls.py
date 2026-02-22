@@ -21,13 +21,15 @@ from django.views.generic.base import RedirectView
 from as_app import views as as_views
 from as_project import views as as_project_views
 from tool_inventory.admin import tool_admin_site
-
+from as_project.sysadmin import sysadmin_site
 urlpatterns = [
     path("", as_project_views.portal_view, name="portal_view"),
     # /admin/as_app/ 클릭 시 대시보드(메인)로 바로 리다이렉트
     path("admin/as_app/", RedirectView.as_view(url="/admin/", permanent=False)),
     path("admin/", admin.site.urls),
     path("inventory/", tool_admin_site.urls),
+    path("sysadmin/", sysadmin_site.urls),
+    path("signup/", as_project_views.signup_view, name="signup_view"),
     path("api/tools-by-brand/", as_views.get_tools_by_brand, name="api_tools_by_brand"),
 ]
 

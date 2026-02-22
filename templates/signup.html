@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 계정 등록</title>
+    <style>
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+            padding: 2rem;
+        }
+
+        .signup-wrapper {
+            background: white;
+            border-radius: 16px;
+            padding: 2.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e5e7eb;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            font-size: 1.6rem;
+            color: #111827;
+            text-align: center;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: #6b7280;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .input-group input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.75rem 1rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .helptext {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+
+        .errorlist {
+            color: #ef4444;
+            font-size: 0.8rem;
+            list-style: none;
+            padding-left: 0;
+            margin-top: 0.25rem;
+        }
+
+        .signup-btn {
+            width: 100%;
+            background-color: #10b981;
+            color: white;
+            border: none;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .signup-btn:hover {
+            background-color: #059669;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 1.5rem;
+            color: #6366f1;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="signup-wrapper">
+            <h2>회원가입</h2>
+            <p class="subtitle">계정 생성 후 관리자 승인이 필요합니다.</p>
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="input-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}
+                    <div class="helptext">{{ field.help_text|safe }}</div>
+                    {% endif %}
+                    {% if field.errors %}
+                    {{ field.errors }}
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="signup-btn">계정 생성 신청</button>
+            </form>
+            <a href="/" class="back-link">포탈 돌아가기</a>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -150,6 +150,8 @@ def dashboard_callback(request, context):
     if request.path.startswith('/inventory/'):
         from tool_inventory.dashboard import dashboard_callback as inv_callback
         return inv_callback(request, context)
+    elif request.path.startswith('/sysadmin/'):
+        return context
     else:
         from as_app.dashboard import dashboard_callback as as_callback
         return as_callback(request, context)
@@ -202,6 +204,36 @@ def sidebar_callback(request):
                         "title": "품목명",
                         "icon": "category",
                         "link": reverse_lazy("tool_admin:tool_inventory_itemname_changelist"),
+                    },
+                ],
+            },
+        ]
+    elif request.path.startswith('/sysadmin/'):
+        return [
+            {
+                "title": "내비게이션",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "포탈 (홈) 으로 돌아가기",
+                        "icon": "home",
+                        "link": "/",
+                    },
+                ],
+            },
+            {
+                "title": "시스템 계정 관리",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "사용자(회원) 관리",
+                        "icon": "person",
+                        "link": reverse_lazy("sysadmin:auth_user_changelist"),
+                    },
+                    {
+                        "title": "권한 그룹(역할)",
+                        "icon": "group",
+                        "link": reverse_lazy("sysadmin:auth_group_changelist"),
                     },
                 ],
             },
@@ -298,16 +330,22 @@ def sidebar_callback(request):
 def site_title_callback(request):
     if request.path.startswith('/inventory/'):
         return "장비/툴 관리"
+    elif request.path.startswith('/sysadmin/'):
+        return "시스템 관리"
     return "AS 관리"
 
 def site_header_callback(request):
     if request.path.startswith('/inventory/'):
         return "장비/툴 관리 대시보드"
+    elif request.path.startswith('/sysadmin/'):
+        return "시스템 권한 승인 센터"
     return "AS 시스템"
 
 def site_symbol_callback(request):
     if request.path.startswith('/inventory/'):
         return "inventory_2"
+    elif request.path.startswith('/sysadmin/'):
+        return "admin_panel_settings"
     return "build"
 
 UNFOLD = {
