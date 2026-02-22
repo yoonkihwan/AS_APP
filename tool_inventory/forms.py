@@ -16,7 +16,7 @@ class InventoryForm(forms.ModelForm):
         label="브랜드",
         required=False,
         empty_label="---------",
-        widget=UnfoldAdminSelectWidget(attrs={'style': 'width: 100px; min-width: 100px;'}),
+        widget=UnfoldAdminSelectWidget(),
     )
 
     no_serial = forms.BooleanField(
@@ -29,15 +29,19 @@ class InventoryForm(forms.ModelForm):
         label="수량",
         min_value=1,
         required=False,
-        widget=UnfoldAdminIntegerFieldWidget(attrs={'style': 'width: 80px;', 'placeholder': '1'}),
+        widget=UnfoldAdminIntegerFieldWidget(attrs={
+            'style': 'width: 60px; pointer-events: none; opacity: 0.5; background-color: #f3f4f6;', 
+            'placeholder': '1', 
+            'readonly': 'readonly'
+        }),
     )
 
     class Meta:
         model = Inventory
         fields = ["brand", "tool", "no_serial", "quantity", "serial"]
         widgets = {
-            "tool": UnfoldAdminSelectWidget(attrs={'style': 'width: 125px; min-width: 125px;'}),
-            "serial": UnfoldAdminTextInputWidget(attrs={'style': 'width: 100%; min-width: 200px;'}),
+            "tool": UnfoldAdminSelectWidget(),
+            "serial": UnfoldAdminTextInputWidget(attrs={'style': 'width: 100%;'}),
         }
 
     def __init__(self, *args, **kwargs):

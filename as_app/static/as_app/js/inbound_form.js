@@ -56,21 +56,27 @@ document.addEventListener("DOMContentLoaded", function () {
         quantityField.disabled = false;
         quantityField.readOnly = false;
         quantityField.style.opacity = "1";
+        quantityField.style.pointerEvents = "auto";
+        quantityField.style.backgroundColor = ""; // 기본 배경색
 
         serialField.disabled = true;
         serialField.readOnly = true;
         serialField.style.opacity = "0.3";
+        serialField.style.pointerEvents = "none";
         serialField.value = "";
       } else {
         // 체크 해제 시(기본): 수량 비활성화, 시리얼 입력 활성화
-        quantityField.disabled = true;
+        quantityField.disabled = false; // 폼 전송을 위해 disabled는 false 유지 (readonly로 치환)
         quantityField.readOnly = true;
-        quantityField.style.opacity = "0.3";
-        quantityField.value = "";
+        quantityField.style.opacity = "0.5";
+        quantityField.style.pointerEvents = "none";
+        quantityField.style.backgroundColor = "#f3f4f6";
+        quantityField.value = "1";
 
         serialField.disabled = false;
         serialField.readOnly = false;
         serialField.style.opacity = "1";
+        serialField.style.pointerEvents = "auto";
       }
     }
   }
