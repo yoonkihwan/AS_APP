@@ -6,6 +6,7 @@ from unfold.widgets import (
     UnfoldBooleanWidget,
     UnfoldAdminIntegerFieldWidget,
     UnfoldAdminTextInputWidget,
+    UnfoldAdminCheckboxSelectMultiple,
 )
 
 class InventoryForm(forms.ModelForm):
@@ -88,9 +89,9 @@ class OutboundTicketForm(forms.ModelForm):
     current_stock = forms.CharField(
         label="현재 재고",
         required=False,
-        widget=forms.TextInput(attrs={
+        widget=UnfoldAdminTextInputWidget(attrs={
             'readonly': 'readonly', 
-            'style': 'background-color:#f3f4f6; width:100px; text-align:center; border:none; outline:none;'
+            'style': 'width:100px; text-align:center; pointer-events: none;'
         })
     )
     
@@ -100,7 +101,8 @@ class OutboundTicketForm(forms.ModelForm):
         fields = ["brand", "tool", "current_stock", "quantity", "inventories"]
         widgets = {
             "tool": UnfoldAdminSelectWidget(),
-            "inventories": forms.CheckboxSelectMultiple(attrs={"class": "checkbox-select-multiple"}),
+            "inventories": UnfoldAdminCheckboxSelectMultiple(attrs={"class": "checkbox-select-multiple"}),
+            "quantity": UnfoldAdminIntegerFieldWidget(attrs={'style': 'width: 80px;'}),
         }
 
     def __init__(self, *args, **kwargs):

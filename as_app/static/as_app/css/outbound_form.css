@@ -19,9 +19,9 @@ button[name="_continue"] {
     /* 브랜드 드롭박스 너비 고정 */
     .djn-inline-form .field-brand,
     .tabular .field-brand {
-        width: 300px !important;
-        min-width: 300px !important;
-        max-width: 300px !important;
+        width: 250px !important;
+        min-width: 250px !important;
+        max-width: 250px !important;
     }
 
     /* 대상 장비 드롭박스 너비 고정 */

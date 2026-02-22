@@ -123,21 +123,61 @@ document.addEventListener("DOMContentLoaded", function () {
     const quantityInput = row.querySelector("input[name$='-quantity']");
     if (!quantityInput) return;
 
+    // 현재 목록에 진짜 시리얼이 있는지 확인 ("S/N: 없음"이 아닌 레이블 존재 여부)
+    let hasSerial = false;
+    let hasItems = false;
+    const allLabels = row.querySelectorAll(".field-inventories label");
+    if (allLabels.length > 0) {
+      hasItems = true;
+      allLabels.forEach(lbl => {
+        if (!lbl.textContent.includes("S/N: 없음")) {
+          hasSerial = true;
+        }
+      });
+    }
+
     // 체크된 체크박스 개수 세기
     const checkedBoxes = row.querySelectorAll("input[type='checkbox'][name$='-inventories']:checked");
     const selectedCount = checkedBoxes.length;
 
-    if (selectedCount > 0) {
-      // 유저가 직접 재고(시리얼)를 체크했다면 그 갯수만큼 수량 자동 고정
-      quantityInput.value = selectedCount;
+    // 공통: 하얗게 변하는 현상(inline style) 완전 제거하여 주변 디자인과 통일
+    quantityInput.style.backgroundColor = 'transparent'; // 다른 필드와 같은 색상 유지
+    quantityInput.style.color = 'inherit';
+
+    if (!hasItems || hasSerial) {
+      // 1. 선택된 툴이 없거나 시리얼이 있는 품목: 클릭 및 입력 원천 불가 (선택된 박스 수로만 제어)
       quantityInput.readOnly = true;
-      quantityInput.style.backgroundColor = '#f3f4f6';
+      quantityInput.style.pointerEvents = 'none';
+      quantityInput.style.opacity = '0.5';
+
+      if (hasSerial) {
+        // 시리얼이 있는 품목은 체크박스 활성화
+        row.querySelectorAll("input[type='checkbox'][name$='-inventories']").forEach(cb => {
+          cb.disabled = false;
+        });
+      }
+
+      if (selectedCount > 0) {
+        quantityInput.value = selectedCount;
+      } else {
+        if (!quantityInput.value || quantityInput.value === '0') {
+          quantityInput.value = 1; // 기본값
+        }
+      }
     } else {
-      // 체크하지 않았다면 선입선출을 위해 유저가 수동입력 가능. 기본 1
+      // 2. 시리얼이 없는 품목: 수동 입력 활성화 및 체크박스 잠금
       quantityInput.readOnly = false;
-      quantityInput.style.backgroundColor = '';
+      quantityInput.style.pointerEvents = 'auto';
+      quantityInput.style.opacity = '1';
+
+      // 시리얼이 없는 품목은 체크박스 선택 불가토록 강제 잠금 및 해제
+      row.querySelectorAll("input[type='checkbox'][name$='-inventories']").forEach(cb => {
+        cb.checked = false;
+        cb.disabled = true;
+      });
+
       if (!quantityInput.value || quantityInput.value === '0') {
-        quantityInput.value = 1;
+        quantityInput.value = selectedCount > 0 ? selectedCount : 1;
       }
     }
   }

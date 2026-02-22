@@ -187,7 +187,7 @@ def sidebar_callback(request):
                 "separator": True,
                 "items": [
                     {
-                        "title": "통합 재고 리스트",
+                        "title": "통합 입출고 이력",
                         "icon": "history",
                         "link": reverse_lazy("tool_admin:tool_inventory_inventory_changelist"),
                     },
@@ -199,7 +199,18 @@ def sidebar_callback(request):
                     {
                         "title": "출고 등록",
                         "icon": "local_shipping",
-                        "link": reverse_lazy("tool_admin:tool_inventory_outboundinventory_changelist"),
+                        "link": reverse_lazy("tool_admin:tool_inventory_outboundbatch_add"),
+                    },
+                ],
+            },
+            {
+                "title": "재고",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "재고",
+                        "icon": "inventory_2",
+                        "link": reverse_lazy("tool_admin:tool_inventory_toolstocksummary_changelist"),
                     },
                 ],
             },
@@ -210,17 +221,17 @@ def sidebar_callback(request):
                     {
                         "title": "매출처",
                         "icon": "local_shipping",
-                        "link": reverse_lazy("admin:as_app_company_changelist"),
+                        "link": reverse_lazy("tool_admin:as_app_company_changelist"),
                     },
                     {
                         "title": "입고업체",
                         "icon": "store",
-                        "link": reverse_lazy("admin:as_app_outsourcecompany_changelist"),
+                        "link": reverse_lazy("tool_admin:as_app_outsourcecompany_changelist"),
                     },
                     {
                         "title": "브랜드/툴 관리",
                         "icon": "category",
-                        "link": reverse_lazy("admin:as_app_tool_changelist"),
+                        "link": reverse_lazy("tool_admin:as_app_tool_changelist"),
                     },
                 ],
             },

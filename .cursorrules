@@ -8,62 +8,51 @@
 - **Safety First:** 데이터 삭제나 변경 작업은 신중하게 처리하며, 특히 `drop`, `delete` 등의 파괴적 작업 전에는 백업이나 확인 절차를 고려한다.
 
 ## 2. 기술 스택 및 환경 (Tech & Environment)
-- **Backend:** Python 3.x, Django 5.x
+- **Backend:** Python 3.10+, Django 5.x
 - **Database:** PostgreSQL (로컬 개발 및 운영 배포 모두 사용)
-- **Admin UI:** **Django Unfold** (필수 사용 - 기본 Django Admin 스타일 사용 지양)
+- **Admin UI:** **Django Unfold** (기본 테마: 다크 모드, `theme: True` 설정 적극 활용)
 - **Static Files:** WhiteNoise (운영 환경 정적 파일 서빙)
+- **PDF Generation:** `reportlab` (한글 출력을 위해 `malgun.ttf` 폰트 적용 필수)
 - **Linting/Formatting:** PEP 8 준수, Flake8/Black 스타일 지향.
 
 ## 3. Django 개발 패턴 (Architecture & Patterns)
 ### 3.1. Models (Fat Models)
-- 비즈니스 로직의 대부분은 `views.py`가 아닌 **`models.py`의 메서드**로 구현한다. (예: `calculate_cost()`, `is_overdue()`)
+- 비즈니스 로직의 대부분은 `views.py`가 아닌 **`models.py`의 메서드**로 구현한다. 
 - 모든 필드에는 `verbose_name`과 `help_text`를 명시하여, Admin 화면에서 사용자가 의미를 명확히 알 수 있게 한다.
-- `__str__` 메서드는 객체를 쉽게 식별할 수 있는 포맷으로 반드시 정의한다.
-- **프록시 모델:** Admin 뷰를 분리할 때 `proxy = True` 모델을 활용한다 (예: RepairTicket, OutboundTicket, ASHistory).
+- **프록시 모델(Proxy Models):** Admin 뷰를 목적별로 분리할 때 적극 활용한다 (예: `RepairTicket`, `ToolStockSummary`, `ASHistory`).
 
-### 3.2. Views & Admin
-- **Class-Based Views (CBV):** 커스텀 뷰가 필요할 경우 FBV보다 CBV를 우선 고려한다. (Admin 커스텀 제외)
-- **N+1 문제 방지:** FK나 M2M 관계 필드 접근 시 `select_related`, `prefetch_related`를 필수적으로 사용하여 쿼리 수를 최적화한다.
+### 3.2. Views & Admin (Unfold)
+- **N+1 문제 방지:** FK나 M2M 관계 필드 접근 시 `select_related`, `prefetch_related`를 필수적으로 사용.
 - **Admin Customization:**
-    - `list_display`, `list_filter`, `search_fields`는 사용자 입장에서 자주 쓰는 항목 위주로 구성한다.
-    - `autocomplete_fields`: FK/M2M 필드는 데이터가 많아질 것을 대비해 항상 설정한다.
-    - `inlines`: 부모-자식 관계 데이터 입력 시 적극 활용한다.
+    - `autocomplete_fields`: FK/M2M 필드는 데이터가 많아질 것을 대비해 항상 설정.
     - `NoRelatedButtonsMixin`: FK/M2M 드롭다운 옆의 추가/수정/삭제 버튼을 제거하여 입력 실수 방지.
-    - 사이드바 숨김: 통합 관리 시 `has_module_permission = False`로 불필요한 메뉴 숨김.
-    - 커스텀 템플릿: `change_list_template`로 탭 네비게이션, 바로가기 버튼 등 추가.
+    - 읽기 전용 뷰/숨김 메뉴: 불필요한 목록 상단 보라색 '+' 버튼은 `has_add_permission = False`로 차단.
+    - 데이터 표출: 데이터가 길거나 표를 망가뜨릴 우려가 있는 경우, `textwrap` 모듈을 활용하여 UI 깨짐 및 PDF 렌더링 잘림을 방지.
 
 ## 4. 코드 스타일 및 네이밍 (Naming Convention)
 - **Variables/Functions:** `snake_case` (예: `repair_cost`, `calculate_total_price`)
-- **Classes:** `PascalCase` (예: `RepairTicket`, `InboundBatch`)
-- **Constants:** `UPPER_CASE` (예: `DEFAULT_TAX_RATE`, `STATUS_CHOICES`)
+- **Classes:** `PascalCase` (예: `RepairTicket`, `ToolStockSummaryAdmin`)
 - **Type Hinting:** 주요 함수 및 메서드에는 Python 3 타입 힌트를 적용한다.
-    ```python
-    def calculate_cost(self, parts: list[Part]) -> int:
-        ...
-    ```
 
 ## 5. UI/UX 가이드라인 (Django Unfold)
-- **일관성:** 버튼 색상, 아이콘 등은 Unfold의 [Tailwind CSS 클래스 기반] 디자인 시스템을 따른다.
-- **Material Icons:** 사이드바 및 탭 아이콘은 `material-symbols-outlined` (Google Material Symbols) 사용.
-- **피드백:** 저장, 수정, 삭제 등의 액션 후에는 반드시 `messages.success` 또는 `messages.error`를 통해 사용자에게 피드백을 제공한다.
-- **안전장치:** 중요한 상태 변경(예: 출고 처리) 시에는 `actions`를 사용하여 한 번 더 확인하거나 일괄 처리하도록 유도한다.
-- **탭 네비게이션:** 관련 모델을 하나의 메뉴로 통합할 때 탭 방식 사용 (예: 업체관리 → 매출처업체/의뢰업체).
-- **저장 후 리다이렉트:** `response_add`/`response_change`를 오버라이드하여 사용자 워크플로우에 맞는 페이지로 이동.
+- **다크 모드 기본:** 모든 Admin Portal은 기본적으로 다크/라이트 테마 토글 체제 하에서 통일감 있게 렌더링되어야 한다.
+- **포인트 컬러/스타일링:** Unfold의 데코레이터(`@unfold_action(attrs=...)`)를 활용해 버튼 색상(예: 보라색 `#9333ea`)을 커스텀 적용.
+- **글로벌 액션 버튼 (`actions_list`):** 왼쪽 체크박스가 필요 없는 "리스트 전체 화면 대상 동작(예: 전체 PDF 다운로드)"의 경우, `actions_list`에 액션을 명시하고 `list_disable_select_all = True`, `actions = None`으로 맞춰서 리스트 UI를 깔끔하게 유지한다.
+- **상태 컬러 마킹:** 티켓 및 진행 상태에 따라 행 전체 또는 셀 컬러를 적용해 직관적 구분을 돕는다.
+- **로컬라이징:** 모든 버튼, 툴팁, 플레이스홀더 텍스트는 한국어(`ko-kr`)를 최우선 지원한다.
 
 ## 6. 다중 사이트 분리 아키텍처 (Multi-Admin Sites)
-프로젝트는 기능별로 독립된 Admin Site를 통해 뷰를 분리한다.
-- **AS 시스템 (`as_app`):** 기본 관리자 페이지 (`/admin/`). AS 프로세스와 마스터 데이터의 메인 컨트롤러.
-- **시스템 관리 (`sysadmin`):** 사용자 계정 및 권한 부여 전용 페이지 (`/sysadmin/`). 일괄 권한 부여 액션 탑재.
-- **장비/툴 관리 (`tool_inventory`):** 입출고 및 재고 데이터 전용 페이지 (`/inventory/`). 
+프로젝트는 기능별로 독립된 Admin Site를 통해 뷰를 완전히 분리한다. 사이드바 네비게이션은 `settings.py`에서 명확히 통제된다.
+- **AS 시스템 (`/admin/`):** AS 프로세스 (입고, 수리, 출고) 및 마스터 데이터 컨트롤러.
+- **장비/툴 관리 (`/inventory/`):** 툴/장비의 통합 입출고 이력 관리 및 `ToolStockSummary`(재고 현황) 전용 관리. 
+- **시스템 관리 (`/sysadmin/`):** 시스템 계정 및 권한(Group/Permission) 관리 센터. 일괄 업무권한 부여 체제 유지.
 
 ## 7. Git 커밋 컨벤션 (Conventional Commits)
-- 형식: `type: Subject`
 - **feat:** 새로운 기능 추가
 - **fix:** 버그 수정
-- **docs:** 문서 수정
-- **style:** 코드 포맷팅, 세미콜론 누락 등 (로직 변경 없음)
-- **refactor:** 코드 리팩토링 (기능 변경 없음)
-- **chore:** 빌드 업무 수정, 패키지 매니저 설정 등
+- **docs:** 문서 수정 (`.cursorrules` 및 `MD` 파일 포함)
+- **style:** 코드 띄어쓰기, 주석 등
+- **refactor:** 로직 개선, UI 최적화
 
 ---
 **주의:** 이 파일의 내용은 개발 진행 상황에 따라 지속적으로 업데이트되어야 합니다.

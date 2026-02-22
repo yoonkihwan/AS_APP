@@ -50,7 +50,7 @@ class OutboundTicket(models.Model):
     tool = models.ForeignKey(
         'as_app.Tool',
         on_delete=models.PROTECT,
-        verbose_name="대상 장비"
+        verbose_name="품목"
     )
     quantity = models.PositiveIntegerField(
         "출고 수량",
@@ -121,8 +121,8 @@ class Inventory(models.Model):
     status = models.CharField("상태", max_length=10, choices=STATUS_CHOICES, default='재고')
 
     class Meta:
-        verbose_name = "통합 재고 리스트"
-        verbose_name_plural = "통합 재고 리스트"
+        verbose_name = "통합 입출고 이력"
+        verbose_name_plural = "통합 입출고 이력"
         ordering = ['-date']
 
     def __str__(self):
@@ -146,3 +146,12 @@ class OutboundInventory(Inventory):
         proxy = True
         verbose_name = "출고 등록"
         verbose_name_plural = "출고 등록"
+
+from as_app.models import Tool
+
+class ToolStockSummary(Tool):
+    """툴별 현재 재고 수량 및 시리얼 조회를 위한 프록시 모델"""
+    class Meta:
+        proxy = True
+        verbose_name = "재고 현황"
+        verbose_name_plural = "재고"

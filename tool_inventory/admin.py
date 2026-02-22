@@ -87,10 +87,10 @@ class InventoryAdmin(ModelAdmin):
         context["show_save_and_continue"] = False
         return super().render_change_form(request, context, add, change, form_url, obj)
 
-    fields = (
-        'id', 'date', 'supplier_text', 'tool_text', 'serial',
-        'release_date', 'release_company', 'status'
-    )
+    def get_fields(self, request, obj=None):
+        if obj:
+            return ('id', 'date', 'supplier_text', 'tool_text', 'serial', 'release_date', 'release_company', 'status')
+        return ('date', 'supplier', 'tool', 'serial', 'status')
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
@@ -307,8 +307,11 @@ class OutboundBatchAdmin(ModelAdmin):
     def save_formset(self, request, form, formset, change):
         super().save_formset(request, form, formset, change)
         if formset.model == OutboundTicket:
-            for instance in formset.instances:
-                if instance in formset.deleted_objects:
+            for inline_form in formset.forms:
+                instance = inline_form.instance
+                
+                # 삭제 대상이거나 빈 폼(cleaned_data가 없는 경우)은 건너뜀
+                if instance in formset.deleted_objects or not getattr(inline_form, 'cleaned_data', None):
                     continue
                 
                 selected_inventories = list(instance.inventories.all())
@@ -377,3 +380,160 @@ class OutboundInventoryAdmin(ModelAdmin):
     def add_view(self, request, form_url='', extra_context=None):
         # "추가" 버튼 클릭 시 OutboundBatch 생성 화면으로 리다이렉트
         return HttpResponseRedirect(reverse("tool_admin:tool_inventory_outboundbatch_add"))
+
+from .models import ToolStockSummary
+
+@admin.register(ToolStockSummary, site=tool_admin_site)
+class ToolStockSummaryAdmin(ModelAdmin):
+    list_display = ('brand', 'model_name', 'stock_count', 'serial_list')
+    search_fields = ('brand__name', 'model_name')
+    list_filter = ('brand',)
+    list_per_page = 50
+    actions = None
+    list_disable_select_all = True
+    actions_list = ["export_stock_pdf"]
+
+    def has_add_permission(self, request):
+        return False
+        
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def get_queryset(self, request):
+        # Tools that only have inventory records maybe? 
+        # For now, let's just return all tools.
+        return super().get_queryset(request)
+
+    @display(description="현재 재고 수량")
+    def stock_count(self, obj):
+        count = Inventory.objects.filter(tool=obj, status='재고').count()
+        return format_html(
+            '<span style="font-weight: bold; color: {};">{}개</span>',
+            '#10b981' if count > 0 else '#ef4444', 
+            count
+        )
+
+    @display(description="보유 시리얼 목록")
+    def serial_list(self, obj):
+        from django.db.models import Q
+        invs = Inventory.objects.filter(tool=obj, status='재고').order_by('date')
+        serials = [inv.serial for inv in invs if inv.serial]
+        no_serial_count = invs.filter(Q(serial__isnull=True) | Q(serial__exact='')).count()
+        
+        parts = []
+        if serials:
+            parts.append(", ".join(serials))
+        if no_serial_count > 0:
+            parts.append(f"(S/N 없음: {no_serial_count}개)")
+            
+        return " / ".join(parts) if parts else "-"
+
+    @unfold_action(description="재고 내역 출력", url_path="export-stock-pdf", attrs={"style": "background-color: #9333ea; color: white; border: none;"})
+    def export_stock_pdf(self, request):
+        queryset = self.get_queryset(request)
+        import io
+        from django.http import FileResponse
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import os
+        from django.db.models import Q
+        from django.utils import timezone
+        
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        
+        font_name = 'Helvetica'
+        try:
+            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('Malgun', font_path))
+                font_name = 'Malgun'
+        except Exception:
+            pass
+            
+        queryset = queryset.select_related('brand').order_by('brand__name', 'model_name')
+        c.setFont(font_name, 16)
+        c.drawString(50, 800, "현재 재고 내역")
+        
+        c.setFont(font_name, 10)
+        c.drawRightString(550, 800, f"출력일: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+        
+        y = 750
+        current_brand = None
+        
+        import textwrap
+        
+        for tool in queryset:
+            if y < 100:
+                c.showPage()
+                y = 800
+                current_brand = None
+
+            if tool.brand != current_brand:
+                current_brand = tool.brand
+                c.setFont(font_name, 12)
+                brand_name = current_brand.name if current_brand else "미지정"
+                c.setStrokeColorRGB(0.7, 0.7, 0.7)
+                c.line(50, y+15, 550, y+15)
+                c.setStrokeColorRGB(0, 0, 0)
+                c.drawString(50, y, f"■ 브랜드: {brand_name}")
+                y -= 25
+            
+            invs = Inventory.objects.filter(tool=tool, status='재고').order_by('date')
+            count = invs.count()
+            
+            serials = [inv.serial for inv in invs if inv.serial]
+            no_serial_count = invs.filter(Q(serial__isnull=True) | Q(serial__exact='')).count()
+            
+            parts = []
+            if serials:
+                parts.append(", ".join(serials))
+            if no_serial_count > 0:
+                parts.append(f"S/N 없음: {no_serial_count}개")
+            
+            serial_text = " / ".join(parts) if parts else "재고 없음"
+            
+            name_lines = textwrap.wrap(tool.model_name, width=42)
+            # "내역: " prefix takes some space, adjust if first line
+            serial_lines = textwrap.wrap(serial_text, width=46)
+            if not serial_lines:
+                serial_lines = [""]
+            if not name_lines:
+                name_lines = [""]
+                
+            max_lines = max(len(name_lines), len(serial_lines))
+            
+            c.setFont(font_name, 10)
+            
+            for i in range(max_lines):
+                if y < 70:
+                    c.showPage()
+                    y = 800
+                    c.setFont(font_name, 10)
+                    
+                if i == 0:
+                    c.drawString(60, y, "•")
+                    c.drawRightString(320, y, f"수량: {count}개")
+                    c.drawString(340, y, "내역:")
+                    s_x = 365
+                else:
+                    s_x = 340
+                    
+                if i < len(name_lines):
+                    c.drawString(70, y, name_lines[i])
+                    
+                if i < len(serial_lines):
+                    c.drawString(s_x, y, serial_lines[i])
+                
+                y -= 16
+                
+            y -= 4 # Extra spacing after each tool
+            
+        c.save()
+        buffer.seek(0)
+        
+        filename = f"tool_stock_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        response = FileResponse(buffer, as_attachment=True, filename=filename)
+        return response
