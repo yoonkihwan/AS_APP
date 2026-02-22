@@ -34,12 +34,15 @@
 
 /* 입고등록 인라인 - 시리얼번호 입력란은 나머지 공간 전체 차지 */
 .djn-inline-form .field-serial_number,
-.tabular .field-serial_number {
+.tabular .field-serial_number,
+.djn-inline-form .field-serial,
+.tabular .field-serial {
     width: auto !important;
     max-width: none !important;
 }
 
-.tabular .field-serial_number input[type="text"] {
+.tabular .field-serial_number input[type="text"],
+.tabular .field-serial input[type="text"] {
     width: 100% !important;
     box-sizing: border-box;
 }

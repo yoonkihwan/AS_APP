@@ -11,8 +11,6 @@ class InventoryBatch(models.Model):
         verbose_name="입고업체",
         related_name="inbound_batches",
     )
-    manager = models.CharField("담당자/부서", max_length=100, blank=True)
-    memo = models.TextField("메모", blank=True)
     created_at = models.DateTimeField("생성일", auto_now_add=True)
 
     class Meta:
@@ -26,8 +24,8 @@ class InventoryBatch(models.Model):
 class Inventory(models.Model):
     """메인 방비/툴 재고 리스트"""
     STATUS_CHOICES = [
-        ('재고', '재고 (입고됨)'),
-        ('출고', '출고 완료'),
+        ('재고', '재고'),
+        ('출고', '출고'),
     ]
 
     # 배치 정보 연동

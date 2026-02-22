@@ -6,7 +6,9 @@ from unfold.admin import ModelAdmin, TabularInline
 from unfold.sites import UnfoldAdminSite
 from unfold.decorators import action as unfold_action, display
 from django.utils import timezone
+from django.utils.html import format_html
 from .models import Inventory, InventoryBatch, InboundInventory, OutboundInventory
+from .forms import InventoryForm
 from as_app.models import OutsourceCompany, Company, Tool, Brand
 
 class ToolInventoryAdminSite(UnfoldAdminSite):
@@ -42,17 +44,55 @@ class ToolToolAdmin(ModelAdmin):
 
 @admin.register(Inventory, site=tool_admin_site)
 class InventoryAdmin(ModelAdmin):
-    list_display = ('tool', 'serial', 'supplier', 'date', 'release_company', 'release_date', 'status')
+    list_display = (
+        'display_status', 'date', 'supplier', 'tool', 'serial', 
+        'release_company', 'release_date', 'display_edit_button'
+    )
+    list_display_links = None
     list_filter = ('status', 'supplier', 'release_company')
     search_fields = ('tool__model_name', 'tool__brand__name', 'serial', 'supplier__name', 'release_company__name')
-    date_hierarchy = 'date'
     list_per_page = 50
     autocomplete_fields = ('tool', 'supplier', 'release_company')
+
+    class Media:
+        css = {"all": ("as_app/css/row_colors.css",)}
+
+    def has_add_permission(self, request):
+        return False
+
+    @display(description="상태")
+    def display_status(self, obj):
+        css_status = "inbound" if obj.status == "재고" else "shipped"
+        return format_html(
+            '<span class="status-marker" data-status="{}">{}</span>',
+            css_status,
+            obj.get_status_display(),
+        )
+
+    @display(description="수정")
+    def display_edit_button(self, obj):
+        url = reverse("tool_admin:tool_inventory_inventory_change", args=[obj.pk])
+        return format_html(
+            '<a href="{}" style="'
+            'display:inline-flex; align-items:center; gap:4px; '
+            'padding:6px 12px; border-radius:6px; font-size:0.8rem; '
+            'font-weight:600; text-decoration:none; '
+            'background:#8b5cf6; color:#fff; '
+            'transition:all .15s ease;'
+            '" '
+            'onmouseover="this.style.background=\'#7c3aed\'" '
+            'onmouseout="this.style.background=\'#8b5cf6\'">'
+            '📝 수정</a>',
+            url
+        )
 
 class InventoryInline(TabularInline):
     model = Inventory
     fk_name = "batch"
-    fields = ["tool", "serial", "status"]
+    form = InventoryForm
+    fields = ["brand", "tool", "serial"]
+    verbose_name = "입고등록 티켓"
+    verbose_name_plural = "입고등록 티켓"
     extra = 0
     min_num = 1
 
@@ -64,19 +104,35 @@ class InventoryInline(TabularInline):
                 field.widget.can_change_related = False
                 field.widget.can_delete_related = False
                 field.widget.can_view_related = False
+                if hasattr(field.widget, 'attrs'):
+                    field.widget.attrs['autocomplete'] = 'off'
         if 'serial' in formset.form.base_fields:
             formset.form.base_fields['serial'].label = "시리얼 번호 (쉼표로 구분 시 다건 등록)"
         return formset
 
 @admin.register(InventoryBatch, site=tool_admin_site)
 class InventoryBatchAdmin(ModelAdmin):
-    list_display = ["inbound_date", "supplier", "manager", "created_at"]
+    list_display = ["inbound_date", "supplier", "created_at"]
     list_filter = ["inbound_date", "supplier"]
-    search_fields = ["supplier__name", "manager", "memo"]
+    search_fields = ["supplier__name"]
     autocomplete_fields = ["supplier"]
     date_hierarchy = "inbound_date"
     list_per_page = 20
     inlines = [InventoryInline]
+
+    class Media:
+        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css")}
+        js = ("as_app/js/inbound_form.js",)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if 'supplier' in form.base_fields:
+            widget = form.base_fields['supplier'].widget
+            widget.can_add_related = False
+            widget.can_change_related = False
+            widget.can_delete_related = False
+            widget.can_view_related = False
+        return form
 
     def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
         context["show_save_and_add_another"] = False
@@ -117,7 +173,7 @@ class InventoryBatchAdmin(ModelAdmin):
                             batch=batch,
                             tool=instance.tool,
                             serial=sn,
-                            status=instance.status
+                            # status is '재고' by default
                         )
                         expanded.append(new_inv)
                 else:
