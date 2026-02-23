@@ -10,10 +10,11 @@ def dashboard_callback(request, context):
     """
     from .models import ASTicket
 
-    today = timezone.now().date()
+    today = timezone.localdate()
     ten_days_ago = today - timedelta(days=10)
     
     start_of_week = today - timedelta(days=today.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
     start_of_month = today.replace(day=1)
     start_of_year = today.replace(month=1, day=1)
 
@@ -89,9 +90,10 @@ def dashboard_callback(request, context):
     shipped_qs = ASTicket.objects.filter(status=ASTicket.Status.SHIPPED)
 
     today_rev = shipped_qs.filter(outbound_date=today).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
-    week_rev = shipped_qs.filter(outbound_date__gte=start_of_week, outbound_date__lte=today).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
-    month_rev = shipped_qs.filter(outbound_date__gte=start_of_month, outbound_date__lte=today).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
-    year_rev = shipped_qs.filter(outbound_date__gte=start_of_year, outbound_date__lte=today).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
+    week_rev = shipped_qs.filter(outbound_date__gte=start_of_week, outbound_date__lte=end_of_week).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
+    # "이번 달" 통계 기준을 출고 건수 조회 기준과 동일하게 맞춤 (outbound_date__lte=today -> __month=today.month)
+    month_rev = shipped_qs.filter(outbound_date__month=today.month, outbound_date__year=today.year).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
+    year_rev = shipped_qs.filter(outbound_date__year=today.year).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
 
     revenue_data = [
         {"title": "오늘 수리매출", "amount": f"{today_rev:,}", "icon": "today", "color": "#10b981"},         # emerald

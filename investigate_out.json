@@ -1,0 +1,25 @@
+{
+  "today_utc": "2026-02-23",
+  "today_local": "2026-02-24",
+  "shipped_month_count": 3,
+  "tickets": [
+    {
+      "id": 66,
+      "outbound_date": "2026-02-24",
+      "repair_cost": 362000,
+      "updated_at": "2026-02-23 17:20:45.875586+00:00"
+    },
+    {
+      "id": 65,
+      "outbound_date": "2026-02-24",
+      "repair_cost": 224000,
+      "updated_at": "2026-02-23 17:20:45.873495+00:00"
+    },
+    {
+      "id": 59,
+      "outbound_date": "2026-02-02",
+      "repair_cost": 140000,
+      "updated_at": "2026-02-23 17:20:45.863169+00:00"
+    }
+  ]
+}
