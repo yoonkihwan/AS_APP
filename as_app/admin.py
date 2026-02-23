@@ -766,15 +766,19 @@ class OutboundTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
     ordering = ["-inbound_date", "-created_at"]
 
     class Media:
-        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css")}
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/text_truncate.css")}
         js = ("as_app/js/outbound_row_click.js",)
 
     @admin.display(description="사용 부품")
     def display_used_parts(self, obj):
         parts = obj.used_parts.all()
         if parts:
-            names = ", ".join(p.name for p in parts)
-            return names[:40] + "…" if len(names) > 40 else names
+            full_text = ", ".join(p.name for p in parts)
+            return format_html(
+                '<span class="truncate-text" title="{}">{}</span>',
+                full_text,
+                full_text
+            )
         return "-"
 
     def get_queryset(self, request):
@@ -929,10 +933,9 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
             "all": (
                 "as_app/css/hide_fab.css",
                 "as_app/css/row_colors.css",
+                "as_app/css/text_truncate.css",
             )
         }
-
-
 
     def has_add_permission(self, request):
         return False
@@ -943,14 +946,16 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
     def has_delete_permission(self, request, obj=None):
         return False
 
-    @admin.display(description="사용 부품 요약")
+    @admin.display(description="사용 부품")
     def used_parts_summary(self, obj):
         parts = obj.used_parts.all()
         if parts:
-            part_names = [p.name for p in parts[:2]]
-            if parts.count() > 2:
-                return f"{', '.join(part_names)} 외 {parts.count() - 2}건"
-            return ", ".join(part_names)
+            full_text = ", ".join(p.name for p in parts)
+            return format_html(
+                '<span class="truncate-text" title="{}">{}</span>',
+                full_text,
+                full_text
+            )
         return "-"
 
 

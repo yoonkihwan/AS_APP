@@ -1,0 +1,247 @@
+{% extends "admin/base.html" %}
+
+{% block title %}내 근무 달력 | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .calendar-container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: var(--bg-surface);
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    /* 헤더 스타일 */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--font-color);
+    }
+
+    /* 버튼 공통 스타일 */
+    .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        opacity: 0.9;
+    }
+
+    .btn-secondary {
+        background-color: var(--bg-surface);
+        color: var(--font-color);
+        border-color: var(--border-color);
+    }
+
+    .btn-secondary:hover {
+        background-color: var(--bg-body);
+    }
+
+    /* 통계 요약 카드 */
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .summary-card {
+        background-color: var(--bg-body);
+        padding: 1.5rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+    }
+
+    .summary-title {
+        font-size: 0.875rem;
+        color: var(--font-muted);
+        margin-bottom: 0.5rem;
+    }
+
+    .summary-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--font-color);
+    }
+
+    /* 캘린더 커스텀 */
+    #calendar {
+        background-color: var(--bg-body);
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+    }
+
+    /* 범례 (Legend) */
+    .legend {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--font-color);
+    }
+
+    .color-box {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+    }
+
+    /* 근무 유형별 테마 커스텀 (FullCalendar Event CSS) */
+    .fc-event.type-normal {
+        background-color: #3b82f6 !important;
+        border-color: #2563eb !important;
+    }
+
+    /* 파랑 */
+    .fc-event.type-overtime {
+        background-color: #f59e0b !important;
+        border-color: #d97706 !important;
+    }
+
+    /* 주황 */
+    .fc-event.type-weekend {
+        background-color: #ef4444 !important;
+        border-color: #dc2626 !important;
+    }
+
+    /* 빨강 */
+    .fc-event.type-leave-full {
+        background-color: #10b981 !important;
+        border-color: #059669 !important;
+    }
+
+    /* 초록 */
+    .fc-event.type-leave-half {
+        background-color: #8b5cf6 !important;
+        border-color: #7c3aed !important;
+    }
+
+    /* 보라 */
+</style>
+<!-- FullCalendar CSS CDN -->
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
+{% endblock %}
+
+{% block content %}
+<div class="calendar-container">
+    <div class="page-header">
+        <h1 class="page-title">내 근무 달력</h1>
+        <div style="display: flex; gap: 1rem;">
+            <a href="{% url 'hr_admin:hr_app_attendancerecord_add' %}" class="btn btn-primary">
+                + 새 기록 작성
+            </a>
+            <a href="{% url 'hr_admin:hr_app_attendancerecord_changelist' %}" class="btn btn-secondary">
+                목록으로 보기
+            </a>
+        </div>
+    </div>
+
+    <!-- 이번 달 요약 통계 -->
+    <div class="summary-cards">
+        <div class="summary-card">
+            <div class="summary-title">누적 연장 근무 (이번 달)</div>
+            <div class="summary-value" id="total_overtime">0 H</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-title">연차 사용 (올해 누적)</div>
+            <div class="summary-value" id="total_leave_days">0 일</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-title">주말 특근 (이번 달)</div>
+            <div class="summary-value" id="total_weekend">0 회</div>
+        </div>
+    </div>
+
+    <!-- 달력 영역 -->
+    <div id='calendar'></div>
+
+    <!-- 범례 영역 -->
+    <div class="legend">
+        <div class="legend-item">
+            <div class="color-box" style="background-color: #3b82f6;"></div>
+            <span>정상근무</span>
+        </div>
+        <div class="legend-item">
+            <div class="color-box" style="background-color: #f59e0b;"></div>
+            <span>연장근무</span>
+        </div>
+        <div class="legend-item">
+            <div class="color-box" style="background-color: #ef4444;"></div>
+            <span>주말특근</span>
+        </div>
+        <div class="legend-item">
+            <div class="color-box" style="background-color: #10b981;"></div>
+            <span>연차 (종일)</span>
+        </div>
+        <div class="legend-item">
+            <div class="color-box" style="background-color: #8b5cf6;"></div>
+            <span>반차</span>
+        </div>
+    </div>
+</div>
+
+<!-- FullCalendar JS CDN -->
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js'></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'ko', // 한국어 설정
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            height: 700,
+            events: '/hr/api/calendar-events/', // [TODO] 추후 이 API 엔드포인트를 구현하여 데이터를 받아옵니다.
+            eventClick: function (info) {
+                // 이벤트를 클릭했을 때 상세 페이지로 이동 (id가 URL을 대체)
+                if (info.event.id) {
+                    window.location.href = `/hr/hr_app/attendancerecord/${info.event.id}/change/`;
+                }
+            }
+        });
+        calendar.render();
+    });
+</script>
+{% endblock %}

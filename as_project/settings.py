@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "import_export",
     "as_app",
     "tool_inventory",
+    "hr_app",
 ]
 
 MIDDLEWARE = [
@@ -152,6 +153,9 @@ def dashboard_callback(request, context):
         from tool_inventory.dashboard import dashboard_callback as inv_callback
         return inv_callback(request, context)
     elif request.path.startswith('/sysadmin/'):
+        return context
+    elif request.path.startswith('/hr/'):
+        # Will add a dashboard callback in hr_app later if needed. For now just return context.
         return context
     else:
         from as_app.dashboard import dashboard_callback as as_callback
@@ -266,6 +270,42 @@ def sidebar_callback(request):
                 ],
             },
         ]
+    elif request.path.startswith('/hr/'):
+        return [
+            {
+                "title": "내비게이션",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "포탈로 돌아가기",
+                        "icon": "home",
+                        "link": "/",
+                    },
+                ],
+            },
+            {
+                "title": "근무 현황판",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "내 근무 달력",
+                        "icon": "calendar_month",
+                        "link": reverse_lazy("hr_admin:index"), 
+                    },
+                ],
+            },
+            {
+                "title": "근태 데이터 관리",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "근태 기록 목록",
+                        "icon": "list_alt",
+                        "link": reverse_lazy("hr_admin:hr_app_attendancerecord_changelist"),
+                    },
+                ],
+            },
+        ]
     else:
         return [
             {
@@ -360,6 +400,8 @@ def site_title_callback(request):
         return "장비/툴 관리"
     elif request.path.startswith('/sysadmin/'):
         return "시스템 관리"
+    elif request.path.startswith('/hr/'):
+        return "근무/근태 관리"
     return "AS 관리"
 
 def site_header_callback(request):
@@ -367,6 +409,8 @@ def site_header_callback(request):
         return "TOOL 입출고 관리"
     elif request.path.startswith('/sysadmin/'):
         return "시스템 권한 승인 센터"
+    elif request.path.startswith('/hr/'):
+        return "근무 관리 포털"
     return "AS 시스템"
 
 def site_symbol_callback(request):
@@ -374,6 +418,8 @@ def site_symbol_callback(request):
         return "inventory_2"
     elif request.path.startswith('/sysadmin/'):
         return "admin_panel_settings"
+    elif request.path.startswith('/hr/'):
+        return "event_available"
     return "build"
 
 UNFOLD = {

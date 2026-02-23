@@ -37,13 +37,17 @@ def main():
     def generate_random_sn():
         return f"SN-{random.randint(10000, 99999)}-{random.randint(100, 999)}"
 
+    start_date = date(2020, 1, 1)
+    end_date = date.today()
+    delta_days = (end_date - start_date).days
+
     created_count = 0
-    for i in range(50):
+    for i in range(1000):
         company = random.choice(companies)
         tool = random.choice(tools)
         
-        days_ago = random.randint(0, 180)
-        inbound_date = date.today() - timedelta(days=days_ago)
+        days_ago = random.randint(0, delta_days)
+        inbound_date = end_date - timedelta(days=days_ago)
         
         status = random.choice(statuses)
         
@@ -82,7 +86,7 @@ def main():
             ticket.save()
             
         created_count += 1
-        print(f"[{created_count}/50] Created ticket for {company.name} - {tool.model_name}")
+        print(f"[{created_count}/1000] Created ticket for {company.name} - {tool.model_name}")
 
     print(f"성공적으로 {created_count}개의 AS 이력 더미데이터를 생성했습니다.")
 
