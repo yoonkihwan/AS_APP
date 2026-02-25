@@ -423,7 +423,6 @@ def site_symbol_callback(request):
     return "build"
 
 UNFOLD = {
-    "THEME": "dark",
     "SITE_TITLE": "as_project.settings.site_title_callback",
     "SITE_HEADER": "as_project.settings.site_header_callback",
     "SITE_SYMBOL": "as_project.settings.site_symbol_callback",
@@ -436,4 +435,5 @@ UNFOLD = {
         "show_all_applications": False,
         "navigation": "as_project.settings.sidebar_callback",
     },
+    "THEME": "dark",
 }

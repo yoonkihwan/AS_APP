@@ -52,7 +52,7 @@ class InventoryAdmin(ModelAdmin):
         'release_company', 'release_date', 'display_edit_button'
     )
     list_display_links = None
-    actions = ['cancel_outbound']
+    actions = ['cancel_outbound', 'export_selected_to_pdf', 'export_selected_to_excel']
     list_filter = ('status', 'supplier', 'release_company')
     search_fields = ('tool__model_name', 'tool__brand__name', 'serial', 'supplier__name', 'release_company__name')
     list_per_page = 50
@@ -79,6 +79,203 @@ class InventoryAdmin(ModelAdmin):
             
         from django.contrib import messages
         messages.success(request, f"총 {count}개의 장비가 성공적으로 재고로 원복되었습니다.")
+
+    @unfold_action(description="📄 선택한 내역 PDF 다운로드", url_path="export-selected-pdf", attrs={"style": "background-color: #9333ea; color: white; border: none;"})
+    def export_selected_to_pdf(self, request, queryset):
+        import io
+        import os
+        from django.http import FileResponse
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from django.utils import timezone
+        
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        
+        font_name = 'Helvetica'
+        try:
+            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('Malgun', font_path))
+                font_name = 'Malgun'
+        except Exception:
+            pass
+
+        # 품명 기준으로 정렬 (브랜드 -> 모델명 우선)
+        queryset = queryset.order_by('tool__brand__name', 'tool__model_name', 'date')
+        
+        # 출고 업체명 확인
+        outbound_companies = list(set([obj.release_company.name for obj in queryset if obj.release_company and obj.status == '출고']))
+        is_all_outbound = all(obj.status == '출고' for obj in queryset)
+        
+        if is_all_outbound and len(outbound_companies) == 1:
+            title = f"({outbound_companies[0]}) 출고리스트"
+        elif is_all_outbound and len(outbound_companies) > 1:
+            title = "(다중업체) 출고리스트"
+        else:
+            title = "입출고 이력 내역"
+            
+        # 날짜 추출 (출고리스트인 경우 출고일(release_date) 기준, 아니면 입고일(date))
+        dates_set = set()
+        for obj in queryset:
+            if is_all_outbound:
+                if obj.release_date:
+                    dates_set.add(obj.release_date.strftime('%Y-%m-%d'))
+            else:
+                if obj.date:
+                    dates_set.add(obj.date.strftime('%Y-%m-%d'))
+                    
+        dates_list = sorted(list(dates_set))
+        if dates_list:
+            # 콤마로 나열
+            date_str = ", ".join(dates_list)
+            # 글자가 너무 길면 텍스트를 일부만 보여주거나 줄바꿈해야 하지만 한 두개 날짜 선택을 보통 합니다.
+            date_range = f"({date_str})"
+        else:
+            date_range = ""
+            
+        # 대제목 출력
+        c.setFont(font_name, 16)
+        c.drawString(50, 800, title)
+        
+        # 날짜 출력 (대제목 옆)
+        if date_range:
+            c.setFont(font_name, 12)
+            title_width = c.stringWidth(title, font_name, 16)
+            c.drawString(50 + title_width + 10, 800, date_range)
+            
+        c.setFont(font_name, 10)
+        c.drawRightString(550, 800, f"출력일: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+        
+        y = 750
+        
+        import textwrap
+        from itertools import groupby
+        
+        def get_tool_name(obj):
+            return str(obj.tool) if obj.tool else "미지정 품목"
+            
+        items = list(queryset)
+        items.sort(key=get_tool_name)
+        grouped_items = groupby(items, key=get_tool_name)
+        
+        for tool_name, group in grouped_items:
+            group_list = list(group)
+            quantity = len(group_list)
+            
+            if y < 100:
+                c.showPage()
+                y = 800
+                c.setFont(font_name, 10)
+                
+            # 품명 헤더 (브랜드 및 모델명)
+            c.setFont(font_name, 12)
+            c.setStrokeColorRGB(0.7, 0.7, 0.7)
+            c.line(50, y+15, 550, y+15)
+            c.setStrokeColorRGB(0, 0, 0)
+            c.drawString(50, y, f"■ 품명: {tool_name}")
+            
+            # 수량 표시
+            if is_all_outbound:
+                c.drawRightString(550, y, f"출고 수량: {quantity}개")
+            else:
+                c.drawRightString(550, y, f"수량: {quantity}개")
+                
+            y -= 25
+            c.setFont(font_name, 10)
+            
+            # 시리얼 번호 수집
+            serials = []
+            for obj in group_list:
+                s_text = obj.serial if obj.serial else "S/N 없음"
+                serials.append(s_text)
+                
+            serial_joined = ", ".join(serials)
+            
+            c.drawString(70, y, "• S/N:")
+            
+            wrapped_serials = textwrap.wrap(serial_joined, width=70)
+            if not wrapped_serials:
+                wrapped_serials = ["(없음)"]
+                
+            for idx, line in enumerate(wrapped_serials):
+                if y < 70:
+                    c.showPage()
+                    y = 800
+                    c.setFont(font_name, 10)
+                    
+                c.drawString(110, y, line)
+                y -= 16
+                
+            y -= 8 # 품목 간 추가 여백
+
+        c.save()
+        buffer.seek(0)
+        
+        filename = f"inventory_export_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        response = FileResponse(buffer, as_attachment=True, filename=filename)
+        return response
+
+    @unfold_action(description="📊 선택한 내역 엑셀 다운로드", url_path="export-selected-excel", attrs={"style": "background-color: #10b981; color: white; border: none;"})
+    def export_selected_to_excel(self, request, queryset):
+        import io
+        import openpyxl
+        from django.http import HttpResponse
+        from django.utils import timezone
+        from openpyxl.styles import Font, Alignment
+        
+        # 품명 기준으로 정렬 (브랜드 -> 모델명 우선)
+        queryset = queryset.order_by('tool__brand__name', 'tool__model_name', 'date')
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "입출고이력"
+        
+        headers = ["브랜드", "모델명", "시리얼번호", "상태", "처리일자", "거래처"]
+        ws.append(headers)
+        
+        # 헤더 스타일
+        header_font = Font(bold=True)
+        for col_num, cell in enumerate(ws[1], 1):
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center')
+        
+        for obj in queryset:
+            brand_name = obj.tool.brand.name if obj.tool and obj.tool.brand else "-"
+            model_name = obj.tool.model_name if obj.tool else "미지정 품목"
+            serial_text = obj.serial if obj.serial else "S/N 없음"
+            status_text = obj.get_status_display()
+            
+            if obj.status == '출고':
+                date_str = str(obj.release_date) if obj.release_date else "-"
+                company_text = obj.release_company.name if obj.release_company else "-"
+            else:
+                date_str = str(obj.date) if obj.date else "-"
+                company_text = obj.supplier.name if obj.supplier else "-"
+                
+            ws.append([brand_name, model_name, serial_text, status_text, date_str, company_text])
+            
+        # 열 너비 설정
+        ws.column_dimensions['A'].width = 15
+        ws.column_dimensions['B'].width = 25
+        ws.column_dimensions['C'].width = 25
+        ws.column_dimensions['D'].width = 10
+        ws.column_dimensions['E'].width = 15
+        ws.column_dimensions['F'].width = 20
+        
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        filename = f"inventory_export_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        response = HttpResponse(
+            buffer,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
     def has_add_permission(self, request):
         return False

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" class="dark">
 
 <head>
     <meta charset="UTF-8">
@@ -295,10 +295,141 @@
             pointer-events: none;
             filter: grayscale(80%);
         }
+
+        /* ── Theme Toggle Button ── */
+        .theme-toggle {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        /* ── Light Mode Base ── */
+        html:not(.dark) body {
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        html:not(.dark) h1 {
+            color: #1e293b;
+        }
+
+        html:not(.dark) .theme-toggle {
+            background: #ffffff;
+            border-color: #e2e8f0;
+            color: #1e293b;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        html:not(.dark) .theme-toggle:hover {
+            background: #f1f5f9;
+        }
+
+        html:not(.dark) .login-wrapper {
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        html:not(.dark) .login-wrapper h2 {
+            color: #1e293b;
+        }
+
+        html:not(.dark) .input-group input {
+            background-color: #f8fafc;
+            border-color: #cbd5e1;
+            color: #0f172a;
+        }
+
+        html:not(.dark) .input-group input:focus {
+            background-color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.15);
+        }
+
+        html:not(.dark) .input-group input::placeholder {
+            color: #94a3b8;
+        }
+
+        html:not(.dark) .user-wrapper {
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        html:not(.dark) .user-info {
+            color: #475569;
+        }
+
+        html:not(.dark) .user-info b {
+            color: #1e293b;
+        }
+
+        html:not(.dark) .logout-btn {
+            background-color: #f1f5f9;
+            color: #475569;
+            border-color: #cbd5e1;
+        }
+
+        html:not(.dark) .logout-btn:hover {
+            background-color: #e2e8f0;
+            color: #1e293b;
+        }
+
+        html:not(.dark) .card {
+            background: #ffffff;
+            border-color: #e2e8f0;
+            color: #1e293b;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        html:not(.dark) .card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        html:not(.dark) .card .title {
+            color: #1e293b;
+        }
+
+        html:not(.dark) .card .desc {
+            color: #64748b;
+        }
+
+        html:not(.dark) .signup-btn {
+            background-color: #f1f5f9;
+            color: #475569;
+            border-color: #cbd5e1;
+        }
+
+        html:not(.dark) .signup-btn:hover {
+            background-color: #e2e8f0;
+            color: #1e293b;
+            border-color: #94a3b8;
+        }
     </style>
+
 </head>
 
 <body>
+
     <div class="container">
         <h1>TOOL 관리 포탈</h1>
 
@@ -410,6 +541,8 @@
         <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 2rem;">시스템에 접근하려면 먼저 상단의 로그인을 진행해주세요.</p>
         {% endif %}
     </div>
+
+
 </body>
 
 </html>
