@@ -317,10 +317,10 @@ class InventoryAdmin(ModelAdmin):
 
     @display(description="상태")
     def display_status(self, obj):
-        css_status = "inbound" if obj.status == "재고" else "shipped"
+        if obj.status == "재고":
+            return obj.get_status_display()
         return format_html(
-            '<span class="status-marker" data-status="{}">{}</span>',
-            css_status,
+            '<span class="status-marker" data-status="repaired">{}</span>',
             obj.get_status_display(),
         )
 
@@ -563,10 +563,10 @@ class OutboundInventoryAdmin(ModelAdmin):
 
     @display(description="상태")
     def display_status(self, obj):
-        css_status = "inbound" if obj.status == "재고" else "shipped"
+        if obj.status == "재고":
+            return obj.get_status_display()
         return format_html(
-            '<span class="status-marker" data-status="{}">{}</span>',
-            css_status,
+            '<span class="status-marker" data-status="repaired">{}</span>',
             obj.get_status_display(),
         )
 

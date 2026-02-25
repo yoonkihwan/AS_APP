@@ -30,9 +30,18 @@ class StatusColorMixin:
     
     @display(description="상태")
     def display_status(self, obj):
+        if obj.status == "inbound":
+            return obj.get_status_display()
+            
+        css_status = obj.status
+        if obj.status == "shipped":
+            css_status = "repaired"  # 출고는 초록색
+        elif obj.status == "repaired":
+            css_status = "shipped"   # 수리완료는 파란색
+            
         return format_html(
             '<span class="status-marker" data-status="{}">{}</span>',
-            obj.status,
+            css_status,
             obj.get_status_display(),
         )
 
