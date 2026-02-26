@@ -269,6 +269,17 @@ def sidebar_callback(request):
                     },
                 ],
             },
+            {
+                "title": "활동 모니터링",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "전체 활동 기록",
+                        "icon": "history",
+                        "link": reverse_lazy("sysadmin:admin_logentry_changelist"),
+                    },
+                ],
+            },
         ]
     elif request.path.startswith('/hr/'):
         return [
