@@ -91,11 +91,6 @@ class Tool(models.Model):
 class Part(models.Model):
     """수리부품/공임 관리"""
 
-    class PartType(models.TextChoices):
-        DEDICATED = "dedicated", "전용"
-        COMMON = "common", "공용"
-        LABOR = "labor", "공임"
-
     tools = models.ManyToManyField(
         Tool,
         verbose_name="적용 장비/툴",
@@ -106,12 +101,7 @@ class Part(models.Model):
     name = models.CharField("부품명", max_length=200)
     code = models.CharField("부품코드", max_length=100, blank=True)
     price = models.PositiveIntegerField("단가", default=0)
-    part_type = models.CharField(
-        "구분",
-        max_length=10,
-        choices=PartType.choices,
-        default=PartType.DEDICATED,
-    )
+    remarks = models.TextField("비고", blank=True)
 
     class Meta:
         verbose_name = "수리부품"
@@ -119,8 +109,7 @@ class Part(models.Model):
         ordering = ["name"]
 
     def __str__(self):
-        type_label = self.get_part_type_display()
-        return f"[{type_label}] {self.name} ({self.price:,}원)"
+        return f"{self.name} ({self.price:,}원)"
 
     def tool_list(self):
         """적용 장비 목록 표시용"""

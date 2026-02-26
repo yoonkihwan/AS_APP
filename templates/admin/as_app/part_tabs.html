@@ -1,0 +1,44 @@
+<!-- 수리부품/수리세트 탭 네비게이션 -->
+<div style="
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e5e7eb;
+    display: flex;
+    gap: 0;
+">
+    <a href="{% url 'admin:as_app_part_changelist' %}" id="tab-part" style="
+            padding: 12px 24px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-bottom: 3px solid {% if active_tab == 'part' %}#6366f1{% else %}transparent{% endif %};
+            color: {% if active_tab == 'part' %}#4338ca{% else %}#6b7280{% endif %};
+            margin-bottom: -2px;
+            transition: all .2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+       "
+        onmouseover="if('{{ active_tab }}' !== 'part') { this.style.color='#4338ca'; this.style.borderBottomColor='#c7d2fe'; }"
+        onmouseout="if('{{ active_tab }}' !== 'part') { this.style.color='#6b7280'; this.style.borderBottomColor='transparent'; }">
+        <span class="material-symbols-outlined" style="font-size:1.1rem;">build</span>
+        수리부품
+    </a>
+    <a href="{% url 'admin:as_app_repairpreset_changelist' %}" id="tab-preset" style="
+            padding: 12px 24px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-bottom: 3px solid {% if active_tab == 'preset' %}#6366f1{% else %}transparent{% endif %};
+            color: {% if active_tab == 'preset' %}#4338ca{% else %}#6b7280{% endif %};
+            margin-bottom: -2px;
+            transition: all .2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+       "
+        onmouseover="if('{{ active_tab }}' !== 'preset') { this.style.color='#4338ca'; this.style.borderBottomColor='#c7d2fe'; }"
+        onmouseout="if('{{ active_tab }}' !== 'preset') { this.style.color='#6b7280'; this.style.borderBottomColor='transparent'; }">
+        <span class="material-symbols-outlined" style="font-size:1.1rem;">inventory_2</span>
+        수리세트
+    </a>
+</div>

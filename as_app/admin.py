@@ -178,8 +178,8 @@ class ToolAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 @admin.register(Part)
 class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "수리부품 관리"
-    list_display = ["name", "code", "part_type", "display_tools", "price"]
-    list_filter = ["part_type", "tools__brand"]
+    list_display = ["name", "code", "formatted_price", "display_tools", "remarks"]
+    list_filter = ["tools__brand"]
     search_fields = ["name", "code"]
     filter_horizontal = ["tools"]
     list_per_page = 20
@@ -192,8 +192,8 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
                 "fields": (
                     "name",
                     "code",
-                    "part_type",
                     "price",
+                    "remarks",
                 ),
             },
         ),
@@ -210,11 +210,13 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     def display_tools(self, obj):
         return obj.tool_list()
 
+    @admin.display(description="단가")
+    def formatted_price(self, obj):
+        return f"{obj.price:,}"
+
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        extra_context["preset_url"] = reverse("admin:as_app_repairpreset_changelist")
-        extra_context["preset_add_url"] = reverse("admin:as_app_repairpreset_add")
-        extra_context["preset_count"] = RepairPreset.objects.count()
+        extra_context["active_tab"] = "part"
         return super().changelist_view(request, extra_context)
 
 
@@ -225,6 +227,7 @@ class RepairPresetAdmin(NoRelatedButtonsMixin, ModelAdmin):
     search_fields = ["name"]
     filter_horizontal = ["parts", "tools"]
     list_per_page = 20
+    change_list_template = "admin/as_app/repairpreset/change_list.html"
 
     fieldsets = (
         (
@@ -266,6 +269,11 @@ class RepairPresetAdmin(NoRelatedButtonsMixin, ModelAdmin):
         if tools:
             return ", ".join(str(t) for t in tools[:3])
         return "전체"
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["active_tab"] = "preset"
+        return super().changelist_view(request, extra_context)
 
     def has_module_permission(self, request):
         """사이드바에 표시하지 않음 (PartAdmin에서 통합 관리)"""
@@ -643,8 +651,8 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
         if obj and obj.tool_id:
             from django.db.models import Q
             form.base_fields["used_parts"].queryset = Part.objects.filter(
-                Q(tools=obj.tool) | Q(tools__isnull=True) | Q(part_type=Part.PartType.LABOR)
-            ).distinct().order_by("part_type", "name")
+                Q(tools=obj.tool) | Q(tools__isnull=True)
+            ).distinct().order_by("name")
         # 부품 선택을 체크박스 위젯으로 변경 (빠르고 직관적)
         if "used_parts" in form.base_fields:
             form.base_fields["used_parts"].widget = forms.CheckboxSelectMultiple()
@@ -748,8 +756,8 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
         """특정 장비에 적용 가능한 부품 목록을 JSON으로 반환"""
         from django.db.models import Q
         parts = Part.objects.filter(
-            Q(tools__id=tool_id) | Q(tools__isnull=True) | Q(part_type=Part.PartType.LABOR)
-        ).distinct().values("id", "name", "code", "price", "part_type")
+            Q(tools__id=tool_id) | Q(tools__isnull=True)
+        ).distinct().values("id", "name", "code", "price")
         return JsonResponse({"parts": list(parts)})
 
 
@@ -953,7 +961,9 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        """삭제 권한을 활성화하여 목록에서 체크박스 선택 후 삭제 동작(Run)을 가능하게 함.
+        (Django 기본 delete_selected 액션이 사용되며, 실행 시 자동으로 삭제 확인 화면이 표시됨)"""
+        return True
 
     @admin.display(description="사용 부품")
     def used_parts_summary(self, obj):
