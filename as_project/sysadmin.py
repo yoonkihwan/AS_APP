@@ -38,7 +38,7 @@ class LogEntryInline(TabularInline):
         return False
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("content_type")[:20]
+        return super().get_queryset(request).select_related("content_type")
 
     @display(description="작업")
     def display_action(self, obj):
