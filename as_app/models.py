@@ -91,6 +91,12 @@ class Tool(models.Model):
 class Part(models.Model):
     """수리부품/공임 관리"""
 
+    brand = models.ForeignKey(
+        Brand,
+        on_delete=models.PROTECT,
+        verbose_name="브랜드",
+        related_name="parts",
+    )
     tools = models.ManyToManyField(
         Tool,
         verbose_name="적용 장비/툴",
@@ -122,6 +128,12 @@ class Part(models.Model):
 class RepairPreset(models.Model):
     """수리 세트 - 자주 사용하는 부품 조합을 프리셋으로 관리"""
 
+    brand = models.ForeignKey(
+        Brand,
+        on_delete=models.PROTECT,
+        verbose_name="브랜드",
+        related_name="repair_presets",
+    )
     name = models.CharField("세트명", max_length=200)
     tools = models.ManyToManyField(
         Tool,

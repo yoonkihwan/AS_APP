@@ -1,0 +1,16 @@
+/* 길어지는 텍스트를 줄바꿈 없이 자르고 말줄임표 처리 */
+.truncate-text {
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* 모바일 대응 등 작은 화면 */
+@media (max-width: 768px) {
+    .truncate-text {
+        max-width: 150px;
+    }
+}

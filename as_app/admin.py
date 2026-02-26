@@ -178,9 +178,10 @@ class ToolAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 @admin.register(Part)
 class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "수리부품 관리"
-    list_display = ["name", "code", "formatted_price", "display_tools", "remarks"]
-    list_filter = ["tools__brand"]
+    list_display = ["brand", "name", "code", "formatted_price", "display_tools", "remarks"]
+    list_filter = ["brand", "tools__brand"]
     search_fields = ["name", "code"]
+    autocomplete_fields = ["brand"]
     filter_horizontal = ["tools"]
     list_per_page = 20
     change_list_template = "admin/as_app/part/change_list.html"
@@ -190,6 +191,7 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
             "수리부품 기본 정보",
             {
                 "fields": (
+                    "brand",
                     "name",
                     "code",
                     "price",
@@ -221,19 +223,25 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 
 
 @admin.register(RepairPreset)
-class RepairPresetAdmin(NoRelatedButtonsMixin, ModelAdmin):
+class RepairPresetAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "수리세트 관리"
     """수리 세트 관리 - 자주 사용하는 부품 조합을 프리셋으로 관리"""
-    list_display = ["name", "display_parts", "display_total_price", "display_tools"]
+    list_display = ["brand", "name", "display_parts", "display_total_price", "display_tools"]
+    list_filter = ["brand"]
     search_fields = ["name"]
+    autocomplete_fields = ["brand"]
     filter_horizontal = ["parts", "tools"]
     list_per_page = 20
     change_list_template = "admin/as_app/repairpreset/change_list.html"
+
+    class Media:
+        js = ("as_app/js/preset_brand_cascade.js",)
 
     fieldsets = (
         (
             "세트 기본 정보",
             {
-                "fields": ("name",),
+                "fields": ("brand", "name",),
             },
         ),
         (
@@ -274,6 +282,22 @@ class RepairPresetAdmin(NoRelatedButtonsMixin, ModelAdmin):
         extra_context = extra_context or {}
         extra_context["active_tab"] = "preset"
         return super().changelist_view(request, extra_context)
+
+    def get_urls(self):
+        """브랜드별 장비(Tool) 목록 API 엔드포인트 추가"""
+        custom_urls = [
+            path(
+                "api/tools-for-brand/<int:brand_id>/",
+                self.admin_site.admin_view(self.api_tools_for_brand),
+                name="api_tools_for_brand",
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def api_tools_for_brand(self, request, brand_id):
+        """특정 브랜드에 속한 장비 목록을 JSON으로 반환"""
+        tools = Tool.objects.filter(brand_id=brand_id).values("id", "model_name")
+        return JsonResponse({"tools": list(tools)})
 
     def has_module_permission(self, request):
         """사이드바에 표시하지 않음 (PartAdmin에서 통합 관리)"""
@@ -773,7 +797,7 @@ class OutboundTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
         "tool",
         "serial_number",
         "display_used_parts",
-        "repair_cost",
+        "formatted_repair_cost",
     ]
     list_display_links = None  # 행 클릭 시 상세 페이지 이동 안 함 (체크만)
     list_filter = ["company", "tool__brand"]
@@ -797,6 +821,10 @@ class OutboundTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
                 full_text
             )
         return "-"
+
+    @admin.display(description="수리 비용")
+    def formatted_repair_cost(self, obj):
+        return f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
 
     def get_queryset(self, request):
         """수리완료 상태인 티켓만 표시"""
@@ -887,7 +915,7 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "tool",
         "serial_number",
         "used_parts_summary",
-        "repair_cost",
+        "formatted_repair_cost",
         "estimate_status",
         "tax_invoice",
     ]
@@ -977,6 +1005,10 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
             )
         return "-"
 
+    @admin.display(description="수리 비용")
+    def formatted_repair_cost(self, obj):
+        return f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
+
 
 @admin.register(EstimateTicket)
 class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
@@ -990,7 +1022,7 @@ class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
         "company",
         "tool",
         "serial_number",
-        "repair_cost",
+        "formatted_repair_cost",
     ]
     list_filter = [
         "status",
@@ -1052,6 +1084,10 @@ class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
     def has_delete_permission(self, request, obj=None):
         return False
 
+    @admin.display(description="수리 비용")
+    def formatted_repair_cost(self, obj):
+        return f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
+
 
 @admin.register(TaxInvoiceTicket)
 class TaxInvoiceTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
@@ -1064,7 +1100,7 @@ class TaxInvoiceTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtons
         "company",
         "tool",
         "serial_number",
-        "repair_cost",
+        "formatted_repair_cost",
         "tax_invoice",
     ]
     list_editable = ["tax_invoice"]
@@ -1097,6 +1133,10 @@ class TaxInvoiceTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtons
 
     def has_add_permission(self, request):
         return False
+
+    @admin.display(description="수리 비용")
+    def formatted_repair_cost(self, obj):
+        return f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
 
     def has_delete_permission(self, request, obj=None):
         return False
