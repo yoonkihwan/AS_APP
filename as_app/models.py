@@ -25,6 +25,16 @@ class Company(models.Model):
     """매출처 관리 - AS 매출 거래처"""
 
     name = models.CharField("업체명", max_length=200)
+    business_number = models.CharField(
+        "사업자등록번호",
+        max_length=20,
+        help_text="예: 123-45-67890",
+    )
+    representative = models.CharField(
+        "대표자명",
+        max_length=100,
+    )
+    address = models.TextField("주소")
     price_group = models.ForeignKey(
         CompanyCategory,
         on_delete=models.SET_NULL,
@@ -34,13 +44,6 @@ class Company(models.Model):
         blank=True,
         help_text="견적서 금액이 다르게 적용되는 그룹",
     )
-    region = models.CharField(
-        "지역/국가",
-        max_length=100,
-        blank=True,
-        help_text="예: 한국, 일본, 중국, 미국 등",
-    )
-    address = models.TextField("주소", blank=True)
 
     class Meta:
         verbose_name = "매출처"
@@ -48,8 +51,6 @@ class Company(models.Model):
         ordering = ["name"]
 
     def __str__(self):
-        if self.region:
-            return f"{self.name} [{self.region}]"
         return self.name
 
 

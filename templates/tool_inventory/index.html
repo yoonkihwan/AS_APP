@@ -175,6 +175,110 @@
         font-size: 0.85rem;
     }
 
+    /* ── 투두리스트 ── */
+    .todo-input-row {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+    }
+
+    .todo-input {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.5rem;
+        font-size: 0.85rem;
+        background: transparent;
+        color: var(--text-color, #374151);
+        outline: none;
+    }
+
+    .todo-input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+    }
+
+    .todo-add-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        border: none;
+        background: #6366f1;
+        color: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .todo-add-btn:hover {
+        background: #4f46e5;
+    }
+
+    .todo-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .todo-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.625rem 1.25rem;
+        border-top: 1px solid var(--border-color, #f3f4f6);
+        transition: background 0.1s ease;
+    }
+
+    .todo-item:first-child {
+        border-top: none;
+    }
+
+    .todo-item:hover {
+        background: var(--color-bg-secondary, #f9fafb);
+    }
+
+    .todo-checkbox {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 2px solid #94a3b8;
+        cursor: pointer;
+        flex-shrink: 0;
+        accent-color: #6366f1;
+    }
+
+    .todo-text {
+        flex: 1;
+        font-size: 0.85rem;
+        color: var(--text-color, #374151);
+    }
+
+    .todo-text.done {
+        text-decoration: line-through;
+        color: var(--text-muted, #9ca3af);
+    }
+
+    .todo-delete {
+        background: none;
+        border: none;
+        color: #ef4444;
+        cursor: pointer;
+        font-size: 1.1rem;
+        padding: 2px;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        display: flex;
+        align-items: center;
+    }
+
+    .todo-item:hover .todo-delete {
+        opacity: 1;
+    }
+
     /* ── 다크 모드 ── */
     .dark .kpi-card,
     .dark .dash-panel {
@@ -211,6 +315,32 @@
     .dark .dash-panel-header {
         border-color: #334155;
     }
+
+    .dark .todo-input {
+        background: #1a2332;
+        border-color: #334155;
+        color: #f1f5f9;
+    }
+
+    .dark .todo-input-row {
+        border-color: #334155;
+    }
+
+    .dark .todo-item {
+        border-color: #334155;
+    }
+
+    .dark .todo-item:hover {
+        background: #1a2332;
+    }
+
+    .dark .todo-text {
+        color: #cbd5e1;
+    }
+
+    .dark .todo-text.done {
+        color: #64748b;
+    }
 </style>
 {% endblock %}
 
@@ -246,43 +376,84 @@
 <!-- ② 최신 데이터 패널 모음 -->
 <div class="dash-grid dash-grid-2">
 
-    <!-- 최근 입고 처리 내역 -->
-    <div class="dash-panel">
-        <div class="dash-panel-header">
-            <span class="dash-panel-title">
-                <span class="material-icons-outlined" style="color: #10b981;">move_to_inbox</span>
-                최근 입고된 장비
-            </span>
-            <a href="{% url 'tool_admin:tool_inventory_inventory_changelist' %}?status__exact=재고"
-                class="dash-panel-link">재고 전체 보기 →</a>
+    <!-- 왼쪽 컬럼: 최근 입고 + 투두리스트 -->
+    <div style="display:flex; flex-direction:column; gap:1rem;">
+        <!-- 최근 입고 처리 내역 -->
+        <div class="dash-panel">
+            <div class="dash-panel-header">
+                <span class="dash-panel-title">
+                    <span class="material-icons-outlined" style="color: #10b981;">move_to_inbox</span>
+                    최근 입고된 장비
+                </span>
+                <a href="{% url 'tool_admin:tool_inventory_inventory_changelist' %}?status__exact=재고"
+                    class="dash-panel-link">재고 전체 보기 →</a>
+            </div>
+            {% if recent_in %}
+            <table class="dash-table">
+                <thead>
+                    <tr>
+                        <th>입고일</th>
+                        <th>품목명</th>
+                        <th>매입처</th>
+                        <th>시리얼</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in recent_in %}
+                    <tr>
+                        <td>{{ item.date|date:"Y-m-d" }}</td>
+                        <td><strong>{{ item.tool.model_name }}</strong></td>
+                        <td class="text-muted">{{ item.supplier.name|default:"-" }}</td>
+                        <td>{{ item.serial|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="dash-empty">
+                <span class="material-icons-outlined">inbox</span>
+                최근 입고된 내역이 없습니다.
+            </div>
+            {% endif %}
         </div>
-        {% if recent_in %}
-        <table class="dash-table">
-            <thead>
-                <tr>
-                    <th>입고일</th>
-                    <th>품목명</th>
-                    <th>매입처</th>
-                    <th>시리얼</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in recent_in %}
-                <tr>
-                    <td>{{ item.date|date:"Y-m-d" }}</td>
-                    <td><strong>{{ item.tool.model_name }}</strong></td>
-                    <td class="text-muted">{{ item.supplier.name|default:"-" }}</td>
-                    <td>{{ item.serial|default:"-" }}</td>
-                </tr>
+
+        <!-- 투두리스트 -->
+        <div class="dash-panel" id="todo-panel">
+            <div class="dash-panel-header">
+                <span class="dash-panel-title">
+                    <span class="material-icons-outlined" style="color: #f59e0b;">checklist</span>
+                    할 일 목록
+                    {% if todo_pending_count %}
+                    <span class="dash-panel-badge" style="background: #f59e0b;">{{ todo_pending_count }}</span>
+                    {% endif %}
+                </span>
+            </div>
+            <!-- 입력 영역 -->
+            <div class="todo-input-row">
+                <input type="text" id="todo-input" class="todo-input" placeholder="새로운 할 일을 입력하세요..."
+                    autocomplete="off">
+                <button type="button" id="todo-add-btn" class="todo-add-btn">
+                    <span class="material-icons-outlined" style="font-size:1rem;">add</span> 추가
+                </button>
+            </div>
+            <!-- 목록 -->
+            <ul class="todo-list" id="todo-list">
+                {% for todo in todo_items %}
+                <li class="todo-item" data-id="{{ todo.id }}">
+                    <input type="checkbox" class="todo-checkbox" {% if todo.is_done %}checked{% endif %}>
+                    <span class="todo-text {% if todo.is_done %}done{% endif %}">{{ todo.title }}</span>
+                    <button type="button" class="todo-delete" title="삭제">
+                        <span class="material-icons-outlined" style="font-size:1.1rem;">close</span>
+                    </button>
+                </li>
+                {% empty %}
+                <li class="todo-item" id="todo-empty"
+                    style="justify-content:center; color:var(--text-muted, #9ca3af); font-size:0.85rem; padding:1.5rem;">
+                    등록된 할 일이 없습니다.
+                </li>
                 {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="dash-empty">
-            <span class="material-icons-outlined">inbox</span>
-            최근 입고된 내역이 없습니다.
+            </ul>
         </div>
-        {% endif %}
     </div>
 
     <!-- 최근 출고 완료 -->
@@ -325,5 +496,121 @@
     </div>
 
 </div>
+
+<script>
+    (function () {
+        const todoList = document.getElementById('todo-list');
+        const todoInput = document.getElementById('todo-input');
+        const addBtn = document.getElementById('todo-add-btn');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+            || '{{ csrf_token }}';
+
+        const API_BASE = '/inventory/tool_inventory/todoitem/api';
+
+        function removeEmptyMsg() {
+            const emptyEl = document.getElementById('todo-empty');
+            if (emptyEl) emptyEl.remove();
+        }
+
+        function createTodoElement(id, title, isDone) {
+            const li = document.createElement('li');
+            li.className = 'todo-item';
+            li.dataset.id = id;
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'todo-checkbox';
+            cb.checked = isDone;
+
+            const span = document.createElement('span');
+            span.className = 'todo-text' + (isDone ? ' done' : '');
+            span.textContent = title;
+
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'todo-delete';
+            delBtn.title = '삭제';
+            delBtn.innerHTML = '<span class="material-icons-outlined" style="font-size:1.1rem;">close</span>';
+
+            li.appendChild(cb);
+            li.appendChild(span);
+            li.appendChild(delBtn);
+            return li;
+        }
+
+        // 추가
+        function addTodo() {
+            const title = todoInput.value.trim();
+            if (!title) return;
+            todoInput.value = '';
+
+            fetch(API_BASE + '/add/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify({ title: title }),
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        removeEmptyMsg();
+                        const el = createTodoElement(data.id, data.title, false);
+                        // 미완료 항목은 상단에 추가
+                        const firstDone = todoList.querySelector('.todo-item input[type=checkbox]:checked');
+                        if (firstDone) {
+                            todoList.insertBefore(el, firstDone.closest('.todo-item'));
+                        } else {
+                            todoList.appendChild(el);
+                        }
+                    }
+                })
+                .catch(err => console.error('할 일 추가 오류:', err));
+        }
+
+        addBtn.addEventListener('click', addTodo);
+        todoInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTodo();
+            }
+        });
+
+        // 이벤트 위임: 토글 + 삭제
+        todoList.addEventListener('change', function (e) {
+            if (!e.target.matches('.todo-checkbox')) return;
+            const item = e.target.closest('.todo-item');
+            const id = item.dataset.id;
+            const isDone = e.target.checked;
+
+            item.querySelector('.todo-text').classList.toggle('done', isDone);
+
+            fetch(API_BASE + '/toggle/' + id + '/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+            }).catch(err => console.error('상태 변경 오류:', err));
+        });
+
+        todoList.addEventListener('click', function (e) {
+            const delBtn = e.target.closest('.todo-delete');
+            if (!delBtn) return;
+            const item = delBtn.closest('.todo-item');
+            const id = item.dataset.id;
+            item.style.opacity = '0.3';
+
+            fetch(API_BASE + '/delete/' + id + '/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) item.remove();
+                    else item.style.opacity = '1';
+                })
+                .catch(() => { item.style.opacity = '1'; });
+        });
+    })();
+</script>
 
 {% endblock %}

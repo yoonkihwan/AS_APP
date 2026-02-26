@@ -734,3 +734,72 @@ class ToolStockSummaryAdmin(ModelAdmin):
         filename = f"tool_stock_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
         response = FileResponse(buffer, as_attachment=True, filename=filename)
         return response
+
+
+# ── 투두리스트 관리 ──
+from .models import TodoItem
+from django.http import JsonResponse
+import json
+
+@admin.register(TodoItem, site=tool_admin_site)
+class TodoItemAdmin(ModelAdmin):
+    list_display = ["title", "is_done", "created_at"]
+    list_filter = ["is_done"]
+    search_fields = ["title"]
+
+    def has_module_permission(self, request):
+        """사이드바에 표시하지 않음 (대시보드에서만 관리)"""
+        return False
+
+    def get_urls(self):
+        custom_urls = [
+            path(
+                "api/add/",
+                self.admin_site.admin_view(self.api_add),
+                name="todoitem_api_add",
+            ),
+            path(
+                "api/toggle/<int:pk>/",
+                self.admin_site.admin_view(self.api_toggle),
+                name="todoitem_api_toggle",
+            ),
+            path(
+                "api/delete/<int:pk>/",
+                self.admin_site.admin_view(self.api_delete),
+                name="todoitem_api_delete",
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def api_add(self, request):
+        if request.method != "POST":
+            return JsonResponse({"ok": False}, status=405)
+        try:
+            data = json.loads(request.body)
+            title = data.get("title", "").strip()
+            if not title:
+                return JsonResponse({"ok": False, "error": "title required"}, status=400)
+            todo = TodoItem.objects.create(title=title)
+            return JsonResponse({"ok": True, "id": todo.id, "title": todo.title})
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+    def api_toggle(self, request, pk):
+        if request.method != "POST":
+            return JsonResponse({"ok": False}, status=405)
+        try:
+            todo = TodoItem.objects.get(pk=pk)
+            todo.is_done = not todo.is_done
+            todo.save(update_fields=["is_done"])
+            return JsonResponse({"ok": True, "is_done": todo.is_done})
+        except TodoItem.DoesNotExist:
+            return JsonResponse({"ok": False}, status=404)
+
+    def api_delete(self, request, pk):
+        if request.method != "POST":
+            return JsonResponse({"ok": False}, status=405)
+        try:
+            TodoItem.objects.filter(pk=pk).delete()
+            return JsonResponse({"ok": True})
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=500)

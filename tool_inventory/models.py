@@ -155,3 +155,20 @@ class ToolStockSummary(Tool):
         proxy = True
         verbose_name = "재고 현황"
         verbose_name_plural = "재고"
+
+
+class TodoItem(models.Model):
+    """대시보드 투두리스트 항목"""
+
+    title = models.CharField("할 일", max_length=300)
+    is_done = models.BooleanField("완료 여부", default=False)
+    created_at = models.DateTimeField("생성일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        verbose_name = "할 일"
+        verbose_name_plural = "할 일 목록"
+        ordering = ["is_done", "-created_at"]
+
+    def __str__(self):
+        return self.title

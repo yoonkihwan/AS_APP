@@ -105,9 +105,9 @@ class CompanyCategoryAdmin(ModelAdmin):
 @admin.register(Company)
 class CompanyAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "업체관리"
-    list_display = ["name", "region", "price_group"]
-    list_filter = ["price_group", "region"]
-    search_fields = ["name", "region"]
+    list_display = ["name", "business_number", "representative", "address", "price_group"]
+    list_filter = ["price_group"]
+    search_fields = ["name", "business_number", "representative"]
     list_per_page = 20
     change_list_template = "admin/as_app/company/change_list.html"
 
@@ -117,16 +117,17 @@ class CompanyAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
             {
                 "fields": (
                     "name",
-                    "price_group",
+                    "business_number",
+                    "representative",
                 ),
             },
         ),
         (
-            "지역 및 주소",
+            "주소 및 기타",
             {
                 "fields": (
-                    "region",
                     "address",
+                    "price_group",
                 ),
             },
         ),
