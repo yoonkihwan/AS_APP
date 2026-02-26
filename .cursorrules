@@ -10,7 +10,7 @@
 ## 2. 기술 스택 및 환경 (Tech & Environment)
 - **Backend:** Python 3.10+, Django 5.x
 - **Database:** PostgreSQL (로컬 개발 및 운영 배포 모두 사용)
-- **Admin UI:** **Django Unfold** (모든 화면 다크 테마 통일, `THEME: 'dark'` 설정 및 테마 변경 버튼 삭제)
+- **Admin UI:** **Django Unfold** (전역 다크/라이트 테마 자동 동기화 적용)
 - **Static Files:** WhiteNoise (운영 환경 정적 파일 서빙)
 - **PDF Generation:** `reportlab` (한글 출력을 위해 `malgun.ttf` 폰트 적용 필수)
 - **Linting/Formatting:** PEP 8 준수, Flake8/Black 스타일 지향.
@@ -35,7 +35,7 @@
 - **Type Hinting:** 주요 함수 및 메서드에는 Python 3 타입 힌트를 적용한다.
 
 ## 5. UI/UX 가이드라인 (Django Unfold)
-- **다크 테마 통일:** 모든 Admin Portal은 기본적으로 다크 테마로만 통일감 있게 렌더링되어야 하며, 테마 토글 버튼은 사용하지 않는다.
+- **전역 테마 동기화:** 포탈 및 모든 Admin Site는 다크/라이트 모드를 지원하며, 로컬스토리지(`theme`) 기반으로 사용자 선택이 모든 화면에 동기화 유지된다.
 - **포인트 컬러/스타일링:** Unfold의 데코레이터(`@unfold_action(attrs=...)`)를 활용해 버튼 색상(예: 보라색 `#9333ea`)을 커스텀 적용.
 - **글로벌 액션 버튼 (`actions_list`):** 왼쪽 체크박스가 필요 없는 "리스트 전체 화면 대상 동작(예: 전체 PDF 다운로드)"의 경우, `actions_list`에 액션을 명시하고 `list_disable_select_all = True`, `actions = None`으로 맞춰서 리스트 UI를 깔끔하게 유지한다.
 - **상태 컬러 마킹:** 티켓 및 진행 상태에 따라 행 전체 또는 셀 컬러를 적용해 직관적 구분을 돕는다.

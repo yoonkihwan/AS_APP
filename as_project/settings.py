@@ -446,5 +446,4 @@ UNFOLD = {
         "show_all_applications": False,
         "navigation": "as_project.settings.sidebar_callback",
     },
-    "THEME": "dark",
 }
