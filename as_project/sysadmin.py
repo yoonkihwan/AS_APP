@@ -1,24 +1,14 @@
 from unfold.sites import UnfoldAdminSite
 from django.shortcuts import redirect
-from django.contrib.auth.models import User, Group, Permission
-from django.contrib.auth.admin import UserAdmin as BaseUserAdmin, GroupAdmin as BaseGroupAdmin
+from django.contrib.auth.models import User
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm as UnfoldUserChangeForm, UserCreationForm
-from django import forms
 from django.contrib import admin, messages
 from unfold.decorators import action, display
 from django.utils.html import format_html
 from django.urls import reverse
-
-
-# ── 사용자 변경 폼 (일반 업무 권한 일괄 추가) ──
-class CustomUserChangeForm(UnfoldUserChangeForm):
-    grant_general_perms = forms.BooleanField(
-        label="일반 업무 권한 일괄 추가",
-        required=False,
-        help_text="⭐ 체크하고 저장하면 'AS 관리', '장비 입출고', '근무/근태 관리'의 모든 기능을 사용할 수 있습니다.",
-    )
 
 
 # ── 활동 기록 인라인 (사용자 상세 페이지에서 표시) ──
@@ -73,22 +63,40 @@ class LogEntryInline(TabularInline):
 
 # ── 사용자 관리 Admin ──
 class UserAdmin(BaseUserAdmin, ModelAdmin):
-    form = CustomUserChangeForm
+    form = UnfoldUserChangeForm
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
 
     list_display = (
         "username",
         "display_name",
-        "is_staff",
+        "display_role",
         "is_active",
-        "is_superuser",
         "display_last_login",
     )
-    list_filter = ("is_staff", "is_superuser", "is_active")
+    list_filter = ("is_superuser", "is_active")
     search_fields = ("username", "first_name", "last_name", "email")
-    actions_list = ["grant_as_inventory_perms"]
+    actions_list = ["approve_as_worker", "promote_to_admin"]
     inlines = [LogEntryInline]
+
+    # ── 역할 표시 컬럼 ──
+    @display(description="역할")
+    def display_role(self, obj):
+        if obj.is_superuser:
+            return format_html(
+                '<span style="color:#f59e0b;font-weight:600;">🛡️ 관리자</span>'
+            )
+        elif obj.is_staff and obj.is_active:
+            return format_html(
+                '<span style="color:#3b82f6;font-weight:600;">🔧 작업자</span>'
+            )
+        elif not obj.is_active:
+            return format_html(
+                '<span style="color:#94a3b8;font-weight:600;">⏳ 미승인</span>'
+            )
+        return format_html(
+            '<span style="color:#94a3b8;">—</span>'
+        )
 
     @display(description="이름")
     def display_name(self, obj):
@@ -101,61 +109,64 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
             return obj.last_login.strftime("%Y-%m-%d %H:%M")
         return format_html('<span style="color:#94a3b8;">-</span>')
 
+    # ── fieldsets 단순화: groups/user_permissions 숨김 ──
     def get_fieldsets(self, request, obj=None):
-        base_fs = super().get_fieldsets(request, obj)
         if not obj:
-            return base_fs
-
-        new_fs = []
-        for name, opts in base_fs:
-            new_opts = opts.copy()
-            fields = new_opts.get("fields", [])
-            if "is_active" in fields and "grant_general_perms" not in fields:
-                new_fields = list(fields)
-                if "is_superuser" in new_fields:
-                    idx = new_fields.index("is_superuser") + 1
-                    new_fields.insert(idx, "grant_general_perms")
-                else:
-                    new_fields.append("grant_general_perms")
-                new_opts["fields"] = tuple(new_fields)
-            new_fs.append((name, new_opts))
-        return tuple(new_fs)
-
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
-        if getattr(form, "cleaned_data", None) and form.cleaned_data.get(
-            "grant_general_perms"
-        ):
-            perms = Permission.objects.filter(
-                content_type__app_label__in=["as_app", "tool_inventory", "hr_app"]
-            )
-            obj.user_permissions.add(*perms)
-            messages.success(
-                request,
-                f"{obj.username} 님에게 AS 관리, 장비 입출고, 근무/근태 관리의 전체 권한이 일괄 부여되었습니다.",
+            # 신규 사용자 생성 폼
+            return (
+                (None, {"fields": ("username", "password1", "password2")}),
             )
 
-    @action(description="선택 항목 일괄: 일반업무 권한 허용 (시스템 제외)")
-    def grant_as_inventory_perms(self, request, queryset):
-        perms = Permission.objects.filter(
-            content_type__app_label__in=["as_app", "tool_inventory", "hr_app"]
+        return (
+            (None, {"fields": ("username", "password")}),
+            ("개인정보", {"fields": ("first_name", "last_name", "email")}),
+            (
+                "권한 설정",
+                {
+                    "fields": ("is_active", "is_staff", "is_superuser"),
+                    "description": "관리자: is_superuser ✅ / 작업자: is_staff ✅ + is_active ✅",
+                },
+            ),
+            ("중요 일자", {"fields": ("last_login", "date_joined")}),
         )
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return ("last_login", "date_joined")
+        return ()
+
+    # ── 작업자 승인 (일괄 액션) ──
+    @action(description="선택 사용자: 작업자로 승인")
+    def approve_as_worker(self, request, queryset):
+        """미승인 사용자를 작업자로 승인합니다. is_active=True, is_staff=True 설정."""
         count = 0
         for user in queryset:
             user.is_active = True
             user.is_staff = True
-            user.user_permissions.add(*perms)
             user.save()
             count += 1
         messages.success(
             request,
-            f"{count}명의 사용자에게 시스템 관리를 제외한 전체 업무 권한을 부여했습니다.",
+            f"{count}명의 사용자를 작업자로 승인했습니다.",
+        )
+
+    # ── 관리자로 승격 (일괄 액션) ──
+    @action(description="선택 사용자: 관리자로 승격")
+    def promote_to_admin(self, request, queryset):
+        """선택한 사용자를 관리자(superuser)로 승격합니다."""
+        count = 0
+        for user in queryset:
+            user.is_active = True
+            user.is_staff = True
+            user.is_superuser = True
+            user.save()
+            count += 1
+        messages.success(
+            request,
+            f"{count}명의 사용자를 관리자로 승격했습니다.",
         )
 
 
-# ── 권한 그룹 Admin ──
-class GroupAdmin(BaseGroupAdmin, ModelAdmin):
-    pass
 
 
 # ── 활동 기록 전체 조회 Admin (읽기 전용) ──
@@ -221,12 +232,16 @@ class LogEntryAdmin(ModelAdmin):
         return msg
 
 
-# ── Sysadmin 사이트 ──
+# ── Sysadmin 사이트 (관리자 전용) ──
 class SysadminSite(UnfoldAdminSite):
     site_title = "시스템 사용자 관리"
     site_header = "계정 가입 및 권한 승인"
     site_url = None
     index_title = "계정/권한 설정"
+
+    def has_permission(self, request):
+        """관리자(superuser)만 시스템 관리 사이트에 접근 가능"""
+        return request.user.is_active and request.user.is_superuser
 
     def index(self, request, extra_context=None):
         return redirect("sysadmin:auth_user_changelist")
@@ -234,5 +249,4 @@ class SysadminSite(UnfoldAdminSite):
 
 sysadmin_site = SysadminSite(name="sysadmin")
 sysadmin_site.register(User, UserAdmin)
-sysadmin_site.register(Group, GroupAdmin)
 sysadmin_site.register(LogEntry, LogEntryAdmin)

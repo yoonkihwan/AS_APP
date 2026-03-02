@@ -44,8 +44,11 @@
 ## 6. 다중 사이트 분리 아키텍처 (Multi-Admin Sites)
 프로젝트는 기능별로 독립된 Admin Site를 통해 뷰를 완전히 분리한다. 사이드바 네비게이션은 `settings.py`에서 명확히 통제된다.
 - **AS 시스템 (`/admin/`):** AS 프로세스 (입고, 수리, 출고) 및 마스터 데이터 컨트롤러.
-- **장비/툴 관리 (`/inventory/`):** 툴/장비의 통합 입출고 이력 관리 및 `ToolStockSummary`(재고 현황) 전용 관리. 
-- **시스템 관리 (`/sysadmin/`):** 시스템 계정 및 권한(Group/Permission) 관리 센터. 일괄 업무권한 부여 체제 유지.
+- **장비/툴 관리 (`/inventory/`):** 툴/장비의 통합 입출고 이력 관리 및 `ToolStockSummary`(재고 현황) 전용 관리.
+- **시스템 관리 (`/sysadmin/`):** `is_superuser` 전용. 관리자/작업자 2단계 권한 체계 운영.
+  - **관리자 (`is_superuser=True`):** 모든 사이트 + 시스템 계정 관리 접근 가능.
+  - **작업자 (`is_staff=True`):** AS/장비/근태 관리 접근 가능, 시스템 계정 관리 접근 불가.
+  - 개별 Permission/Group 관리 불필요. "작업자 승인"/"관리자 승격" 액션으로 일괄 처리.
 
 ## 7. Git 커밋 컨벤션 (Conventional Commits)
 - **feat:** 새로운 기능 추가

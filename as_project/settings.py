@@ -100,6 +100,14 @@ DATABASES = {
 }
 
 
+# ──────────────────────────────────────────────
+# 인증 백엔드 (작업자 이상 = 전체 업무 권한 자동 부여)
+# ──────────────────────────────────────────────
+AUTHENTICATION_BACKENDS = [
+    "as_project.backends.StaffFullAccessBackend",
+]
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -261,11 +269,6 @@ def sidebar_callback(request):
                         "title": "사용자(회원) 관리",
                         "icon": "person",
                         "link": reverse_lazy("sysadmin:auth_user_changelist"),
-                    },
-                    {
-                        "title": "권한 그룹(역할)",
-                        "icon": "group",
-                        "link": reverse_lazy("sysadmin:auth_group_changelist"),
                     },
                 ],
             },

@@ -92,11 +92,22 @@ class Tool(models.Model):
 class Part(models.Model):
     """수리부품/공임 관리"""
 
+    PART_TYPE_CHOICES = [
+        ('part', '부품'),
+        ('labor', '공임'),
+    ]
+
     brand = models.ForeignKey(
         Brand,
         on_delete=models.PROTECT,
         verbose_name="브랜드",
         related_name="parts",
+    )
+    part_type = models.CharField(
+        "구분",
+        max_length=10,
+        choices=PART_TYPE_CHOICES,
+        default='part',
     )
     tools = models.ManyToManyField(
         Tool,

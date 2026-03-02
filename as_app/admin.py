@@ -179,8 +179,8 @@ class ToolAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 @admin.register(Part)
 class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "수리부품 관리"
-    list_display = ["brand", "name", "code", "formatted_price", "display_tools", "remarks"]
-    list_filter = ["brand", "tools__brand"]
+    list_display = ["brand", "name", "code", "part_type", "formatted_price", "display_tools", "remarks"]
+    list_filter = ["brand", "part_type", "tools__brand"]
     search_fields = ["name", "code"]
     autocomplete_fields = ["brand"]
     filter_horizontal = ["tools"]
@@ -193,6 +193,7 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
             {
                 "fields": (
                     "brand",
+                    "part_type",
                     "name",
                     "code",
                     "price",
@@ -742,15 +743,26 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
             ).distinct().prefetch_related("parts")
             preset_data = []
             for preset in presets:
+                parts = preset.parts.all()
+                part_ids = [p.id for p in parts if p.part_type == 'part']
+                labor_ids = [p.id for p in parts if p.part_type == 'labor']
                 preset_data.append({
                     "id": preset.id,
                     "name": preset.name,
-                    "part_ids": list(preset.parts.values_list("id", flat=True)),
+                    "part_ids": part_ids,
+                    "labor_ids": labor_ids,
                     "total_price": preset.total_price,
                 })
             context["repair_presets"] = preset_data
+            # 부품/공임 구분 정보를 별도로 전달 (체크박스에 data 속성 부여용)
+            from django.db.models import Q as Q2
+            all_parts = Part.objects.filter(
+                Q2(tools=obj.tool) | Q2(tools__isnull=True)
+            ).distinct().values("id", "part_type", "price")
+            context["parts_meta"] = list(all_parts)
         else:
             context["repair_presets"] = []
+            context["parts_meta"] = []
         return super().render_change_form(request, context, add, change, form_url, obj)
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
