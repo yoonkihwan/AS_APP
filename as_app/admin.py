@@ -918,7 +918,7 @@ class OutboundTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
 @admin.register(ASHistory)
 class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "통합 이력"
-    """AS 통합 이력 조회 (Read-Only)"""
+    """AS 통합 이력 조회 + 상태 정정 액션"""
 
     list_display = [
         "display_status",
@@ -948,6 +948,14 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "repair_content",
     ]
     list_per_page = 30
+    actions = [
+        "revert_shipped_to_repaired",
+        "revert_repaired_to_inbound",
+        "revert_disposed_to_inbound",
+        "reset_estimate_status",
+        "reset_tax_invoice",
+        "mark_as_disposed",
+    ]
 
     fieldsets = (
         (
@@ -1006,6 +1014,83 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         (Django 기본 delete_selected 액션이 사용되며, 실행 시 자동으로 삭제 확인 화면이 표시됨)"""
         return True
 
+    # ── 상태 정정 액션 ──
+
+    def _validate_status(self, request, queryset, required_status, status_label):
+        """선택된 티켓들이 모두 지정된 상태인지 검증. 혼합 선택 시 에러 반환."""
+        invalid = queryset.exclude(status=required_status)
+        if invalid.exists():
+            invalid_items = ", ".join(
+                f"{t.tool} (S/N: {t.serial_number}, 현재: {t.get_status_display()})"
+                for t in invalid[:5]
+            )
+            extra = f" 외 {invalid.count() - 5}건" if invalid.count() > 5 else ""
+            from django.contrib import messages
+            messages.error(
+                request,
+                f"'{status_label}' 상태가 아닌 항목이 포함되어 있습니다: {invalid_items}{extra}. "
+                f"'{status_label}' 상태인 항목만 선택해 주세요."
+            )
+            return False
+        return True
+
+    @unfold_action(description="⏪ 출고 취소 → 수리완료로 되돌리기")
+    def revert_shipped_to_repaired(self, request, queryset):
+        if not self._validate_status(request, queryset, ASTicket.Status.SHIPPED, "출고"):
+            return
+        updated = queryset.update(
+            status=ASTicket.Status.REPAIRED,
+            outbound_date=None,
+        )
+        from django.contrib import messages
+        messages.success(request, f"{updated}건이 수리완료 상태로 되돌려졌습니다. (출고일 초기화)")
+
+    @unfold_action(description="⏪ 수리완료 취소 → 입고로 되돌리기")
+    def revert_repaired_to_inbound(self, request, queryset):
+        if not self._validate_status(request, queryset, ASTicket.Status.REPAIRED, "수리완료"):
+            return
+        # M2M(used_parts) clear는 개별 처리 필요
+        for ticket in queryset:
+            ticket.used_parts.clear()
+        queryset.update(
+            status=ASTicket.Status.INBOUND,
+            repair_cost=0,
+            repair_content="",
+        )
+        from django.contrib import messages
+        messages.success(
+            request,
+            f"{queryset.count()}건이 입고 상태로 되돌려졌습니다. (사용 부품/공임 초기화, 수리 비용 0원)"
+        )
+
+    @unfold_action(description="⏪ 자체폐기 취소 → 입고로 되돌리기")
+    def revert_disposed_to_inbound(self, request, queryset):
+        if not self._validate_status(request, queryset, ASTicket.Status.DISPOSED, "자체폐기"):
+            return
+        updated = queryset.update(status=ASTicket.Status.INBOUND)
+        from django.contrib import messages
+        messages.success(request, f"{updated}건이 입고 상태로 되돌려졌습니다.")
+
+    @unfold_action(description="🔄 견적서 추출 상태 초기화")
+    def reset_estimate_status(self, request, queryset):
+        updated = queryset.update(estimate_status=False)
+        from django.contrib import messages
+        messages.success(request, f"{updated}건의 견적서 추출 상태가 초기화되었습니다.")
+
+    @unfold_action(description="🔄 세금계산서 발행 상태 초기화")
+    def reset_tax_invoice(self, request, queryset):
+        updated = queryset.update(tax_invoice=False)
+        from django.contrib import messages
+        messages.success(request, f"{updated}건의 세금계산서 발행 상태가 초기화되었습니다.")
+
+    @unfold_action(description="🗑️ 입고 → 자체폐기 처리")
+    def mark_as_disposed(self, request, queryset):
+        if not self._validate_status(request, queryset, ASTicket.Status.INBOUND, "입고"):
+            return
+        updated = queryset.update(status=ASTicket.Status.DISPOSED)
+        from django.contrib import messages
+        messages.success(request, f"{updated}건이 자체폐기 처리되었습니다.")
+
     @admin.display(description="사용 부품")
     def used_parts_summary(self, obj):
         parts = obj.used_parts.all()
@@ -1017,6 +1102,7 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
                 full_text
             )
         return "-"
+
 
     @admin.display(description="수리 비용")
     def formatted_repair_cost(self, obj):
