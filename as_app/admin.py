@@ -74,6 +74,7 @@ from .models import (
     Company,
     CompanyCategory,
     EstimateTicket,
+    ImprovementRequest,
     InboundBatch,
     InboundTicket,
     OutboundTicket,
@@ -1248,3 +1249,85 @@ class TaxInvoiceTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtons
                 fields.remove('tax_invoice')
             return fields
         return []
+
+
+# ──────────────────────────────────────────────
+# 개선사항 요청 게시판 (Improvement Request Board)
+# ──────────────────────────────────────────────
+
+
+@admin.register(ImprovementRequest)
+class ImprovementRequestAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "개선사항 요청"
+    """포탈 개선사항 요청 게시판"""
+
+    list_display = [
+        "status_badge",
+        "title",
+        "author",
+        "created_at",
+        "has_reply",
+    ]
+    list_filter = ["status"]
+    search_fields = ["title", "content", "author__username"]
+    list_per_page = 20
+    ordering = ["-created_at"]
+
+    def get_fieldsets(self, request, obj=None):
+        if obj is None:
+            # 새 글 작성 시: 제목, 내용만
+            return (
+                ("요청 내용", {
+                    "fields": ("title", "content"),
+                }),
+            )
+        # 기존 글 수정 시
+        fieldsets = [
+            ("요청 내용", {
+                "fields": ("title", "content", "author", "created_at"),
+            }),
+        ]
+        if request.user.is_superuser:
+            fieldsets.append(
+                ("관리자 처리", {
+                    "fields": ("status", "admin_reply"),
+                })
+            )
+        return fieldsets
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj is None:
+            return []
+        readonly = ["author", "created_at"]
+        # 일반 사용자는 자기 글만 수정 가능 (제목/내용), 상태/답변은 관리자만
+        if not request.user.is_superuser:
+            readonly += ["status", "admin_reply"]
+        return readonly
+
+    def save_model(self, request, obj, form, change):
+        """새 글 작성 시 자동으로 작성자 설정"""
+        if not change:
+            obj.author = request.user
+        super().save_model(request, obj, form, change)
+
+    @admin.display(description="상태", ordering="status")
+    def status_badge(self, obj):
+        color_map = {
+            "PENDING": "#f59e0b",
+            "IN_PROGRESS": "#3b82f6",
+            "COMPLETED": "#10b981",
+            "REJECTED": "#ef4444",
+        }
+        color = color_map.get(obj.status, "#6b7280")
+        return format_html(
+            '<span style="display:inline-block;padding:3px 10px;border-radius:999px;'
+            'font-size:0.75rem;font-weight:600;color:#fff;background:{};">{}</span>',
+            color, obj.get_status_display()
+        )
+
+    @admin.display(description="답변", boolean=True)
+    def has_reply(self, obj):
+        return bool(obj.admin_reply)
+
+    class Media:
+        css = {"all": ("as_app/css/hide_fab.css",)}

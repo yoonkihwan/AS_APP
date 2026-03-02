@@ -407,6 +407,17 @@ def sidebar_callback(request):
                     },
                 ],
             },
+            {
+                "title": "커뮤니티",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "개선사항 요청",
+                        "icon": "feedback",
+                        "link": reverse_lazy("admin:as_app_improvementrequest_changelist"),
+                    },
+                ],
+            },
         ]
 
 def site_title_callback(request):

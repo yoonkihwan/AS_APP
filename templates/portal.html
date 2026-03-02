@@ -18,7 +18,6 @@
             } else if (theme === 'light') {
                 document.documentElement.classList.remove('dark');
             } else {
-                // auto: follow system preference
                 if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     document.documentElement.classList.add('dark');
                 } else {
@@ -33,7 +32,6 @@
         body {
             font-family: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: #0f172a;
-            /* slate-900 */
             margin: 0;
             padding: 0;
             display: flex;
@@ -41,7 +39,6 @@
             justify-content: center;
             min-height: 100vh;
             color: #f1f5f9;
-            /* slate-100 */
         }
 
         .container {
@@ -59,17 +56,15 @@
             letter-spacing: -0.025em;
         }
 
-        /* ── 로그인 폼 스타일 ── */
+        /* ── 로그인 폼 ── */
         .login-wrapper {
             background: #1e293b;
-            /* slate-800 */
             border-radius: 12px;
             padding: 2.5rem 2rem;
             margin: 0 auto 3rem auto;
             max-width: 400px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
             border: 1px solid #334155;
-            /* slate-700 */
         }
 
         .login-wrapper h2 {
@@ -78,7 +73,6 @@
             font-size: 1.5rem;
             color: #f8fafc;
             font-weight: 600;
-            letter-spacing: -0.02em;
         }
 
         .input-group {
@@ -90,34 +84,27 @@
             box-sizing: border-box;
             padding: 0.75rem 1rem;
             border: 1px solid #475569;
-            /* slate-600 */
             border-radius: 8px;
             font-size: 0.95rem;
             color: #f1f5f9;
-            /* slate-100 */
-            transition: all 0.2s ease-in-out;
+            transition: all 0.2s;
             background-color: #0f172a;
-            /* slate-900 */
         }
 
         .input-group input:focus {
             outline: none;
             border-color: #9333ea;
-            /* purple-600 */
             background-color: #1e293b;
-            /* slate-800 */
             box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.25);
         }
 
         .input-group input::placeholder {
             color: #64748b;
-            /* slate-500 */
         }
 
         .login-btn {
             width: 100%;
             background-color: #9333ea;
-            /* purple-600 */
             color: white;
             border: none;
             padding: 0.85rem;
@@ -125,71 +112,118 @@
             font-weight: 600;
             border-radius: 8px;
             cursor: pointer;
-            transition: background-color 0.2s ease, transform 0.1s ease;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.2s, transform 0.1s;
         }
 
         .login-btn:hover {
             background-color: #a855f7;
-            /* purple-500 */
         }
 
         .login-btn:active {
             transform: scale(0.98);
         }
 
-        /* ── 로그인 완료 후 환영 ── */
+        /* ── 유저 환영 ── */
         .user-wrapper {
             background: #1e293b;
-            /* slate-800 */
             border-radius: 10px;
             padding: 1rem 1.5rem;
             margin: 0 auto 2.5rem auto;
             display: inline-flex;
             align-items: center;
-            justify-content: center;
             gap: 1.25rem;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
             border: 1px solid #334155;
-            /* slate-700 */
         }
 
         .user-info {
             font-size: 0.95rem;
             font-weight: 500;
             color: #cbd5e1;
-            /* slate-300 */
         }
 
         .user-info b {
             color: #f8fafc;
-            /* slate-50 */
             font-weight: 600;
         }
 
         .logout-btn {
             background-color: #334155;
-            /* slate-700 */
             color: #cbd5e1;
-            /* slate-300 */
             border: 1px solid #475569;
-            /* slate-600 */
             padding: 0.4rem 0.8rem;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 500;
             font-size: 0.85rem;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
         }
 
         .logout-btn:hover {
             background-color: #475569;
-            /* slate-600 */
             color: #f8fafc;
-            /* slate-50 */
         }
 
-        /* ── 포탈 카드 스타일 ── */
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+        }
+
+        .signup-btn {
+            width: 100%;
+            background-color: #334155;
+            color: #cbd5e1;
+            border: 1px solid #475569;
+            padding: 0.85rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            box-sizing: border-box;
+        }
+
+        .signup-btn:hover {
+            background-color: #475569;
+            color: #f8fafc;
+            border-color: #64748b;
+        }
+
+        .disabled-card {
+            opacity: 0.6;
+            pointer-events: none;
+            filter: grayscale(80%);
+        }
+
+        /* ── Theme Toggle ── */
+        .theme-toggle {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.5rem;
+            z-index: 100;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        /* ── 포탈 카드 ── */
         .cards {
             display: flex;
             gap: 1.5rem;
@@ -199,19 +233,17 @@
 
         .card {
             background: #1e293b;
-            /* slate-800 */
             border-radius: 12px;
             padding: 2rem 1.5rem;
             width: 260px;
             text-decoration: none;
             color: #f8fafc;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
             align-items: center;
             border: 1px solid #334155;
-            /* slate-700 */
             position: relative;
             overflow: hidden;
         }
@@ -229,29 +261,20 @@
 
         .card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
             border-color: #64748b;
-            /* slate-500 */
         }
 
         .card.as-app:hover::before {
             background-color: #3b82f6;
-            /* blue-500 */
         }
 
         .card.inventory:hover::before {
             background-color: #10b981;
-            /* emerald-500 */
         }
 
         .card.sysadmin:hover::before {
             background-color: #f59e0b;
-            /* amber-500 */
-        }
-
-        .card.hr:hover::before {
-            background-color: #a855f7;
-            /* purple-500 */
         }
 
         .icon {
@@ -263,88 +286,316 @@
         .title {
             font-size: 1.1rem;
             font-weight: 600;
-            margin-bottom: 0.5rem;
             color: #f8fafc;
-            /* slate-50 */
         }
 
         .desc {
             font-size: 0.85rem;
             color: #94a3b8;
-            /* slate-400 */
             line-height: 1.4;
         }
 
-        /* ── 회원가입 등 추가 버튼용 ── */
-        .btn-group {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1.25rem;
-        }
-
-        .signup-btn {
+        /* ── 개선사항 아코디언 카드 ── */
+        .board-toggle-card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 2rem 1.5rem;
             width: 100%;
-            background-color: #334155;
-            /* slate-700 */
-            color: #cbd5e1;
-            /* slate-300 */
-            border: 1px solid #475569;
-            /* slate-600 */
-            padding: 0.85rem;
-            font-size: 0.95rem;
-            font-weight: 600;
-            border-radius: 8px;
+            max-width: 560px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid #334155;
+            position: relative;
+            overflow: hidden;
             cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: inline-block;
+            margin: 1.5rem auto 0 auto;
             box-sizing: border-box;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
 
-        .signup-btn:hover {
-            background-color: #475569;
-            /* slate-600 */
-            color: #f8fafc;
-            /* slate-50 */
-            border-color: #64748b;
-            /* slate-500 */
-        }
-
-        /* 비로그인 시 카드 비활성화 기법 (선택사항) */
-        .disabled-card {
-            opacity: 0.6;
-            pointer-events: none;
-            filter: grayscale(80%);
-        }
-
-        /* ── Theme Toggle Button ── */
-        .theme-toggle {
+        .board-toggle-card::before {
+            content: "";
             position: absolute;
-            top: 1.5rem;
-            right: 1.5rem;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #f8fafc;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background-color: transparent;
+            transition: background-color 0.25s ease;
+        }
+
+        .board-toggle-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            border-color: #64748b;
+        }
+
+        .board-toggle-card:hover::before {
+            background-color: #8b5cf6;
+        }
+
+        .board-toggle-card.open {
+            border-color: #8b5cf6;
+        }
+
+        .board-toggle-card.open::before {
+            background-color: #8b5cf6;
+        }
+
+        .board-toggle-header {
             display: flex;
             align-items: center;
+            gap: 0.75rem;
+            width: 100%;
             justify-content: center;
+        }
+
+        .board-toggle-header .icon-sm {
+            color: #8b5cf6;
+            flex-shrink: 0;
+        }
+
+        .board-toggle-header .title-text {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .board-badge {
+            background: #8b5cf6;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 999px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .board-chevron {
+            transition: transform 0.3s ease;
+            color: #64748b;
+            margin-left: 0.5rem;
+        }
+
+        .board-toggle-card.open .board-chevron {
+            transform: rotate(180deg);
+        }
+
+        /* 펼침 패널 */
+        .board-panel {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+            text-align: left;
+            box-sizing: border-box;
+        }
+
+        .board-panel.open {
+            max-height: 2000px;
+        }
+
+        .board-panel-inner {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 1.25rem;
+        }
+
+        .board-form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .board-input,
+        .board-textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.6rem 0.85rem;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #f1f5f9;
+            background-color: #0f172a;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .board-input:focus,
+        .board-textarea:focus {
+            outline: none;
+            border-color: #9333ea;
+            box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.25);
+        }
+
+        .board-input::placeholder,
+        .board-textarea::placeholder {
+            color: #64748b;
+        }
+
+        .board-textarea {
+            resize: vertical;
+            min-height: 50px;
+        }
+
+        .board-submit-btn {
+            align-self: flex-end;
+            background: #9333ea;
+            color: #fff;
+            border: none;
+            padding: 0.45rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
             cursor: pointer;
-            transition: all 0.2s;
-            font-size: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-            z-index: 100;
+            transition: background 0.2s;
         }
 
-        .theme-toggle:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.05);
+        .board-submit-btn:hover {
+            background: #a855f7;
         }
 
-        /* ── Light Mode Base ── */
+        .board-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .board-item {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+        }
+
+        .board-item-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.35rem;
+        }
+
+        .board-item-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #f8fafc;
+        }
+
+        .board-item-content {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            line-height: 1.45;
+            margin-bottom: 0.35rem;
+        }
+
+        .board-item-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+            color: #64748b;
+        }
+
+        .board-actions {
+            display: flex;
+            gap: 0.3rem;
+        }
+
+        .board-action-btn {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+
+        .board-action-delete {
+            color: #ef4444;
+        }
+
+        .board-action-delete:hover {
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        .board-action-complete {
+            color: #10b981;
+        }
+
+        .board-action-complete:hover {
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        .board-status {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 999px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .board-status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .board-status-in_progress {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .board-status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .board-status-rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .board-reply {
+            margin-top: 0.5rem;
+            padding: 0.6rem;
+            background: #1e293b;
+            border-radius: 6px;
+            border-left: 3px solid #9333ea;
+        }
+
+        .board-reply-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #9333ea;
+            display: block;
+            margin-bottom: 0.2rem;
+        }
+
+        .board-reply-text {
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            line-height: 1.4;
+        }
+
+        .board-empty {
+            text-align: center;
+            padding: 1.5rem;
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+
+        /* ── Light Mode ── */
         html:not(.dark) body {
             background-color: #f8fafc;
             color: #0f172a;
@@ -358,7 +609,6 @@
             background: #ffffff;
             border-color: #e2e8f0;
             color: #1e293b;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         html:not(.dark) .theme-toggle:hover {
@@ -393,7 +643,6 @@
         html:not(.dark) .user-wrapper {
             background: #ffffff;
             border-color: #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
 
         html:not(.dark) .user-info {
@@ -419,7 +668,7 @@
             background: #ffffff;
             border-color: #e2e8f0;
             color: #1e293b;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
 
         html:not(.dark) .card:hover {
@@ -429,10 +678,6 @@
 
         html:not(.dark) .card .title {
             color: #1e293b;
-        }
-
-        html:not(.dark) .card .desc {
-            color: #64748b;
         }
 
         html:not(.dark) .signup-btn {
@@ -446,14 +691,81 @@
             color: #1e293b;
             border-color: #94a3b8;
         }
-    </style>
 
+        /* 게시판 Light Mode */
+        html:not(.dark) .board-toggle-card {
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        html:not(.dark) .board-toggle-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        html:not(.dark) .board-toggle-card.open {
+            border-color: #8b5cf6;
+        }
+
+        html:not(.dark) .board-toggle-header .title-text {
+            color: #1e293b;
+        }
+
+        html:not(.dark) .board-panel-inner {
+            background: #fff;
+            border-color: #e2e8f0;
+        }
+
+        html:not(.dark) .board-input,
+        html:not(.dark) .board-textarea {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            color: #0f172a;
+        }
+
+        html:not(.dark) .board-input:focus,
+        html:not(.dark) .board-textarea:focus {
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.15);
+        }
+
+        html:not(.dark) .board-input::placeholder,
+        html:not(.dark) .board-textarea::placeholder {
+            color: #94a3b8;
+        }
+
+        html:not(.dark) .board-item {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+        }
+
+        html:not(.dark) .board-item-title {
+            color: #1e293b;
+        }
+
+        html:not(.dark) .board-item-content {
+            color: #64748b;
+        }
+
+        html:not(.dark) .board-item-meta {
+            color: #94a3b8;
+        }
+
+        html:not(.dark) .board-reply {
+            background: #f1f5f9;
+            border-left-color: #9333ea;
+        }
+
+        html:not(.dark) .board-reply-text {
+            color: #475569;
+        }
+    </style>
 </head>
 
 <body>
-
     <div class="container">
-        <!-- Theme Toggle Button -->
+        <!-- Theme Toggle -->
         <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
             <svg id="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                 stroke-width="1.5" stroke="currentColor" style="width: 1.5rem; height: 1.5rem; display: none;">
@@ -476,7 +788,7 @@
         </div>
         {% endif %}
 
-        <!-- 로그인 상단 영역 -->
+        <!-- 로그인/유저 영역 -->
         {% if not user.is_authenticated %}
         <div class="login-wrapper">
             <h2>로그인</h2>
@@ -518,9 +830,8 @@
         </div>
         {% endif %}
 
-        <!-- 포탈 선택 하단 영역 -->
+        <!-- 포탈 카드 -->
         <div class="cards">
-            <!-- AS 업무 시스템 카드 -->
             <a href="/admin/" class="card as-app {% if not user.is_authenticated %}disabled-card{% endif %}">
                 <div class="icon" style="color: #3b82f6;">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -531,8 +842,6 @@
                 </div>
                 <div class="title">AS 관리</div>
             </a>
-
-            <!-- 툴/장비 인벤토리 시스템 카드 -->
             <a href="/inventory/" class="card inventory {% if not user.is_authenticated %}disabled-card{% endif %}">
                 <div class="icon" style="color: #10b981;">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -543,9 +852,6 @@
                 </div>
                 <div class="title">TOOL 입출고 관리</div>
             </a>
-
-
-            <!-- 시스템 계정 관리 카드 (최고관리자 전용) -->
             {% if user.is_superuser %}
             <a href="/sysadmin/" class="card sysadmin">
                 <div class="icon" style="color: #f59e0b;">
@@ -560,42 +866,121 @@
             {% endif %}
         </div>
 
+        <!-- 개선사항 요청 (아코디언 카드) -->
+        {% if user.is_authenticated %}
+        <div class="board-toggle-card" id="board-toggle" onclick="toggleBoard()">
+            <div class="board-toggle-header">
+                <svg class="icon-sm" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    stroke-width="1.5" stroke="currentColor" style="width: 1.5rem; height: 1.5rem;">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                </svg>
+                <span class="title-text">개선사항 요청</span>
+                {% if recent_requests %}
+                <span class="board-badge">{{ recent_requests|length }}</span>
+                {% endif %}
+                <svg class="board-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    stroke-width="2" stroke="currentColor" style="width: 1rem; height: 1rem;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+            </div>
+        </div>
+        <div class="board-panel" id="board-panel">
+            <div class="board-panel-inner">
+                <!-- 작성 폼 -->
+                <form method="post" action="{% url 'portal_view' %}" class="board-form"
+                    onclick="event.stopPropagation();">
+                    {% csrf_token %}
+                    <input type="text" name="improvement_title" placeholder="제목을 입력하세요" required class="board-input">
+                    <textarea name="improvement_content" placeholder="개선을 원하는 내용을 작성해 주세요" required rows="2"
+                        class="board-textarea"></textarea>
+                    <button type="submit" class="board-submit-btn">요청 등록</button>
+                </form>
+                <!-- 목록 -->
+                {% if recent_requests %}
+                <div class="board-list">
+                    {% for req in recent_requests %}
+                    <div class="board-item">
+                        <div class="board-item-header">
+                            <span class="board-status board-status-{{ req.status|lower }}">
+                                {% if req.status == 'PENDING' %}접수
+                                {% elif req.status == 'IN_PROGRESS' %}검토 중
+                                {% elif req.status == 'COMPLETED' %}반영 완료
+                                {% elif req.status == 'REJECTED' %}반려
+                                {% endif %}
+                            </span>
+                            <span class="board-item-title">{{ req.title }}</span>
+                        </div>
+                        <div class="board-item-content">{{ req.content }}</div>
+                        <div class="board-item-meta">
+                            <span>{{ req.author.username }} · {{ req.created_at|date:"m/d H:i" }}</span>
+                            <span class="board-actions">
+                                {% if user.is_superuser and req.status != 'COMPLETED' %}
+                                <form method="post" action="{% url 'portal_view' %}" style="display:inline;margin:0;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="complete_request_id" value="{{ req.pk }}">
+                                    <button type="submit" class="board-action-btn board-action-complete" title="완료 처리">✓
+                                        완료</button>
+                                </form>
+                                {% endif %}
+                                {% if req.author == user or user.is_superuser %}
+                                <form method="post" action="{% url 'portal_view' %}" style="display:inline;margin:0;"
+                                    onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="delete_request_id" value="{{ req.pk }}">
+                                    <button type="submit" class="board-action-btn board-action-delete" title="삭제">✕
+                                        삭제</button>
+                                </form>
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% if req.admin_reply %}
+                        <div class="board-reply">
+                            <span class="board-reply-label">↳ 관리자 답변</span>
+                            <div class="board-reply-text">{{ req.admin_reply }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="board-empty">아직 등록된 개선사항 요청이 없습니다.</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         {% if not user.is_authenticated %}
         <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 2rem;">시스템에 접근하려면 먼저 상단의 로그인을 진행해주세요.</p>
         {% endif %}
     </div>
 
     <script>
+        // 테마 토글
         document.addEventListener('DOMContentLoaded', () => {
             const toggleBtn = document.getElementById('theme-toggle');
             const iconDark = document.getElementById('theme-icon-dark');
             const iconLight = document.getElementById('theme-icon-light');
             const html = document.documentElement;
-
             function updateIcons() {
-                if (html.classList.contains('dark')) {
-                    iconDark.style.display = 'block';
-                    iconLight.style.display = 'none';
-                } else {
-                    iconDark.style.display = 'none';
-                    iconLight.style.display = 'block';
-                }
+                if (html.classList.contains('dark')) { iconDark.style.display = 'block'; iconLight.style.display = 'none'; }
+                else { iconDark.style.display = 'none'; iconLight.style.display = 'block'; }
             }
-
-            // 초기 설정
             updateIcons();
-
             toggleBtn.addEventListener('click', () => {
-                if (html.classList.contains('dark')) {
-                    html.classList.remove('dark');
-                    localStorage.setItem('adminTheme', JSON.stringify('light'));
-                } else {
-                    html.classList.add('dark');
-                    localStorage.setItem('adminTheme', JSON.stringify('dark'));
-                }
+                if (html.classList.contains('dark')) { html.classList.remove('dark'); localStorage.setItem('adminTheme', JSON.stringify('light')); }
+                else { html.classList.add('dark'); localStorage.setItem('adminTheme', JSON.stringify('dark')); }
                 updateIcons();
             });
         });
+
+        // 게시판 아코디언 토글
+        function toggleBoard() {
+            const card = document.getElementById('board-toggle');
+            const panel = document.getElementById('board-panel');
+            card.classList.toggle('open');
+            panel.classList.toggle('open');
+        }
     </script>
 </body>
 

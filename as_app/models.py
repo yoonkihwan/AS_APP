@@ -388,3 +388,49 @@ class TaxInvoiceTicket(ASTicket):
         verbose_name = "세금계산서 등록"
         verbose_name_plural = "세금계산서 등록"
 
+
+# ──────────────────────────────────────────────
+# 개선사항 요청 게시판 (Improvement Request Board)
+# ──────────────────────────────────────────────
+
+
+class ImprovementRequest(models.Model):
+    """포탈 개선사항 요청 게시판"""
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "접수"
+        IN_PROGRESS = "IN_PROGRESS", "검토 중"
+        COMPLETED = "COMPLETED", "반영 완료"
+        REJECTED = "REJECTED", "반려"
+
+    title = models.CharField("제목", max_length=200)
+    content = models.TextField("내용", help_text="개선을 원하는 내용을 자세히 작성해 주세요.")
+    author = models.ForeignKey(
+        "auth.User",
+        on_delete=models.CASCADE,
+        verbose_name="작성자",
+        related_name="improvement_requests",
+    )
+    status = models.CharField(
+        "처리 상태",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    admin_reply = models.TextField(
+        "관리자 답변",
+        blank=True,
+        default="",
+        help_text="관리자가 작성하는 답변/처리 결과",
+    )
+    created_at = models.DateTimeField("작성일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        verbose_name = "개선사항 요청"
+        verbose_name_plural = "개선사항 요청"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[{self.get_status_display()}] {self.title}"
+
