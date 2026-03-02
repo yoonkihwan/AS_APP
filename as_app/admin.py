@@ -1331,3 +1331,7 @@ class ImprovementRequestAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmi
 
     class Media:
         css = {"all": ("as_app/css/hide_fab.css",)}
+
+    # 사이드바에 표시하지 않음 (포탈에서 직접 관리)
+    def has_module_permission(self, request):
+        return False
