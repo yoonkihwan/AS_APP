@@ -719,7 +719,8 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
         super().save_related(request, form, formsets, change)
         obj = form.instance
         total_parts = sum(part.price for part in obj.used_parts.all())
-        total_with_vat = int(total_parts * 1.1)  # 부품비용에 부가세 10% 포함
+        nego_price = int(total_parts * 0.9)  # 네고가 (10% 할인)
+        total_with_vat = int(nego_price * 1.1)  # 부가세 10% 포함
         update_fields = []
         if obj.repair_cost != total_with_vat:
             obj.repair_cost = total_with_vat
