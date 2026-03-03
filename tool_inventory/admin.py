@@ -586,9 +586,7 @@ class ToolStockSummaryAdmin(ModelAdmin):
     search_fields = ('brand__name', 'model_name')
     list_filter = ('brand',)
     list_per_page = 50
-    actions = None
-    list_disable_select_all = True
-    actions_list = ["export_stock_pdf"]
+    actions = ["export_stock_pdf", "export_stock_excel"]
 
     def has_add_permission(self, request):
         return False
@@ -596,10 +594,12 @@ class ToolStockSummaryAdmin(ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     def get_queryset(self, request):
-        # Tools that only have inventory records maybe? 
-        # For now, let's just return all tools.
-        return super().get_queryset(request)
+        # 재고가 있는 장비만 표시
+        return super().get_queryset(request).filter(inventory__status='재고').distinct()
 
     @display(description="현재 재고 수량")
     def stock_count(self, obj):
@@ -625,9 +625,8 @@ class ToolStockSummaryAdmin(ModelAdmin):
             
         return " / ".join(parts) if parts else "-"
 
-    @unfold_action(description="재고 내역 출력", url_path="export-stock-pdf", attrs={"style": "background-color: #9333ea; color: white; border: none;"})
-    def export_stock_pdf(self, request):
-        queryset = self.get_queryset(request)
+    @unfold_action(description="재고 내역 출력 (PDF)", attrs={"style": "background-color: #9333ea; color: white; border: none;"})
+    def export_stock_pdf(self, request, queryset):
         import io
         from django.http import FileResponse
         from reportlab.pdfgen import canvas
@@ -735,6 +734,65 @@ class ToolStockSummaryAdmin(ModelAdmin):
         response = FileResponse(buffer, as_attachment=True, filename=filename)
         return response
 
+    @unfold_action(description="재고 내역 출력 (Excel)", attrs={"style": "background-color: #10b981; color: white; border: none;"})
+    def export_stock_excel(self, request, queryset):
+        import io
+        import openpyxl
+        from django.http import HttpResponse
+        from django.utils import timezone
+        from openpyxl.styles import Font, Alignment
+        from django.db.models import Q
+        
+        queryset = queryset.select_related('brand').order_by('brand__name', 'model_name')
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "재고현황"
+        
+        headers = ["브랜드", "모델명", "수량", "재고 내역(시리얼)"]
+        ws.append(headers)
+        
+        header_font = Font(bold=True)
+        for col_num, cell in enumerate(ws[1], 1):
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center')
+        
+        for tool in queryset:
+            brand_name = tool.brand.name if tool.brand else "미지정"
+            model_name = tool.model_name
+            
+            invs = Inventory.objects.filter(tool=tool, status='재고').order_by('date')
+            count = invs.count()
+            
+            serials = [inv.serial for inv in invs if inv.serial]
+            no_serial_count = invs.filter(Q(serial__isnull=True) | Q(serial__exact='')).count()
+            
+            parts = []
+            if serials:
+                parts.append(", ".join(serials))
+            if no_serial_count > 0:
+                parts.append(f"S/N 없음: {no_serial_count}개")
+            
+            serial_text = " / ".join(parts) if parts else "재고 없음"
+            
+            ws.append([brand_name, model_name, count, serial_text])
+            
+        ws.column_dimensions['A'].width = 15
+        ws.column_dimensions['B'].width = 30
+        ws.column_dimensions['C'].width = 10
+        ws.column_dimensions['D'].width = 50
+        
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        filename = f"tool_stock_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        response = HttpResponse(
+            buffer,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 # ── 투두리스트 관리 ──
 from .models import TodoItem

@@ -41,4 +41,22 @@
         <span class="material-symbols-outlined" style="font-size:1.1rem;">handshake</span>
         의뢰업체
     </a>
+    <a href="{% url 'admin:as_app_companycategory_changelist' %}" id="tab-category" style="
+            padding: 12px 24px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            border-bottom: 3px solid {% if active_tab == 'category' %}#6366f1{% else %}transparent{% endif %};
+            color: {% if active_tab == 'category' %}#4338ca{% else %}#6b7280{% endif %};
+            margin-bottom: -2px;
+            transition: all .2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+       "
+        onmouseover="if('{{ active_tab }}' !== 'category') { this.style.color='#4338ca'; this.style.borderBottomColor='#c7d2fe'; }"
+        onmouseout="if('{{ active_tab }}' !== 'category') { this.style.color='#6b7280'; this.style.borderBottomColor='transparent'; }">
+        <span class="material-symbols-outlined" style="font-size:1.1rem;">sell</span>
+        단가그룹
+    </a>
 </div>

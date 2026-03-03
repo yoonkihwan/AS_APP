@@ -118,7 +118,6 @@ class Part(models.Model):
     )
     name = models.CharField("부품명", max_length=200)
     code = models.CharField("부품코드", max_length=100, blank=True)
-    price = models.PositiveIntegerField("단가", default=0)
     remarks = models.TextField("비고", blank=True)
 
     class Meta:
@@ -126,8 +125,14 @@ class Part(models.Model):
         verbose_name_plural = "수리부품 관리"
         ordering = ["name"]
 
+    @property
+    def default_price(self):
+        """기본 단가 (다스 그룹 단가 기준)"""
+        default_group = self.group_prices.filter(category__name="다스").first()
+        return default_group.price if default_group else 0
+
     def __str__(self):
-        return f"{self.name} ({self.price:,}원)"
+        return f"{self.name} ({self.default_price:,}원)"
 
     def tool_list(self):
         """적용 장비 목록 표시용"""
@@ -135,6 +140,40 @@ class Part(models.Model):
         if tools:
             return ", ".join(str(t) for t in tools)
         return "공용 (전체 적용)"
+
+    def get_price_for_company(self, company):
+        """업체의 단가 그룹에 맞는 부품 단가를 반환. 설정된 그룹 단가가 없으면 다스 기본 단가 반환"""
+        if company and company.price_group:
+            group_price = self.group_prices.filter(category=company.price_group).first()
+            if group_price:
+                return group_price.price
+        return self.default_price
+
+class PartPrice(models.Model):
+    """수리부품의 단가 그룹별 차등 단가"""
+
+    part = models.ForeignKey(
+        Part,
+        on_delete=models.CASCADE,
+        related_name="group_prices",
+        verbose_name="부품",
+    )
+    category = models.ForeignKey(
+        CompanyCategory,
+        on_delete=models.CASCADE,
+        verbose_name="단가 그룹",
+    )
+    price = models.PositiveIntegerField("그룹 단가", default=0)
+
+    class Meta:
+        verbose_name = "단가 그룹별 금액"
+        verbose_name_plural = "단가 그룹별 금액"
+        unique_together = ["part", "category"]
+
+    def __str__(self):
+        return f"[{self.category.name}] {self.price:,}원"
+
+
 
 
 class RepairPreset(models.Model):
@@ -172,7 +211,7 @@ class RepairPreset(models.Model):
     @property
     def total_price(self):
         """세트에 포함된 부품/공임의 합계 금액"""
-        return sum(p.price for p in self.parts.all())
+        return sum(p.default_price for p in self.parts.all())
 
 
 # ──────────────────────────────────────────────

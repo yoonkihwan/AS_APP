@@ -85,7 +85,8 @@ from .models import (
     TaxInvoiceTicket,
     Tool,
 )
-from .forms import ASTicketForm
+from .forms import ASTicketForm, PartForm
+
 
 
 # ──────────────────────────────────────────────
@@ -94,13 +95,18 @@ from .forms import ASTicketForm
 
 
 @admin.register(CompanyCategory)
-class CompanyCategoryAdmin(ModelAdmin):
+class CompanyCategoryAdmin(CustomTitleMixin, ModelAdmin):
+    custom_title = "단가그룹 관리"
     list_display = ["name"]
     search_fields = ["name"]
+    change_list_template = "admin/as_app/companycategory/change_list.html"
 
-    def has_module_permission(self, request):
-        """사이드바에 표시하지 않음 (Company Admin에서 통합 관리)"""
-        return False
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["active_tab"] = "category"
+        return super().changelist_view(request, extra_context)
+
+
 
 
 @admin.register(Company)
@@ -179,6 +185,7 @@ class ToolAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 
 @admin.register(Part)
 class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    form = PartForm
     custom_title = "수리부품 관리"
     list_display = ["brand", "name", "code", "part_type", "formatted_price", "display_tools", "remarks"]
     list_filter = ["brand", "part_type", "tools__brand"]
@@ -187,6 +194,25 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     filter_horizontal = ["tools"]
     list_per_page = 20
     change_list_template = "admin/as_app/part/change_list.html"
+
+    def get_form(self, request, obj=None, **kwargs):
+        from django import forms
+        from .models import CompanyCategory
+        
+        form_attrs = {}
+        categories = CompanyCategory.objects.all().order_by('name')
+        for cat in categories:
+            field_name = f'price_group_{cat.id}'
+            is_das = (cat.name == "다스")
+            form_attrs[field_name] = forms.IntegerField(
+                label=f"{cat.name} 단가",
+                required=is_das,
+                help_text="모든 단가의 기준이 되는 기본 단가입니다." if is_das else f"빈 칸인 경우 기본 단가(다스 단가)가 자동 적용됩니다.",
+                widget=forms.NumberInput(attrs={'placeholder': '기준 단가 필수 입력' if is_das else '기본 단가 자동 적용'})
+            )
+        
+        kwargs['form'] = type('DynamicPartForm', (self.form,), form_attrs)
+        return super().get_form(request, obj, **kwargs)
 
     fieldsets = (
         (
@@ -197,7 +223,6 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
                     "part_type",
                     "name",
                     "code",
-                    "price",
                     "remarks",
                 ),
             },
@@ -211,13 +236,46 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
         ),
     )
 
+    def get_fieldsets(self, request, obj=None):
+        fs = list(self.fieldsets)
+        # Deep copy to prevent modifying class attribute
+        fs[0] = (fs[0][0], {"fields": tuple(fs[0][1]["fields"]), **{k:v for k,v in fs[0][1].items() if k != "fields"}})
+        
+        categories = CompanyCategory.objects.all().order_by('name')
+        if categories.exists():
+            group_fields = [f'price_group_{cat.id}' for cat in categories]
+            base_fields = list(fs[0][1]['fields'])
+            # Insert group fields right before 'remarks'
+            base_fields = base_fields[:-1] + group_fields + base_fields[-1:]
+            fs[0][1]['fields'] = tuple(base_fields)
+        return tuple(fs)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if isinstance(form, PartForm):
+            for cat in form.categories:
+                field_name = f'price_group_{cat.id}'
+                price_val = form.cleaned_data.get(field_name)
+                if price_val is not None:
+                    from .models import PartPrice
+                    PartPrice.objects.update_or_create(
+                        part=form.instance,
+                        category=cat,
+                        defaults={'price': price_val}
+                    )
+                else:
+                    from .models import PartPrice
+                    PartPrice.objects.filter(part=form.instance, category=cat).delete()
+
+
+
     @admin.display(description="적용 장비")
     def display_tools(self, obj):
         return obj.tool_list()
 
     @admin.display(description="단가")
     def formatted_price(self, obj):
-        return f"{obj.price:,}"
+        return f"{obj.default_price:,}"
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
@@ -719,7 +777,7 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
         """M2M 저장 후 사용 부품/공임 단가 합산으로 AS 비용 자동 계산 + 수리완료 상태 변경"""
         super().save_related(request, form, formsets, change)
         obj = form.instance
-        total_parts = sum(part.price for part in obj.used_parts.all())
+        total_parts = sum(part.get_price_for_company(obj.company) for part in obj.used_parts.all())
         nego_price = int(total_parts * 0.9)  # 네고가 (10% 할인)
         total_with_vat = int(nego_price * 1.1)  # 부가세 10% 포함
         update_fields = []
@@ -748,20 +806,26 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
                 parts = preset.parts.all()
                 part_ids = [p.id for p in parts if p.part_type == 'part']
                 labor_ids = [p.id for p in parts if p.part_type == 'labor']
+                company_total = sum(p.get_price_for_company(obj.company) for p in parts)
                 preset_data.append({
                     "id": preset.id,
                     "name": preset.name,
                     "part_ids": part_ids,
                     "labor_ids": labor_ids,
-                    "total_price": preset.total_price,
+                    "total_price": company_total,
                 })
             context["repair_presets"] = preset_data
             # 부품/공임 구분 정보를 별도로 전달 (체크박스에 data 속성 부여용)
             from django.db.models import Q as Q2
             all_parts = Part.objects.filter(
                 Q2(tools=obj.tool) | Q2(tools__isnull=True)
-            ).distinct().values("id", "part_type", "price")
-            context["parts_meta"] = list(all_parts)
+            ).distinct().prefetch_related('group_prices')
+            
+            parts_meta = []
+            for p in all_parts:
+                p_price = p.get_price_for_company(obj.company)
+                parts_meta.append({"id": p.id, "part_type": p.part_type, "price": p_price})
+            context["parts_meta"] = parts_meta
         else:
             context["repair_presets"] = []
             context["parts_meta"] = []

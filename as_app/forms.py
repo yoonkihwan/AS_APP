@@ -55,3 +55,28 @@ class ASTicketForm(forms.ModelForm):
                      self.fields["tool"].queryset = Tool.objects.filter(brand_id=brand_id)
                  except (ValueError, TypeError):
                      pass
+
+from .models import Part, CompanyCategory
+
+class PartForm(forms.ModelForm):
+    class Meta:
+        model = Part
+        fields = [
+            "brand",
+            "part_type",
+            "name",
+            "code",
+            "remarks",
+            "tools",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.categories = list(CompanyCategory.objects.all().order_by('name'))
+        for cat in self.categories:
+            field_name = f'price_group_{cat.id}'
+            if self.instance and self.instance.pk:
+                pp = self.instance.group_prices.filter(category=cat).first()
+                if pp:
+                    self.initial[field_name] = pp.price
+
