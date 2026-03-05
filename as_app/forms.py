@@ -13,10 +13,21 @@ class ASTicketForm(forms.ModelForm):
         empty_label="---------",
         widget=UnfoldAdminSelectWidget(),  # Unfold 스타일 적용
     )
+    no_serial_number = forms.BooleanField(
+        label="시리얼 없음",
+        required=False,
+    )
+    quantity = forms.IntegerField(
+        label="개수",
+        min_value=1,
+        initial=1,
+        required=False,
+        widget=forms.NumberInput(attrs={'style': 'width: 60px;'}),
+    )
 
     class Meta:
         model = ASTicket
-        fields = ["brand", "tool", "serial_number"]
+        fields = ["brand", "tool", "no_serial_number", "quantity", "serial_number"]
         widgets = {
             "tool": UnfoldAdminSelectWidget(),  # Tool 필드에도 동일 위젯 명시(일관성)
         }
@@ -26,6 +37,10 @@ class ASTicketForm(forms.ModelForm):
         
         # 기본적으로 툴 목록을 비움 (브랜드 선택 전까지)
         self.fields["tool"].queryset = Tool.objects.none()
+        
+        # 기본적으로 시리얼 번호 필드를 필수가 아니도록 변경 (clean에서 수동 검증)
+        if "serial_number" in self.fields:
+            self.fields["serial_number"].required = False
 
         # 1. 인스턴스가 있고(수정 모드), 툴이 이미 저장되어 있는 경우
         if self.instance.pk and self.instance.tool_id:
@@ -55,6 +70,24 @@ class ASTicketForm(forms.ModelForm):
                      self.fields["tool"].queryset = Tool.objects.filter(brand_id=brand_id)
                  except (ValueError, TypeError):
                      pass
+                         
+    def clean(self):
+        cleaned_data = super().clean()
+        no_serial = cleaned_data.get("no_serial_number")
+        serial = cleaned_data.get("serial_number")
+        qty = cleaned_data.get("quantity") or 1
+
+        if no_serial:
+            # 시리얼 번호 에러 무시
+            if "serial_number" in self._errors:
+                del self._errors["serial_number"]
+            cleaned_data["serial_number"] = "[NO-SN]"
+            if not qty or qty < 1:
+                self.add_error("quantity", "수량을 1 이상 입력해주세요.")
+        else:
+            if not serial:
+                self.add_error("serial_number", "시리얼 번호를 입력하거나 '시리얼 없음'을 체크해주세요.")
+        return cleaned_data
 
 from .models import Part, CompanyCategory
 

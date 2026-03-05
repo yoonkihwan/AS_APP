@@ -402,7 +402,7 @@ class ASTicketInline(NoRelatedButtonsMixin, TabularInline):
     model = ASTicket
     fk_name = "inbound_batch"
     form = ASTicketForm  # 커스텀 폼 적용
-    fields = ["brand", "tool", "serial_number"]  # form에 정의된 순서대로 표시
+    fields = ["brand", "tool", "no_serial_number", "quantity", "serial_number"]  # form에 정의된 순서대로 표시
     # autocomplete_fields = ["tool"]  # JS Cascading을 위해 일반 Select로 변경 (주석 처리)
     extra = 0
     min_num = 1
@@ -546,10 +546,33 @@ class InboundBatchAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 
         batch = form.instance
 
-        # ── 쉼표로 구분된 시리얼번호를 개별 티켓으로 확장 ──
+        # ── 쉼표로 구분된 시리얼번호 및 시리얼 없음(수량) 처리 ──
         expanded = []
-        for instance in instances:
-            if instance.tool_id and instance.serial_number:
+        import uuid
+        
+        for form_obj in formset.forms:
+            if not form_obj.is_valid() or form_obj.cleaned_data.get('DELETE'):
+                continue
+            instance = form_obj.instance
+            no_sn = form_obj.cleaned_data.get('no_serial_number')
+            qty = form_obj.cleaned_data.get('quantity') or 1
+            
+            if not instance.tool_id:
+                continue
+
+            if no_sn:
+                # 첫 번째는 원래 인스턴스에 할당
+                instance.serial_number = f"없음-{uuid.uuid4().hex[:6]}"
+                expanded.append(instance)
+                # 나머지는 새 티켓으로 생성
+                for _ in range(qty - 1):
+                    new_ticket = ASTicket(
+                        inbound_batch=batch,
+                        tool=instance.tool,
+                        serial_number=f"없음-{uuid.uuid4().hex[:6]}",
+                    )
+                    expanded.append(new_ticket)
+            elif instance.serial_number:
                 serials = [s.strip() for s in instance.serial_number.split(",") if s.strip()]
                 if len(serials) > 1:
                     # 첫 번째는 원래 인스턴스에 할당
@@ -565,7 +588,7 @@ class InboundBatchAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
                         expanded.append(new_ticket)
                 else:
                     expanded.append(instance)
-            elif instance.tool_id:
+            else:
                 expanded.append(instance)
 
         # ── 중복 검증 ──

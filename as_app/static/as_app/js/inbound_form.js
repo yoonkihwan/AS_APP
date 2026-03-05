@@ -45,9 +45,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // 시리얼 없음 체크 시 제어 로직
   function toggleSerialFields(row) {
     if (!row) return;
-    const noSerialCheckbox = row.querySelector("input[name$='-no_serial']");
+    const noSerialCheckbox = row.querySelector("input[name$='-no_serial_number']");
     const quantityField = row.querySelector("input[name$='-quantity']");
-    const serialField = row.querySelector("input[name$='-serial']");
+    const serialField = row.querySelector("input[name$='-serial_number']");
 
     if (noSerialCheckbox && quantityField && serialField) {
       const isChecked = noSerialCheckbox.checked;
@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", function () {
       toolSelect.value = "";
 
       updateToolOptions(e.target);
-    } else if (e.target.matches("input[name$='-no_serial']")) {
+    } else if (e.target.matches("input[name$='-no_serial_number']")) {
       const row = e.target.closest("tr");
       toggleSerialFields(row);
     }
