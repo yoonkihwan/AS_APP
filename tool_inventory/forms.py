@@ -152,3 +152,22 @@ class OutboundTicketForm(forms.ModelForm):
                 self.fields["inventories"].queryset = q.distinct()
         except (ValueError, TypeError):
             pass
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tool = cleaned_data.get("tool")
+        quantity = cleaned_data.get("quantity") or 1
+        inventories = cleaned_data.get("inventories")
+        
+        if tool:
+            # 사용자가 체크박스(시리얼)를 선택하지 않았을 때 = 시리얼 없는 품목 등
+            if not inventories:
+                current_stock = Inventory.objects.filter(tool=tool, status='재고').count()
+                if self.instance.pk:
+                    current_stock += self.instance.inventories.count()
+                
+                # 삭제 체크된 폼은 검증하지 않음
+                if not self.cleaned_data.get('DELETE') and quantity > current_stock:
+                    self.add_error("quantity", f"입력한 수량({quantity}개)이 현재 재고({current_stock}개)보다 많습니다.")
+        
+        return cleaned_data

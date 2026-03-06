@@ -218,5 +218,36 @@ document.addEventListener("DOMContentLoaded", function () {
       const row = e.target.closest("tr");
       updateQuantityLogic(row);
     }
+
+    // 수량 입력값 제한 (현재 재고 초과 방지)
+    if (e.target.matches("input[name$='-quantity']")) {
+      const row = e.target.closest("tr");
+      const currentStockInput = row.querySelector("input[name$='-current_stock']");
+      if (currentStockInput && currentStockInput.value) {
+        const maxStock = parseInt(currentStockInput.value, 10) || 0;
+        let val = parseInt(e.target.value, 10);
+
+        if (!isNaN(val) && maxStock > 0 && val > maxStock) {
+          e.target.value = maxStock;
+          alert("입력한 수량이 현재 재고(" + maxStock + "개)를 초과하여 자동 조정되었습니다.");
+        }
+      }
+    }
+  });
+
+  // input 이벤트에서도 즉시 체크하여 위/아래 방향키나 타이핑 시 바로 방어
+  document.body.addEventListener("input", function (e) {
+    if (e.target.matches("input[name$='-quantity']")) {
+      const row = e.target.closest("tr");
+      const currentStockInput = row.querySelector("input[name$='-current_stock']");
+      if (currentStockInput && currentStockInput.value) {
+        const maxStock = parseInt(currentStockInput.value, 10) || 0;
+        let val = parseInt(e.target.value, 10);
+
+        if (!isNaN(val) && maxStock > 0 && val > maxStock) {
+          e.target.value = maxStock;
+        }
+      }
+    }
   });
 });
