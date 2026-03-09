@@ -41,8 +41,11 @@ def _safe_image(path, width=None, height=None):
     return ""
 
 
-def generate_pdf_estimate(tickets):
-    """기존 다스 공구실 견적서 엑셀 양식과 동일한 레이아웃의 PDF 생성"""
+def generate_pdf_estimate(tickets) -> io.BytesIO:
+    """기존 다스 공구실 견적서 엑셀 양식과 동일한 레이아웃의 PDF 생성
+    
+    업체별 단가 그룹에 따른 차등 가격이 자동 적용됩니다.
+    """
     _register_fonts()
     buffer = io.BytesIO()
 
@@ -117,12 +120,15 @@ def generate_pdf_estimate(tickets):
             from reportlab.platypus import PageBreak
             elements.append(PageBreak())
 
-        company_name = ticket.company.name if ticket.company else "업체미정"
+        company = ticket.company
+        company_name = company.name if company else "업체미정"
         model_name = ticket.tool.model_name if ticket.tool else "품목미정"
         brand_name = ticket.tool.brand.name if ticket.tool and ticket.tool.brand else ""
         sn = ticket.serial_number if ticket.serial_number else ""
         parts = list(ticket.used_parts.all())
-        total_price = sum(p.price for p in parts)
+        # 업체별 단가 그룹에 따른 차등 가격 적용
+        part_prices = {p: p.get_price_for_company(company) for p in parts}
+        total_price = sum(part_prices.values())
         nego_price = int(total_price * 0.9)
         today = datetime.now()
 
@@ -231,12 +237,13 @@ def generate_pdf_estimate(tickets):
 
         # 5-3) 부품/공임 목록
         for part in parts:
+            price = part_prices[part]
             table_data.append([
                 Paragraph(part.name, cell_style),
                 Paragraph(part.code or "", cell_center),
                 Paragraph("1 EA", cell_center),
-                Paragraph(f"{part.price:,}", cell_right),
-                Paragraph(f"{part.price:,}", cell_right),
+                Paragraph(f"{price:,}", cell_right),
+                Paragraph(f"{price:,}", cell_right),
                 Paragraph("", cell_style),
             ])
 

@@ -1,6 +1,6 @@
 from django import forms
 from .models import Inventory
-from as_app.models import Brand, Tool
+from master_data.models import Brand, Tool
 from unfold.widgets import (
     UnfoldAdminSelectWidget,
     UnfoldBooleanWidget,

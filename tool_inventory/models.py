@@ -6,7 +6,7 @@ class InventoryBatch(models.Model):
     """입고 배치 - 한 번에 여러 툴/장비를 입고 등록"""
     inbound_date = models.DateField("입고 날짜")
     supplier = models.ForeignKey(
-        'as_app.OutsourceCompany',
+        'master_data.OutsourceCompany',
         on_delete=models.PROTECT,
         verbose_name="입고업체",
         related_name="inbound_batches",
@@ -25,7 +25,7 @@ class OutboundBatch(models.Model):
     """출고 배치 - 한 번에 여러 툴/장비를 출고 등록"""
     release_date = models.DateField("출고 날짜")
     release_company = models.ForeignKey(
-        'as_app.Company',
+        'master_data.Company',
         on_delete=models.PROTECT,
         verbose_name="출고업체",
         related_name="tool_outbound_batches",
@@ -48,7 +48,7 @@ class OutboundTicket(models.Model):
         related_name="tickets"
     )
     tool = models.ForeignKey(
-        'as_app.Tool',
+        'master_data.Tool',
         on_delete=models.PROTECT,
         verbose_name="품목"
     )
@@ -81,7 +81,7 @@ class Inventory(models.Model):
     # 배치 정보 연동
     batch = models.ForeignKey(
         InventoryBatch,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         verbose_name="입고 배치",
@@ -98,13 +98,13 @@ class Inventory(models.Model):
     )
     
     supplier = models.ForeignKey(
-        'as_app.OutsourceCompany',
+        'master_data.OutsourceCompany',
         on_delete=models.PROTECT,
         verbose_name="입고처",
     )
     date = models.DateField("입고일 자")
     tool = models.ForeignKey(
-        'as_app.Tool',
+        'master_data.Tool',
         on_delete=models.PROTECT,
         verbose_name="품목명",
     )
@@ -112,7 +112,7 @@ class Inventory(models.Model):
     
     release_date = models.DateField("출고일자", blank=True, null=True)
     release_company = models.ForeignKey(
-        'as_app.Company',
+        'master_data.Company',
         on_delete=models.SET_NULL,
         verbose_name="출고처",
         null=True, blank=True,
@@ -147,7 +147,7 @@ class OutboundInventory(Inventory):
         verbose_name = "출고 등록"
         verbose_name_plural = "출고 등록"
 
-from as_app.models import Tool
+from master_data.models import Tool
 
 class ToolStockSummary(Tool):
     """툴별 현재 재고 수량 및 시리얼 조회를 위한 프록시 모델"""

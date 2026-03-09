@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "import_export",
+    "master_data",
     "as_app",
     "tool_inventory",
     "hr_app",
@@ -163,7 +164,8 @@ def dashboard_callback(request, context):
     elif request.path.startswith('/sysadmin/'):
         return context
     elif request.path.startswith('/hr/'):
-        # Will add a dashboard callback in hr_app later if needed. For now just return context.
+        return context
+    elif request.path.startswith('/master/'):
         return context
     else:
         from as_app.dashboard import dashboard_callback as as_callback
@@ -233,17 +235,17 @@ def sidebar_callback(request):
                     {
                         "title": "매출처",
                         "icon": "local_shipping",
-                        "link": reverse_lazy("tool_admin:as_app_company_changelist"),
+                        "link": reverse_lazy("tool_admin:master_data_company_changelist"),
                     },
                     {
                         "title": "입고업체",
                         "icon": "store",
-                        "link": reverse_lazy("tool_admin:as_app_outsourcecompany_changelist"),
+                        "link": reverse_lazy("tool_admin:master_data_outsourcecompany_changelist"),
                     },
                     {
                         "title": "브랜드/툴 관리",
                         "icon": "category",
-                        "link": reverse_lazy("tool_admin:as_app_tool_changelist"),
+                        "link": reverse_lazy("tool_admin:master_data_tool_changelist"),
                     },
                 ],
             },
@@ -316,6 +318,52 @@ def sidebar_callback(request):
                         "title": "근태 기록 목록",
                         "icon": "list_alt",
                         "link": reverse_lazy("hr_admin:hr_app_attendancerecord_changelist"),
+                    },
+                ],
+            },
+        ]
+    elif request.path.startswith('/master/'):
+        return [
+            {
+                "title": "내비게이션",
+                "separator": False,
+                "items": [
+                    {
+                        "title": "포탈로 돌아가기",
+                        "icon": "home",
+                        "link": "/",
+                    },
+                ],
+            },
+            {
+                "title": "업체 관리",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "매출처",
+                        "icon": "business",
+                        "link": reverse_lazy("master_data_admin:master_data_company_changelist"),
+                    },
+                    {
+                        "title": "의뢰업체",
+                        "icon": "handshake",
+                        "link": reverse_lazy("master_data_admin:master_data_outsourcecompany_changelist"),
+                    },
+                    {
+                        "title": "단가 그룹",
+                        "icon": "sell",
+                        "link": reverse_lazy("master_data_admin:master_data_companycategory_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "장비 관리",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "브랜드 & 툴",
+                        "icon": "hardware",
+                        "link": reverse_lazy("master_data_admin:master_data_tool_changelist"),
                     },
                 ],
             },
@@ -393,7 +441,7 @@ def sidebar_callback(request):
                     {
                         "title": "업체관리",
                         "icon": "business",
-                        "link": reverse_lazy("admin:as_app_company_changelist"),
+                        "link": reverse_lazy("admin:master_data_company_changelist"),
                     },
                     {
                         "title": "수리부품 관리",
@@ -403,7 +451,7 @@ def sidebar_callback(request):
                     {
                         "title": "브랜드 & 툴 관리",
                         "icon": "hardware",
-                        "link": reverse_lazy("admin:as_app_tool_changelist"),
+                        "link": reverse_lazy("admin:master_data_tool_changelist"),
                     },
                 ],
             },
@@ -417,6 +465,8 @@ def site_title_callback(request):
         return "시스템 관리"
     elif request.path.startswith('/hr/'):
         return "근무/근태 관리"
+    elif request.path.startswith('/master/'):
+        return "기준정보 관리"
     return "AS 관리"
 
 def site_header_callback(request):
@@ -426,6 +476,8 @@ def site_header_callback(request):
         return "시스템 권한 승인 센터"
     elif request.path.startswith('/hr/'):
         return "근무 관리 포털"
+    elif request.path.startswith('/master/'):
+        return "기준정보 관리 포털"
     return "AS 시스템"
 
 def site_symbol_callback(request):
@@ -435,6 +487,8 @@ def site_symbol_callback(request):
         return "admin_panel_settings"
     elif request.path.startswith('/hr/'):
         return "event_available"
+    elif request.path.startswith('/master/'):
+        return "database"
     return "build"
 
 UNFOLD = {

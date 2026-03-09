@@ -1036,6 +1036,7 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "symptom",
         "repair_content",
     ]
+    autocomplete_fields = ["company", "tool", "used_parts"]
     list_per_page = 30
     actions = [
         "revert_shipped_to_repaired",
@@ -1093,9 +1094,6 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         }
 
     def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from .models import Inventory, InventoryBatch, InboundInventory, OutboundInventory
 from .forms import InventoryForm
-from as_app.models import OutsourceCompany, Company, Tool, Brand
+from master_data.models import OutsourceCompany, Company, Tool, Brand
 
 class ToolInventoryAdminSite(UnfoldAdminSite):
     site_title = "장비/툴 관리 시스템"
@@ -24,15 +24,26 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
 tool_admin_site = ToolInventoryAdminSite(name='tool_admin')
 
 # ── Register AS_APP models for autocomplete functionality in Tool Inventory ──
+# NOTE: Company/OutsourceCompany are registered here ONLY for autocomplete support.
+# changelist_view/change_view are redirected to prevent NoReverseMatch errors
+# caused by company_tabs.html referencing URLs not registered in tool_admin_site.
 @admin.register(OutsourceCompany, site=tool_admin_site)
 class ToolOutsourceCompanyAdmin(ModelAdmin):
     search_fields = ["name"]
     def has_module_permission(self, request): return False
+    def changelist_view(self, request, extra_context=None):
+        return HttpResponseRedirect(reverse('tool_admin:index'))
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        return HttpResponseRedirect(reverse('tool_admin:index'))
 
 @admin.register(Company, site=tool_admin_site)
 class ToolCompanyAdmin(ModelAdmin):
     search_fields = ["name"]
     def has_module_permission(self, request): return False
+    def changelist_view(self, request, extra_context=None):
+        return HttpResponseRedirect(reverse('tool_admin:index'))
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        return HttpResponseRedirect(reverse('tool_admin:index'))
 
 @admin.register(Brand, site=tool_admin_site)
 class ToolBrandAdmin(ModelAdmin):

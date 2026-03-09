@@ -24,6 +24,7 @@ from tool_inventory.admin import tool_admin_site
 from as_project.sysadmin import sysadmin_site
 from tool_inventory import views as tool_views
 from hr_app.admin import hr_admin_site
+from master_data.admin import master_data_site
 
 urlpatterns = [
     path("", as_project_views.portal_view, name="portal_view"),
@@ -31,6 +32,7 @@ urlpatterns = [
     path("admin/as_app/", RedirectView.as_view(url="/admin/", permanent=False)),
     path("admin/", admin.site.urls),
     path("inventory/", tool_admin_site.urls),
+    path("master/", master_data_site.urls),
     path("sysadmin/", sysadmin_site.urls),
     path("hr/hr_app/calendar/", RedirectView.as_view(url="/hr/api/calendar/", permanent=False)), # temporary redirect
     path("hr/api/", include("hr_app.urls")), # API and custom views for HR

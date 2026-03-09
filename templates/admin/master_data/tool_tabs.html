@@ -1,11 +1,11 @@
-<!-- 브랜드 & 툴 관리 탭 네비게이션 -->
+<!-- 브랜드/툴 탭 네비게이션 (기준정보 포털용) -->
 <div style="
     margin-bottom: 20px;
     border-bottom: 2px solid #e5e7eb;
     display: flex;
     gap: 0;
 ">
-    <a href="{% url 'admin:master_data_tool_changelist' %}" id="tab-tool" style="
+    <a href="{% url 'master_data_admin:master_data_tool_changelist' %}" id="tab-tool" style="
             padding: 12px 24px;
             font-size: 0.9rem;
             font-weight: 600;
@@ -23,7 +23,7 @@
         <span class="material-symbols-outlined" style="font-size:1.1rem;">hardware</span>
         장비/툴 관리
     </a>
-    <a href="{% url 'admin:master_data_brand_changelist' %}" id="tab-brand" style="
+    <a href="{% url 'master_data_admin:master_data_brand_changelist' %}" id="tab-brand" style="
             padding: 12px 24px;
             font-size: 0.9rem;
             font-weight: 600;

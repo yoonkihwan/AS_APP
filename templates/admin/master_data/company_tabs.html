@@ -1,11 +1,11 @@
-<!-- 업체관리 탭 네비게이션 -->
+<!-- 업체관리 탭 네비게이션 (기준정보 포털용) -->
 <div style="
     margin-bottom: 20px;
     border-bottom: 2px solid #e5e7eb;
     display: flex;
     gap: 0;
 ">
-    <a href="{% url 'admin:master_data_company_changelist' %}" id="tab-company" style="
+    <a href="{% url 'master_data_admin:master_data_company_changelist' %}" id="tab-company" style="
             padding: 12px 24px;
             font-size: 0.9rem;
             font-weight: 600;
@@ -23,7 +23,7 @@
         <span class="material-symbols-outlined" style="font-size:1.1rem;">business</span>
         매출처업체
     </a>
-    <a href="{% url 'admin:master_data_outsourcecompany_changelist' %}" id="tab-outsource" style="
+    <a href="{% url 'master_data_admin:master_data_outsourcecompany_changelist' %}" id="tab-outsource" style="
             padding: 12px 24px;
             font-size: 0.9rem;
             font-weight: 600;
@@ -41,7 +41,7 @@
         <span class="material-symbols-outlined" style="font-size:1.1rem;">handshake</span>
         의뢰업체
     </a>
-    <a href="{% url 'admin:master_data_companycategory_changelist' %}" id="tab-category" style="
+    <a href="{% url 'master_data_admin:master_data_companycategory_changelist' %}" id="tab-category" style="
             padding: 12px 24px;
             font-size: 0.9rem;
             font-weight: 600;
