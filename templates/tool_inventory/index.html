@@ -222,6 +222,28 @@
         list-style: none;
         padding: 0;
         margin: 0;
+        max-height: 140px;
+        /* 대략 3개 항목 높이 */
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    /* Webkit Scrollbar Styling for Todo List */
+    .todo-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .todo-list::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .todo-list::-webkit-scrollbar-thumb {
+        background: var(--border-color, #e5e7eb);
+        border-radius: 3px;
+    }
+
+    .dark .todo-list::-webkit-scrollbar-thumb {
+        background: #475569;
     }
 
     .todo-item {
@@ -394,153 +416,132 @@
 
 {% block content %}
 
-<!-- ① KPI 요약 + 퀵 리포트 영역 (4열 그리드) -->
-<div class="dash-grid dash-grid-4">
-    <!-- 보유 재고 총계 -->
-    <div class="kpi-card">
-        <div class="kpi-icon" style="background: linear-gradient(135deg, #10b981, #059669);">
-            <span class="material-icons-outlined">inventory</span>
-        </div>
-        <div class="kpi-info">
-            <span class="kpi-label">현재 보유 재고</span>
-            <span class="kpi-metric">{{ total_inventory|default:"0" }}<span
-                    style="font-size: 0.9rem; font-weight: 500; margin-left: 2px;">개</span></span>
-        </div>
-    </div>
+<!-- ① 상단 영역: 할 일 목록 + 퀵 리포트 카드 -->
+<div class="dash-grid dash-grid-2" style="margin-bottom: 1.5rem;">
 
-    <!-- 출고 장비 총계 -->
-    <div class="kpi-card">
-        <div class="kpi-icon" style="background: linear-gradient(135deg, #3b82f6, #2563eb);">
-            <span class="material-icons-outlined">local_shipping</span>
+    <!-- 왼쪽: 할 일 목록 -->
+    <div class="dash-panel" id="todo-panel">
+        <div class="dash-panel-header">
+            <span class="dash-panel-title">
+                <span class="material-icons-outlined" style="color: #f59e0b;">checklist</span>
+                할 일 목록
+                {% if todo_pending_count %}
+                <span class="dash-panel-badge" style="background: #f59e0b;">{{ todo_pending_count }}</span>
+                {% endif %}
+            </span>
         </div>
-        <div class="kpi-info">
-            <span class="kpi-label">누적 출고된 툴</span>
-            <span class="kpi-metric">{{ total_released|default:"0" }}<span
-                    style="font-size: 0.9rem; font-weight: 500; margin-left: 2px;">개</span></span>
-        </div>
-    </div>
-
-    <!-- 재고현황 PDF 다운로드 -->
-    <div class="kpi-card" style="cursor:pointer;"
-        onclick="window.location.href='{% url 'tool_admin:dashboard_stock_pdf' %}'">
-        <div class="kpi-icon" style="background: linear-gradient(135deg, #9333ea, #7c3aed);">
-            <span class="material-icons-outlined">download</span>
-        </div>
-        <div class="kpi-info">
-            <span class="kpi-label">퀵 리포트</span>
-            <span style="font-size: 1rem; font-weight: 700; color: var(--text-color, #111827);">📄 재고현황 PDF</span>
-        </div>
-    </div>
-
-    <!-- 기간별 입출고 이력 PDF -->
-    <div class="kpi-card" style="flex-direction:column; align-items:stretch; gap:0.6rem; padding:1rem 1.25rem;">
-        <div style="display:flex; align-items:center; gap:0.75rem;">
-            <div class="kpi-icon"
-                style="background: linear-gradient(135deg, #f59e0b, #d97706); width:40px; height:40px;">
-                <span class="material-icons-outlined" style="font-size:20px;">date_range</span>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">퀵 리포트</span>
-                <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-color, #111827);">📋 기간별 입출고
-                    이력</span>
-            </div>
-        </div>
-        <form id="history-pdf-form" method="get" action="{% url 'tool_admin:dashboard_history_pdf' %}"
-            style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
-            <input type="date" name="start" id="history-start" class="quick-date-input" title="시작일">
-            <span style="color:var(--text-muted, #6b7280); font-size:0.8rem;">~</span>
-            <input type="date" name="end" id="history-end" class="quick-date-input" title="종료일">
-            <button type="submit" class="quick-dl-btn" title="PDF 다운로드">
-                <span class="material-icons-outlined" style="font-size:1rem;">download</span> PDF
+        <!-- 입력 영역 -->
+        <div class="todo-input-row">
+            <input type="text" id="todo-input" class="todo-input" placeholder="새로운 할 일을 입력하세요..." autocomplete="off">
+            <button type="button" id="todo-add-btn" class="todo-add-btn">
+                <span class="material-icons-outlined" style="font-size:1rem;">add</span> 추가
             </button>
-        </form>
+        </div>
+        <!-- 목록 -->
+        <ul class="todo-list" id="todo-list">
+            {% for todo in todo_items %}
+            <li class="todo-item" data-id="{{ todo.id }}">
+                <input type="checkbox" class="todo-checkbox" {% if todo.is_done %}checked{% endif %}>
+                <span class="todo-text {% if todo.is_done %}done{% endif %}">{{ todo.title }}</span>
+                <button type="button" class="todo-delete" title="삭제">
+                    <span class="material-icons-outlined" style="font-size:1.1rem;">close</span>
+                </button>
+            </li>
+            {% empty %}
+            <li class="todo-item" id="todo-empty"
+                style="justify-content:center; color:var(--text-muted, #9ca3af); font-size:0.85rem; padding:1.5rem;">
+                등록된 할 일이 없습니다.
+            </li>
+            {% endfor %}
+        </ul>
     </div>
+
+    <!-- 오른쪽: 퀵 리포트 카드 2개 (세로 배치) -->
+    <div style="display:flex; flex-direction:column; gap:1rem;">
+        <!-- 재고현황 PDF 다운로드 -->
+        <div class="kpi-card"
+            style="cursor:pointer; flex-direction:row; gap:0.75rem; padding:1rem 1.25rem; align-items:center;"
+            onclick="window.location.href='{% url 'tool_admin:dashboard_stock_pdf' %}'">
+            <div class="kpi-icon"
+                style="background: linear-gradient(135deg, #9333ea, #7c3aed); width:40px; height:40px;">
+                <span class="material-icons-outlined" style="font-size:20px;">download</span>
+            </div>
+            <div class="kpi-info" style="gap:0.2rem;">
+                <span class="kpi-label">퀵 리포트</span>
+                <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-color, #111827);">재고현황 PDF</span>
+            </div>
+        </div>
+
+        <!-- 기간별 입출고 이력 PDF -->
+        <div class="kpi-card" style="flex-direction:column; align-items:stretch; gap:0.6rem; padding:1rem 1.25rem;">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+                <div class="kpi-icon"
+                    style="background: linear-gradient(135deg, #f59e0b, #d97706); width:40px; height:40px;">
+                    <span class="material-icons-outlined" style="font-size:20px;">date_range</span>
+                </div>
+                <div class="kpi-info" style="gap:0.2rem;">
+                    <span class="kpi-label">퀵 리포트</span>
+                    <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-color, #111827);">기간별 입출고
+                        이력</span>
+                </div>
+            </div>
+            <form id="history-pdf-form" method="get" action="{% url 'tool_admin:dashboard_history_pdf' %}"
+                style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+                <input type="date" name="start" id="history-start" class="quick-date-input" title="시작일">
+                <span style="color:var(--text-muted, #6b7280); font-size:0.8rem;">~</span>
+                <input type="date" name="end" id="history-end" class="quick-date-input" title="종료일">
+                <button type="submit" class="quick-dl-btn" title="PDF 다운로드">
+                    <span class="material-icons-outlined" style="font-size:1rem;">download</span> PDF
+                </button>
+            </form>
+        </div>
+    </div>
+
 </div>
 
-<!-- ② 최신 데이터 패널 모음 -->
+<!-- ② 최신 데이터 패널 모음 (입고 / 출고) -->
 <div class="dash-grid dash-grid-2">
 
-    <!-- 왼쪽 컬럼: 최근 입고 + 투두리스트 -->
-    <div style="display:flex; flex-direction:column; gap:1rem;">
-        <!-- 최근 입고 처리 내역 -->
-        <div class="dash-panel">
-            <div class="dash-panel-header">
-                <span class="dash-panel-title">
-                    <span class="material-icons-outlined" style="color: #10b981;">move_to_inbox</span>
-                    최근 입고된 장비
-                </span>
-                <a href="{% url 'tool_admin:tool_inventory_inventory_changelist' %}?status__exact=재고"
-                    class="dash-panel-link">재고 전체 보기 →</a>
-            </div>
-            {% if recent_in %}
-            <table class="dash-table">
-                <thead>
-                    <tr>
-                        <th>입고일</th>
-                        <th>품목명</th>
-                        <th>매입처</th>
-                        <th>시리얼</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in recent_in %}
-                    <tr>
-                        <td>{{ item.date|date:"Y-m-d" }}</td>
-                        <td><strong>{{ item.tool.model_name }}</strong></td>
-                        <td class="text-muted">{{ item.supplier.name|default:"-" }}</td>
-                        <td>{{ item.serial|default:"-" }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="dash-empty">
-                <span class="material-icons-outlined">inbox</span>
-                최근 입고된 내역이 없습니다.
-            </div>
-            {% endif %}
+    <!-- 최근 입고 (그룹핑) -->
+    <div class="dash-panel">
+        <div class="dash-panel-header">
+            <span class="dash-panel-title">
+                <span class="material-icons-outlined" style="color: #10b981;">move_to_inbox</span>
+                최근 입고된 장비
+            </span>
+            <a href="{% url 'tool_admin:tool_inventory_inventory_changelist' %}?status__exact=재고"
+                class="dash-panel-link">재고 전체 보기 →</a>
         </div>
-
-        <!-- 투두리스트 -->
-        <div class="dash-panel" id="todo-panel">
-            <div class="dash-panel-header">
-                <span class="dash-panel-title">
-                    <span class="material-icons-outlined" style="color: #f59e0b;">checklist</span>
-                    할 일 목록
-                    {% if todo_pending_count %}
-                    <span class="dash-panel-badge" style="background: #f59e0b;">{{ todo_pending_count }}</span>
-                    {% endif %}
-                </span>
-            </div>
-            <!-- 입력 영역 -->
-            <div class="todo-input-row">
-                <input type="text" id="todo-input" class="todo-input" placeholder="새로운 할 일을 입력하세요..."
-                    autocomplete="off">
-                <button type="button" id="todo-add-btn" class="todo-add-btn">
-                    <span class="material-icons-outlined" style="font-size:1rem;">add</span> 추가
-                </button>
-            </div>
-            <!-- 목록 -->
-            <ul class="todo-list" id="todo-list">
-                {% for todo in todo_items %}
-                <li class="todo-item" data-id="{{ todo.id }}">
-                    <input type="checkbox" class="todo-checkbox" {% if todo.is_done %}checked{% endif %}>
-                    <span class="todo-text {% if todo.is_done %}done{% endif %}">{{ todo.title }}</span>
-                    <button type="button" class="todo-delete" title="삭제">
-                        <span class="material-icons-outlined" style="font-size:1.1rem;">close</span>
-                    </button>
-                </li>
-                {% empty %}
-                <li class="todo-item" id="todo-empty"
-                    style="justify-content:center; color:var(--text-muted, #9ca3af); font-size:0.85rem; padding:1.5rem;">
-                    등록된 할 일이 없습니다.
-                </li>
+        {% if recent_in %}
+        <table class="dash-table">
+            <thead>
+                <tr>
+                    <th>입고일</th>
+                    <th>품목명</th>
+                    <th>매입처</th>
+                    <th style="text-align:center;">수량</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in recent_in %}
+                <tr>
+                    <td>{{ item.date|date:"Y-m-d" }}</td>
+                    <td><strong>{{ item.tool__model_name }}</strong></td>
+                    <td class="text-muted">{{ item.supplier__name|default:"-" }}</td>
+                    <td style="text-align:center; font-weight:600;">{{ item.count }}개</td>
+                </tr>
                 {% endfor %}
-            </ul>
+            </tbody>
+        </table>
+        {% else %}
+        <div class="dash-empty">
+            <span class="material-icons-outlined">inbox</span>
+            최근 입고된 내역이 없습니다.
         </div>
+        {% endif %}
     </div>
 
-    <!-- 최근 출고 완료 -->
+    <!-- 최근 출고 (그룹핑) -->
     <div class="dash-panel">
         <div class="dash-panel-header">
             <span class="dash-panel-title">
@@ -557,16 +558,16 @@
                     <th>출고일</th>
                     <th>품목명</th>
                     <th>출고 현장</th>
-                    <th>시리얼</th>
+                    <th style="text-align:center;">수량</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in recent_out %}
                 <tr>
                     <td>{{ item.release_date|date:"Y-m-d" }}</td>
-                    <td><strong>{{ item.tool.model_name }}</strong></td>
-                    <td class="text-muted">{{ item.release_company.name|default:"-" }}</td>
-                    <td>{{ item.serial|default:"-" }}</td>
+                    <td><strong>{{ item.tool__model_name }}</strong></td>
+                    <td class="text-muted">{{ item.release_company__name|default:"-" }}</td>
+                    <td style="text-align:center; font-weight:600;">{{ item.count }}개</td>
                 </tr>
                 {% endfor %}
             </tbody>
