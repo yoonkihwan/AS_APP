@@ -21,6 +21,281 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
     def app_index(self, request, app_label, extra_context=None):
         return HttpResponseRedirect(reverse('tool_admin:index'))
 
+    def get_urls(self):
+        custom_urls = [
+            path('dashboard/stock-pdf/', self.admin_view(self.dashboard_stock_pdf), name='dashboard_stock_pdf'),
+            path('dashboard/history-pdf/', self.admin_view(self.dashboard_history_pdf), name='dashboard_history_pdf'),
+        ]
+        return custom_urls + super().get_urls()
+
+    def dashboard_stock_pdf(self, request):
+        """대시보드 원클릭: 현재 재고 현황 PDF 다운로드"""
+        import io, os, textwrap
+        from django.http import FileResponse
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from django.db.models import Q
+        from master_data.models import Tool
+
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+
+        font_name = 'Helvetica'
+        try:
+            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('Malgun', font_path))
+                font_name = 'Malgun'
+        except Exception:
+            pass
+
+        from .models import Inventory
+        tools_with_stock = Tool.objects.filter(
+            inventory__status='재고'
+        ).distinct().select_related('brand').order_by('brand__name', 'model_name')
+
+        c.setFont(font_name, 16)
+        c.drawString(50, 800, "현재 재고 내역")
+        c.setFont(font_name, 10)
+        c.drawRightString(550, 800, f"출력일: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+
+        y = 750
+        current_brand = None
+
+        for tool in tools_with_stock:
+            if y < 100:
+                c.showPage()
+                y = 800
+                current_brand = None
+
+            if tool.brand != current_brand:
+                current_brand = tool.brand
+                c.setFont(font_name, 12)
+                brand_name = current_brand.name if current_brand else "미지정"
+                c.setStrokeColorRGB(0.7, 0.7, 0.7)
+                c.line(50, y + 15, 550, y + 15)
+                c.setStrokeColorRGB(0, 0, 0)
+                c.drawString(50, y, f"■ 브랜드: {brand_name}")
+                y -= 25
+
+            invs = Inventory.objects.filter(tool=tool, status='재고').order_by('date')
+            count = invs.count()
+            serials = [inv.serial for inv in invs if inv.serial]
+            no_serial_count = invs.filter(Q(serial__isnull=True) | Q(serial__exact='')).count()
+
+            parts = []
+            if serials:
+                parts.append(", ".join(serials))
+            if no_serial_count > 0:
+                parts.append(f"S/N 없음: {no_serial_count}개")
+            serial_text = " / ".join(parts) if parts else "재고 없음"
+
+            name_lines = textwrap.wrap(tool.model_name, width=42)
+            serial_lines = textwrap.wrap(serial_text, width=46)
+            if not serial_lines:
+                serial_lines = [""]
+            if not name_lines:
+                name_lines = [""]
+
+            max_lines = max(len(name_lines), len(serial_lines))
+            c.setFont(font_name, 10)
+
+            for i in range(max_lines):
+                if y < 70:
+                    c.showPage()
+                    y = 800
+                    c.setFont(font_name, 10)
+                if i == 0:
+                    c.drawString(60, y, "•")
+                    c.drawRightString(320, y, f"수량: {count}개")
+                    c.drawString(340, y, "내역:")
+                    s_x = 365
+                else:
+                    s_x = 340
+                if i < len(name_lines):
+                    c.drawString(70, y, name_lines[i])
+                if i < len(serial_lines):
+                    c.drawString(s_x, y, serial_lines[i])
+                y -= 16
+            y -= 4
+
+        c.save()
+        buffer.seek(0)
+        filename = f"tool_stock_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        return FileResponse(buffer, as_attachment=True, filename=filename)
+
+    def dashboard_history_pdf(self, request):
+        """대시보드: 기간별 입출고 이력 PDF 다운로드"""
+        import io, os, textwrap
+        from datetime import date, datetime
+        from django.http import FileResponse
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from .models import Inventory
+        from django.db.models import Q
+
+        # 쿼리 파라미터에서 시작일/종료일 수신
+        start_str = request.GET.get('start', '')
+        end_str = request.GET.get('end', '')
+
+        today = date.today()
+        if start_str:
+            try:
+                start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
+            except ValueError:
+                start_date = today.replace(day=1)
+        else:
+            start_date = today.replace(day=1)
+
+        if end_str:
+            try:
+                end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
+            except ValueError:
+                end_date = today
+        else:
+            end_date = today
+
+        # 해당 기간 내 입고 또는 출고된 모든 데이터
+        qs_inbound = Inventory.objects.filter(
+            date__gte=start_date, date__lte=end_date
+        ).select_related('tool', 'tool__brand', 'supplier').order_by('date', 'tool__model_name')
+
+        qs_outbound = Inventory.objects.filter(
+            status='출고',
+            release_date__gte=start_date, release_date__lte=end_date
+        ).select_related('tool', 'tool__brand', 'release_company').order_by('release_date', 'tool__model_name')
+
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+
+        font_name = 'Helvetica'
+        try:
+            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('Malgun', font_path))
+                font_name = 'Malgun'
+        except Exception:
+            pass
+
+        period_label = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
+
+        # ─── 입고 내역 섹션 ───
+        c.setFont(font_name, 16)
+        c.drawString(50, 800, "입출고 이력 보고서")
+        c.setFont(font_name, 10)
+        c.drawRightString(550, 800, f"출력일: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+        c.setFont(font_name, 11)
+        c.drawString(50, 778, f"조회 기간: {period_label}")
+
+        y = 748
+
+        # ── 입고 테이블 ──
+        c.setFont(font_name, 13)
+        c.setFillColorRGB(0.06, 0.72, 0.51)
+        c.drawString(50, y, f"■ 입고 내역 ({qs_inbound.count()}건)")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 22
+
+        if qs_inbound.exists():
+            # 테이블 헤더
+            c.setFont(font_name, 9)
+            c.setFillColorRGB(0.4, 0.4, 0.4)
+            c.drawString(55, y, "입고일")
+            c.drawString(120, y, "품목명")
+            c.drawString(310, y, "입고처")
+            c.drawString(430, y, "시리얼")
+            c.setFillColorRGB(0, 0, 0)
+            y -= 4
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
+            c.line(50, y, 550, y)
+            c.setStrokeColorRGB(0, 0, 0)
+            y -= 14
+
+            c.setFont(font_name, 9)
+            for inv in qs_inbound:
+                if y < 60:
+                    c.showPage()
+                    y = 800
+                    c.setFont(font_name, 9)
+                date_str = inv.date.strftime('%Y-%m-%d') if inv.date else "-"
+                tool_name = str(inv.tool) if inv.tool else "-"
+                if len(tool_name) > 28:
+                    tool_name = tool_name[:27] + "…"
+                supplier_name = inv.supplier.name if inv.supplier else "-"
+                if len(supplier_name) > 18:
+                    supplier_name = supplier_name[:17] + "…"
+                serial = inv.serial if inv.serial else "-"
+
+                c.drawString(55, y, date_str)
+                c.drawString(120, y, tool_name)
+                c.drawString(310, y, supplier_name)
+                c.drawString(430, y, serial)
+                y -= 14
+        else:
+            c.setFont(font_name, 10)
+            c.drawString(55, y, "해당 기간 내 입고 내역이 없습니다.")
+            y -= 18
+
+        # ── 출고 테이블 ──
+        y -= 20
+        if y < 120:
+            c.showPage()
+            y = 800
+
+        c.setFont(font_name, 13)
+        c.setFillColorRGB(0.23, 0.51, 0.96)
+        c.drawString(50, y, f"■ 출고 내역 ({qs_outbound.count()}건)")
+        c.setFillColorRGB(0, 0, 0)
+        y -= 22
+
+        if qs_outbound.exists():
+            c.setFont(font_name, 9)
+            c.setFillColorRGB(0.4, 0.4, 0.4)
+            c.drawString(55, y, "출고일")
+            c.drawString(120, y, "품목명")
+            c.drawString(310, y, "출고처")
+            c.drawString(430, y, "시리얼")
+            c.setFillColorRGB(0, 0, 0)
+            y -= 4
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
+            c.line(50, y, 550, y)
+            c.setStrokeColorRGB(0, 0, 0)
+            y -= 14
+
+            c.setFont(font_name, 9)
+            for inv in qs_outbound:
+                if y < 60:
+                    c.showPage()
+                    y = 800
+                    c.setFont(font_name, 9)
+                date_str = inv.release_date.strftime('%Y-%m-%d') if inv.release_date else "-"
+                tool_name = str(inv.tool) if inv.tool else "-"
+                if len(tool_name) > 28:
+                    tool_name = tool_name[:27] + "…"
+                company_name = inv.release_company.name if inv.release_company else "-"
+                if len(company_name) > 18:
+                    company_name = company_name[:17] + "…"
+                serial = inv.serial if inv.serial else "-"
+
+                c.drawString(55, y, date_str)
+                c.drawString(120, y, tool_name)
+                c.drawString(310, y, company_name)
+                c.drawString(430, y, serial)
+                y -= 14
+        else:
+            c.setFont(font_name, 10)
+            c.drawString(55, y, "해당 기간 내 출고 내역이 없습니다.")
+            y -= 18
+
+        c.save()
+        buffer.seek(0)
+        filename = f"inventory_history_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.pdf"
+        return FileResponse(buffer, as_attachment=True, filename=filename)
+
 tool_admin_site = ToolInventoryAdminSite(name='tool_admin')
 
 # ── Register AS_APP models for autocomplete functionality in Tool Inventory ──

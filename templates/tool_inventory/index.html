@@ -341,12 +341,60 @@
     .dark .todo-text.done {
         color: #64748b;
     }
+
+    /* ── 퀵 리포트 카드 ── */
+    .quick-date-input {
+        padding: 0.35rem 0.5rem;
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.4rem;
+        font-size: 0.78rem;
+        background: transparent;
+        color: var(--text-color, #374151);
+        outline: none;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .quick-date-input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+    }
+
+    .quick-dl-btn {
+        padding: 0.35rem 0.7rem;
+        border-radius: 0.4rem;
+        border: none;
+        background: #f59e0b;
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        transition: background 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .quick-dl-btn:hover {
+        background: #d97706;
+    }
+
+    .dark .quick-date-input {
+        background: #1a2332;
+        border-color: #334155;
+        color: #f1f5f9;
+    }
+
+    .dark .quick-date-input::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- ① KPI 요약 영역 -->
+<!-- ① KPI 요약 + 퀵 리포트 영역 (4열 그리드) -->
 <div class="dash-grid dash-grid-4">
     <!-- 보유 재고 총계 -->
     <div class="kpi-card">
@@ -370,6 +418,42 @@
             <span class="kpi-metric">{{ total_released|default:"0" }}<span
                     style="font-size: 0.9rem; font-weight: 500; margin-left: 2px;">개</span></span>
         </div>
+    </div>
+
+    <!-- 재고현황 PDF 다운로드 -->
+    <div class="kpi-card" style="cursor:pointer;"
+        onclick="window.location.href='{% url 'tool_admin:dashboard_stock_pdf' %}'">
+        <div class="kpi-icon" style="background: linear-gradient(135deg, #9333ea, #7c3aed);">
+            <span class="material-icons-outlined">download</span>
+        </div>
+        <div class="kpi-info">
+            <span class="kpi-label">퀵 리포트</span>
+            <span style="font-size: 1rem; font-weight: 700; color: var(--text-color, #111827);">📄 재고현황 PDF</span>
+        </div>
+    </div>
+
+    <!-- 기간별 입출고 이력 PDF -->
+    <div class="kpi-card" style="flex-direction:column; align-items:stretch; gap:0.6rem; padding:1rem 1.25rem;">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+            <div class="kpi-icon"
+                style="background: linear-gradient(135deg, #f59e0b, #d97706); width:40px; height:40px;">
+                <span class="material-icons-outlined" style="font-size:20px;">date_range</span>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">퀵 리포트</span>
+                <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-color, #111827);">📋 기간별 입출고
+                    이력</span>
+            </div>
+        </div>
+        <form id="history-pdf-form" method="get" action="{% url 'tool_admin:dashboard_history_pdf' %}"
+            style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+            <input type="date" name="start" id="history-start" class="quick-date-input" title="시작일">
+            <span style="color:var(--text-muted, #6b7280); font-size:0.8rem;">~</span>
+            <input type="date" name="end" id="history-end" class="quick-date-input" title="종료일">
+            <button type="submit" class="quick-dl-btn" title="PDF 다운로드">
+                <span class="material-icons-outlined" style="font-size:1rem;">download</span> PDF
+            </button>
+        </form>
     </div>
 </div>
 
@@ -498,6 +582,19 @@
 </div>
 
 <script>
+    // ── 기간별 입출고 이력 날짜 자동 설정 (이번 달) ──
+    (function () {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+        const startEl = document.getElementById('history-start');
+        const endEl = document.getElementById('history-end');
+        if (startEl) startEl.value = `${y}-${m}-01`;
+        if (endEl) endEl.value = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+    })();
+
+    // ── 투두리스트 로직 ──
     (function () {
         const todoList = document.getElementById('todo-list');
         const todoInput = document.getElementById('todo-input');
