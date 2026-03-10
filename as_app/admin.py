@@ -1237,29 +1237,120 @@ class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
             status__in=[ASTicket.Status.REPAIRED, ASTicket.Status.SHIPPED]
         )
 
-    @unfold_action(description="📄 선택 항목 견적서 출력 (PDF 다운로드)")
+    def get_urls(self):
+        urls = super().get_urls()
+        from django.urls import path
+        custom_urls = [
+            path(
+                "estimate-preview/",
+                self.admin_site.admin_view(self.estimate_preview_view),
+                name="as_app_estimateticket_estimate_preview",
+            ),
+        ]
+        return custom_urls + set(urls) if isinstance(urls, set) else custom_urls + urls
+
+    @unfold_action(description="📄 선택 항목 견적서 출력 (미리보기)")
     def export_estimate(self, request, queryset):
-        from .utils.pdf_export import generate_pdf_estimate
-        from django.http import FileResponse
-        
-        try:
-            buffer = generate_pdf_estimate(queryset)
+        """선택된 티켓들을 미리보기 페이지로 넘깁니다."""
+        selected_ids = ",".join(str(obj.pk) for obj in queryset)
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse
+        url = reverse("admin:as_app_estimateticket_estimate_preview")
+        return HttpResponseRedirect(f"{url}?ids={selected_ids}")
+
+    def estimate_preview_view(self, request):
+        """견적서 커스텀 미리보기 뷰"""
+        from django.template.response import TemplateResponse
+        from django.http import HttpResponseRedirect, FileResponse
+        from django.urls import reverse
+        import json
+
+        if request.method == "POST":
+            data_json = request.POST.get("estimate_data")
+            if not data_json:
+                from django.contrib import messages
+                messages.error(request, "전송된 견적서 데이터가 없습니다.")
+                return HttpResponseRedirect(reverse("admin:as_app_estimateticket_changelist"))
             
-            # 견적서 추출 상태 업데이트
-            queryset.update(estimate_status=True)
-            
-            response = FileResponse(
-                buffer, 
-                as_attachment=True, 
-                filename="estimate_demo.pdf",
-                content_type="application/pdf"
-            )
-            return response
-            
-        except Exception as e:
+            try:
+                custom_data_list = json.loads(data_json)
+                
+                # 견적서 상태 업데이트
+                ticket_ids = [int(item["ticket_id"]) for item in custom_data_list if "ticket_id" in item and item["ticket_id"]]
+                if ticket_ids:
+                    ASTicket.objects.filter(id__in=ticket_ids).update(estimate_status=True)
+
+                from .utils.pdf_export import generate_custom_pdf_estimate
+                buffer = generate_custom_pdf_estimate(custom_data_list)
+
+                return FileResponse(
+                    buffer, 
+                    as_attachment=True, 
+                    filename="estimate_custom.pdf",
+                    content_type="application/pdf"
+                )
+            except Exception as e:
+                from django.contrib import messages
+                messages.error(request, f"견적서 추출 중 오류가 발생했습니다: {str(e)}")
+                return HttpResponseRedirect(reverse("admin:as_app_estimateticket_changelist"))
+
+        ids_str = request.GET.get("ids", "")
+        if not ids_str:
             from django.contrib import messages
-            messages.error(request, f"견적서 추출 중 오류가 발생했습니다: {str(e)}")
-            return None
+            messages.warning(request, "선택된 항목이 없습니다.")
+            return HttpResponseRedirect(reverse("admin:as_app_estimateticket_changelist"))
+
+        ticket_ids = [int(pk) for pk in ids_str.split(",") if pk.isdigit()]
+        tickets = ASTicket.objects.filter(id__in=ticket_ids).select_related("company", "tool", "tool__brand").prefetch_related("used_parts")
+
+        if not tickets.exists():
+            from django.contrib import messages
+            messages.warning(request, "선택된 항목을 찾을 수 없습니다.")
+            return HttpResponseRedirect(reverse("admin:as_app_estimateticket_changelist"))
+
+        tickets_data = []
+        for ticket in tickets:
+            company = ticket.company
+            company_name = company.name if company else "업체미정"
+            model_name = ticket.tool.model_name if ticket.tool else "품목미정"
+            serial_number = ticket.serial_number if ticket.serial_number else ""
+            
+            parts = []
+            part_sum = 0
+            for part in ticket.used_parts.all():
+                price = part.get_price_for_company(company)
+                part_sum += price
+                parts.append({
+                    "name": part.name,
+                    "code": part.code or "",
+                    "quantity": 1,
+                    "unit_price": price,
+                    "amount": price,
+                    "remark": ""
+                })
+
+            tickets_data.append({
+                "ticket_id": ticket.id,
+                "company_name": company_name,
+                "model_name": model_name,
+                "serial_number": serial_number,
+                "parts": parts,
+                "total_price": part_sum,
+                "nego_price": int(part_sum * 0.9)
+            })
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "견적서 미리보기 및 수정",
+            "opts": self.model._meta,
+            "tickets_data_json": json.dumps(tickets_data),
+        }
+
+        return TemplateResponse(
+            request,
+            "admin/as_app/estimate_preview.html",
+            context,
+        )
 
     def has_add_permission(self, request):
         return False

@@ -59,15 +59,35 @@ class ToolToolAdmin(ModelAdmin):
 @admin.register(Inventory, site=tool_admin_site)
 class InventoryAdmin(ModelAdmin):
     list_display = (
-        'display_status', 'date', 'supplier', 'tool', 'serial', 
-        'release_company', 'release_date', 'display_edit_button'
+        'display_status', 'date', 'supplier_text', 'release_date', 'release_company', 
+        'tool_text', 'serial', 'usage_process', 'display_edit_button'
     )
     list_display_links = None
     actions = ['cancel_outbound', 'export_selected_to_pdf', 'export_selected_to_excel']
     list_filter = ('status', 'supplier', 'release_company')
-    search_fields = ('tool__model_name', 'tool__brand__name', 'serial', 'supplier__name', 'release_company__name')
+    search_fields = ('tool__model_name', 'tool__brand__name', 'serial', 'supplier__name', 'release_company__name', 'usage_process')
     list_per_page = 50
     autocomplete_fields = ('tool', 'supplier', 'release_company')
+
+    def get_ordering(self, request):
+        """필터 컨텍스트에 따른 동적 정렬:
+        - 출고 상태 필터 또는 출고처 필터 선택 시 → 출고일자 최신순 우선
+        - 입고처 필터 선택 시 → 입고일자 최신순 우선
+        - 기본 → 입고일자 최신순 + 품목명 오름차순
+        """
+        status_filter = request.GET.get('status__exact', '')
+        supplier_filter = request.GET.get('supplier__id__exact', '')
+        release_company_filter = request.GET.get('release_company__id__exact', '')
+
+        if release_company_filter or status_filter == '출고':
+            # 출고처 필터 또는 출고 상태 필터 → 출고일자 최신순 우선
+            return ['-release_date', 'tool__model_name']
+        elif supplier_filter:
+            # 입고처 필터 → 입고일자 최신순 우선
+            return ['-date', 'tool__model_name']
+
+        # 기본 정렬: 입고일자 최신순 + 품목명 오름차순
+        return ['-date', 'tool__model_name']
 
     class Media:
         css = {"all": ("as_app/css/row_colors.css",)}
@@ -297,12 +317,12 @@ class InventoryAdmin(ModelAdmin):
 
     def get_fields(self, request, obj=None):
         if obj:
-            return ('id', 'date', 'supplier_text', 'tool_text', 'serial', 'release_date', 'release_company', 'status')
-        return ('date', 'supplier', 'tool', 'serial', 'status')
+            return ('id', 'date', 'supplier_text', 'tool_text', 'serial', 'release_date', 'release_company', 'usage_process', 'status')
+        return ('date', 'supplier', 'tool', 'serial', 'usage_process', 'status')
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
-            # 수정 모드: 'serial', 'release_company', 'release_date' 수정 가능
+            # 수정 모드: 'serial', 'release_company', 'release_date', 'usage_process' 수정 가능
             # 입고배치(batch)는 fields에서 제외하여 보이지 않게 함
             # 품목(tool) 및 입고처(supplier)는 단순 텍스트로 표시되어 링크 이동 방지
             return ['id', 'date', 'supplier_text', 'tool_text', 'status']
@@ -487,7 +507,7 @@ class OutboundTicketInline(TabularInline):
     model = OutboundTicket
     fk_name = "batch"
     form = OutboundTicketForm
-    fields = ["brand", "tool", "current_stock", "quantity", "inventories"]
+    fields = ["brand", "tool", "current_stock", "quantity", "inventories", "usage_process"]
     verbose_name = "출고등록 티켓"
     verbose_name_plural = "출고등록 티켓"
     extra = 0
@@ -536,6 +556,7 @@ class OutboundBatchAdmin(ModelAdmin):
                         inv.release_date = instance.batch.release_date
                         inv.release_company = instance.batch.release_company
                         inv.status = '출고'
+                        inv.usage_process = instance.usage_process
                         inv.save()
                         instance.inventories.add(inv)
                 else:
@@ -544,6 +565,7 @@ class OutboundBatchAdmin(ModelAdmin):
                         inv.release_date = instance.batch.release_date
                         inv.release_company = instance.batch.release_company
                         inv.status = '출고'
+                        inv.usage_process = instance.usage_process
                         inv.save()
                         
                 instance.quantity = instance.inventories.count()

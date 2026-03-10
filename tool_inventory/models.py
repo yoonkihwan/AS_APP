@@ -63,6 +63,13 @@ class OutboundTicket(models.Model):
         verbose_name="출고 대상 (시리얼 다중선택)",
         limit_choices_to={'status': '재고'}
     )
+    usage_process = models.CharField(
+        "적용공정/용도",
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="[선택] 출고 시 현장 적용 공정이나 용도를 기입"
+    )
 
     class Meta:
         verbose_name = "출고등록 티켓"
@@ -119,11 +126,12 @@ class Inventory(models.Model):
     )
     
     status = models.CharField("상태", max_length=10, choices=STATUS_CHOICES, default='재고')
+    usage_process = models.CharField("적용공정/용도", max_length=50, blank=True, null=True)
 
     class Meta:
         verbose_name = "통합 입출고 이력"
         verbose_name_plural = "통합 입출고 이력"
-        ordering = ['-date']
+        ordering = ['-date', 'tool__model_name']
 
     def __str__(self):
         base_str = f"[{self.status}] {self.tool.model_name}"

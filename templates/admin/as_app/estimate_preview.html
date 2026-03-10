@@ -1,0 +1,413 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}견적서 미리보기 및 수정 | {{ site_title }}{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+<style>
+    .preview-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+
+    .header-section {
+        margin-bottom: 2rem;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-color, #111827);
+        margin-bottom: 0.5rem;
+    }
+
+    .dark .page-title {
+        color: #f8fafc;
+    }
+
+    .page-desc {
+        font-size: 0.9rem;
+        color: var(--text-muted, #64748b);
+        line-height: 1.5;
+    }
+
+    .dark .page-desc {
+        color: #94a3b8;
+    }
+
+    .ticket-card {
+        background: var(--color-bg, #ffffff);
+        border: 1px solid var(--border-color, #e2e8f0);
+        border-radius: 0.75rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    .dark .ticket-card {
+        background: #1e293b;
+        border-color: #334155;
+    }
+
+    .ticket-header {
+        padding: 1.25rem;
+        border-bottom: 1px solid var(--border-color, #e2e8f0);
+        background: #f8fafc;
+    }
+
+    .dark .ticket-header {
+        background: #0f172a;
+        border-color: #334155;
+    }
+
+    .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border-color, #cbd5e1);
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        background: #fff;
+        color: #334155;
+        transition: border-color 0.15s;
+    }
+
+    .dark .form-input {
+        background: #0f172a;
+        border-color: #475569;
+        color: #e2e8f0;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #6366f1;
+    }
+
+    .parts-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .parts-table th {
+        background: #f1f5f9;
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #475569;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .dark .parts-table th {
+        background: #1e293b;
+        color: #94a3b8;
+        border-color: #334155;
+    }
+
+    .parts-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        vertical-align: middle;
+    }
+
+    .dark .parts-table td {
+        border-color: #334155;
+    }
+
+    .w-20 {
+        width: 5rem;
+    }
+
+    .w-32 {
+        width: 8rem;
+    }
+
+    .w-16 {
+        width: 4rem;
+    }
+
+    .text-center {
+        text-align: center;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .btn-icon {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 0.25rem;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+    }
+
+    .btn-icon:hover {
+        opacity: 1;
+        background: #fee2e2;
+    }
+
+    .dark .btn-icon:hover {
+        background: #7f1d1d;
+    }
+
+    .btn-add {
+        background: none;
+        border: 1px dashed #cbd5e1;
+        color: #64748b;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        cursor: pointer;
+        width: 100%;
+        transition: all 0.2s;
+    }
+
+    .dark .btn-add {
+        border-color: #475569;
+        color: #94a3b8;
+    }
+
+    .btn-add:hover {
+        border-color: #6366f1;
+        color: #6366f1;
+        background: #eef2ff;
+    }
+
+    .dark .btn-add:hover {
+        background: rgba(99, 102, 241, 0.1);
+    }
+
+    .action-bar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .dark .action-bar {
+        border-color: #334155;
+    }
+
+    .btn {
+        padding: 0.625rem 1.5rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+    }
+
+    .btn-cancel {
+        background: #fff;
+        border-color: #d1d5db;
+        color: #374151;
+    }
+
+    .dark .btn-cancel {
+        background: #1e293b;
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    .btn-cancel:hover {
+        background: #f3f4f6;
+    }
+
+    .dark .btn-cancel:hover {
+        background: #334155;
+    }
+
+    .btn-submit {
+        background: #6366f1;
+        color: #fff;
+    }
+
+    .btn-submit:hover {
+        background: #4f46e5;
+    }
+</style>
+
+<div class="preview-container">
+    <div class="header-section">
+        <h2 class="page-title">📄 견적서 미리보기 및 수정</h2>
+        <p class="page-desc">출력될 견적서의 내용을 확인하고 필요한 항목(금액, 수량, 품명)을 수정하거나 추가/삭제할 수 있습니다.<br>※ 이 화면에서의 수정은 원본 수리 기록에 반영되지
+            않고 <strong>견적서 출력용</strong>으로만 사용됩니다.</p>
+    </div>
+
+    <form method="post" id="estimateForm">
+        {% csrf_token %}
+        <input type="hidden" name="estimate_data" id="estimate_data" value="">
+
+        <div id="ticketsContainer"></div>
+
+        <div class="action-bar">
+            <a href="{% url 'admin:as_app_estimateticket_changelist' %}" class="btn btn-cancel">취소</a>
+            <button type="submit" class="btn btn-submit" id="submitBtn">PDF 다운로드</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    const ticketsData = JSON.parse('{{ tickets_data_json|escapejs }}');
+
+    function renderTickets() {
+        const container = document.getElementById('ticketsContainer');
+        container.innerHTML = '';
+
+        ticketsData.forEach((ticket, t_idx) => {
+            let partsHtml = ticket.parts.map((part, p_idx) => `
+                <tr class="part-row">
+                    <td><input type="text" class="form-input" value="${part.name}" onchange="updatePart(${t_idx}, ${p_idx}, 'name', this.value)"></td>
+                    <td><input type="text" class="form-input" value="${part.code}" onchange="updatePart(${t_idx}, ${p_idx}, 'code', this.value)"></td>
+                    <td><input type="number" class="form-input text-center w-20" value="${part.quantity}" min="1" onchange="updatePart(${t_idx}, ${p_idx}, 'quantity', this.value)"></td>
+                    <td><input type="number" class="form-input text-right w-32" value="${part.unit_price}" min="0" onchange="updatePart(${t_idx}, ${p_idx}, 'unit_price', this.value)"></td>
+                    <td class="text-right font-medium part-amount dark:text-gray-300" style="color: #334155;">${parseInt(part.amount).toLocaleString()}</td>
+                    <td><input type="text" class="form-input" value="${part.remark}" onchange="updatePart(${t_idx}, ${p_idx}, 'remark', this.value)"></td>
+                    <td class="text-center"><button type="button" class="btn-icon btn-danger" onclick="removePart(${t_idx}, ${p_idx})" title="삭제">❌</button></td>
+                </tr>
+            `).join('');
+
+            if (ticket.parts.length === 0) {
+                partsHtml = `<tr><td colspan="7" class="text-center text-gray-400 py-4 dark:text-slate-500">부품 내역이 없습니다. 하단에서 항목을 추가하세요.</td></tr>`;
+            }
+
+            let ticketHtml = `
+                <div class="ticket-card">
+                    <div class="ticket-header">
+                        <div class="grid-3">
+                            <div>
+                                <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; display: block; color: var(--text-muted, #64748b);">업체명</label>
+                                <input type="text" class="form-input" style="font-weight: 600;" value="${ticket.company_name}" onchange="updateTicket(${t_idx}, 'company_name', this.value)">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; display: block; color: var(--text-muted, #64748b);">모델명 (제 목)</label>
+                                <input type="text" class="form-input" style="font-weight: 600;" value="${ticket.model_name}" onchange="updateTicket(${t_idx}, 'model_name', this.value)">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; display: block; color: var(--text-muted, #64748b);">시리얼 번호</label>
+                                <input type="text" class="form-input" value="${ticket.serial_number}" onchange="updateTicket(${t_idx}, 'serial_number', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <table class="parts-table">
+                            <thead>
+                                <tr>
+                                    <th>Description (품명)</th>
+                                    <th>Model (코드)</th>
+                                    <th class="text-center w-20">Qty</th>
+                                    <th class="text-right w-32">Unit Price</th>
+                                    <th class="text-right w-32">Amount</th>
+                                    <th>Remark (비고)</th>
+                                    <th class="w-16"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${partsHtml}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="7" style="padding: 1rem; border-bottom: none;">
+                                        <button type="button" class="btn-add" onclick="addPart(${t_idx})">+ 항목 추가</button>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div style="background: #f8fafc; padding: 1rem 1.25rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;" class="dark:bg-slate-900 dark:border-slate-700">
+                        <div style="font-size: 0.8rem; color: #64748b;" class="dark:text-slate-400">
+                            ※ 단가 및 수량을 변경하면 합계 금액이 자동으로 재계산됩니다.
+                        </div>
+                        <div class="text-right">
+                            <div style="font-size: 0.875rem; color: #475569; margin-bottom: 0.5rem;" class="dark:text-slate-400">
+                                <span>TOTAL: </span>
+                                <span style="display:inline-block; width:100px; font-weight: 700; color: #1e293b;" class="dark:text-slate-200">
+                                    ${parseInt(ticket.total_price).toLocaleString()}
+                                </span>
+                            </div>
+                            <div style="font-size: 1rem; font-weight: 700; color: #4f46e5;" class="dark:text-indigo-400">
+                                최종네고가: 
+                                <input type="number" class="form-input" style="display:inline-block; width: 8rem; margin-left: 0.5rem; text-align: right; font-weight: 700;" value="${ticket.nego_price}" onchange="updateTicket(${t_idx}, 'nego_price', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += ticketHtml;
+        });
+    }
+
+    function calculateTotal(t_idx) {
+        let ticket = ticketsData[t_idx];
+        ticket.total_price = 0;
+        ticket.parts.forEach(part => {
+            part.amount = parseInt(part.quantity) * parseInt(part.unit_price) || 0;
+            ticket.total_price += part.amount;
+        });
+        ticket.nego_price = Math.floor(ticket.total_price * 0.9);
+        renderTickets();
+    }
+
+    function updatePart(t_idx, p_idx, field, value) {
+        if (field === 'quantity' || field === 'unit_price') {
+            ticketsData[t_idx].parts[p_idx][field] = parseInt(value) || 0;
+            calculateTotal(t_idx);
+        } else {
+            ticketsData[t_idx].parts[p_idx][field] = value;
+        }
+    }
+
+    function removePart(t_idx, p_idx) {
+        ticketsData[t_idx].parts.splice(p_idx, 1);
+        calculateTotal(t_idx);
+    }
+
+    function addPart(t_idx) {
+        ticketsData[t_idx].parts.push({
+            name: "",
+            code: "",
+            quantity: 1,
+            unit_price: 0,
+            amount: 0,
+            remark: ""
+        });
+        calculateTotal(t_idx);
+    }
+
+    function updateTicket(t_idx, field, value) {
+        if (field === 'nego_price') {
+            ticketsData[t_idx][field] = parseInt(value) || 0;
+        } else {
+            ticketsData[t_idx][field] = value;
+        }
+    }
+
+    document.getElementById('estimateForm').addEventListener('submit', function (e) {
+        document.getElementById('estimate_data').value = JSON.stringify(ticketsData);
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        renderTickets();
+    });
+</script>
+{% endblock %}
