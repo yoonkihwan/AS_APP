@@ -229,7 +229,7 @@ def sidebar_callback(request):
                 ],
             },
             {
-                "title": "기준 정보 (AS관리 와 연동됨)",
+                "title": "기준 정보",
                 "separator": True,
                 "items": [
                     {
@@ -471,7 +471,7 @@ def site_title_callback(request):
 
 def site_header_callback(request):
     if request.path.startswith('/inventory/'):
-        return "TOOL 입출고 관리"
+        return "툴 입출고 관리"
     elif request.path.startswith('/sysadmin/'):
         return "시스템 권한 승인 센터"
     elif request.path.startswith('/hr/'):
