@@ -79,6 +79,7 @@ from .models import (
     InboundTicket,
     OutboundTicket,
     OutsourceCompany,
+    OutsourcedTicket,
     Part,
     RepairPreset,
     RepairTicket,
@@ -614,6 +615,7 @@ class InboundBatchAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
         # 2) 기존 활성 티켓과 중복 체크
         active_statuses = [
             ASTicket.Status.INBOUND,
+            ASTicket.Status.OUTSOURCED,
             ASTicket.Status.REPAIRED,
         ]
         conflicts = []
@@ -780,6 +782,7 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
             .filter(
                 status__in=[
                     ASTicket.Status.INBOUND,
+                    ASTicket.Status.OUTSOURCED,
                 ]
             )
             .select_related("company", "tool", "tool__brand")
@@ -800,6 +803,8 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
         """M2M 저장 후 사용 부품/공임 단가 합산으로 AS 비용 자동 계산 + 수리완료 상태 변경"""
         super().save_related(request, form, formsets, change)
         obj = form.instance
+
+        # 기존 부품 선택 로직 (수리완료)
         total_parts = sum(part.get_price_for_company(obj.company) for part in obj.used_parts.all())
         nego_price = int(total_parts * 0.9)  # 네고가 (10% 할인)
         total_with_vat = int(nego_price * 1.1)  # 부가세 10% 포함
@@ -885,6 +890,104 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
             Q(tools__id=tool_id) | Q(tools__isnull=True)
         ).distinct().values("id", "name", "code", "price")
         return JsonResponse({"parts": list(parts)})
+
+
+@admin.register(OutsourcedTicket)
+class OutsourcedTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "수리 의뢰 등록"
+    """수리 의뢰 등록 - 입고 목록에서 선택하여 수리의뢰 처리"""
+
+    list_display = [
+        "display_status",
+        "inbound_date",
+        "company",
+        "tool",
+        "serial_number",
+        "symptom",
+    ]
+    list_display_links = None  # 행 클릭 시 상세 페이지 이동 안 함 (체크만)
+    list_filter = ["company", "tool__brand"]
+    search_fields = ["serial_number", "company__name", "tool__model_name", "tool__brand__name"]
+    list_per_page = 30
+    actions = ["mark_as_outsourced"]
+    ordering = ["-inbound_date", "-created_at"]
+
+    class Media:
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/text_truncate.css")}
+
+    def get_queryset(self, request):
+        """입고 상태인 티켓만 표시"""
+        return (
+            super()
+            .get_queryset(request)
+            .filter(status=ASTicket.Status.INBOUND)
+            .select_related("company", "tool", "tool__brand")
+        )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        if obj is None:
+            return True  # changelist 접근 허용
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @unfold_action(description="📦 선택 항목 수리의뢰 처리")
+    def mark_as_outsourced(self, request, queryset):
+        """외주업체 선택 중간 페이지를 통해 수리의뢰 처리"""
+        from django.template.response import TemplateResponse
+        import datetime
+
+        # 중간 페이지에서 의뢰업체를 선택하고 확인 버튼을 눌렀을 때
+        if request.POST.get("confirm") == "yes":
+            company_id = request.POST.get("outsource_company")
+            date_str = request.POST.get("outsource_date", "")
+            
+            if not company_id:
+                from django.contrib import messages
+                messages.error(request, "의뢰업체를 선택해야 합니다.")
+                return None
+                
+            try:
+                outsource_date = datetime.date.fromisoformat(date_str) if date_str else timezone.localdate()
+            except (ValueError, TypeError):
+                from django.contrib import messages
+                messages.error(request, "올바른 날짜 형식이 아닙니다.")
+                return None
+
+            try:
+                company = OutsourceCompany.objects.get(pk=company_id)
+            except OutsourceCompany.DoesNotExist:
+                from django.contrib import messages
+                messages.error(request, "존재하지 않는 의뢰업체입니다.")
+                return None
+
+            updated = queryset.update(
+                status=ASTicket.Status.OUTSOURCED,
+                outsource_company=company,
+                outsource_date=outsource_date,
+            )
+            from django.contrib import messages
+            messages.success(
+                request,
+                "%d건이 수리의뢰 처리되었습니다. (의뢰업체: %s)" % (updated, company.name)
+            )
+            return None
+
+        # 아직 확인 버튼을 누르지 않은 경우 중간 페이지 렌더링
+        companies = OutsourceCompany.objects.all().order_by("name")
+        context = dict(
+            self.admin_site.each_context(request),
+            title="수리의뢰 처리 (의뢰업체 선택)",
+            queryset=queryset,
+            companies=companies,
+            default_date=timezone.localdate().strftime("%Y-%m-%d"),
+            action_checkbox_name=admin.helpers.ACTION_CHECKBOX_NAME,
+        )
+        return TemplateResponse(request, "admin/as_app/action_outsource.html", context)
 
 
 @admin.register(OutboundTicket)
@@ -1041,6 +1144,7 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
     actions = [
         "revert_shipped_to_repaired",
         "revert_repaired_to_inbound",
+        "revert_outsourced_to_inbound",
         "revert_disposed_to_inbound",
         "reset_estimate_status",
         "reset_tax_invoice",
@@ -1069,6 +1173,15 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
                     "used_parts",
                     "repair_cost",
                     "status",
+                ),
+            },
+        ),
+        (
+            "의뢰 정보",
+            {
+                "fields": (
+                    "outsource_company",
+                    "outsource_date",
                 ),
             },
         ),
@@ -1149,6 +1262,18 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
             request,
             f"{queryset.count()}건이 입고 상태로 되돌려졌습니다. (사용 부품/공임 초기화, 수리 비용 0원)"
         )
+
+    @unfold_action(description="⏪ 수리의뢰 취소 → 입고로 되돌리기")
+    def revert_outsourced_to_inbound(self, request, queryset):
+        if not self._validate_status(request, queryset, ASTicket.Status.OUTSOURCED, "수리의뢰"):
+            return
+        updated = queryset.update(
+            status=ASTicket.Status.INBOUND,
+            outsource_company=None,
+            outsource_date=None,
+        )
+        from django.contrib import messages
+        messages.success(request, f"{updated}건이 입고 상태로 되돌려졌습니다. (의뢰업체/날짜 초기화)")
 
     @unfold_action(description="⏪ 자체폐기 취소 → 입고로 되돌리기")
     def revert_disposed_to_inbound(self, request, queryset):

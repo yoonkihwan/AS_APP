@@ -41,6 +41,11 @@ def dashboard_callback(request, context):
         status=ASTicket.Status.REPAIRED,
     ).count()
 
+    # 4-1. 수리의뢰 중 (외주 의뢰 중)
+    outsourced_count = ASTicket.objects.filter(
+        status=ASTicket.Status.OUTSOURCED,
+    ).count()
+
     # 5. 이번 달 출고
     shipped_month_count = ASTicket.objects.filter(
         status=ASTicket.Status.SHIPPED,
@@ -69,6 +74,13 @@ def dashboard_callback(request, context):
             "footer": "현재 수리 대기 중",
             "icon": "pending_actions",
             "color": "#f59e0b",  # amber
+        },
+        {
+            "title": "수리의뢰 중",
+            "metric": outsourced_count,
+            "footer": "현재 외주 의뢰 중인 건수",
+            "icon": "send",
+            "color": "#eab308",  # yellow
         },
         {
             "title": "수리 완료 (미출고)",

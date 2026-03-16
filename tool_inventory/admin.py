@@ -30,113 +30,155 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
 
     def dashboard_stock_pdf(self, request):
         """대시보드 원클릭: 현재 재고 현황 PDF 다운로드"""
-        import io, os, textwrap
+        import io, os
         from django.http import FileResponse
-        from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from django.db.models import Q
         from master_data.models import Tool
+        from .models import Inventory
+        from django.utils import timezone
 
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
+        elements = []
 
         font_name = 'Helvetica'
+        font_name_bold = 'Helvetica-Bold'
         try:
             font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            font_path_bd = "c:\\Windows\\Fonts\\malgunbd.ttf"
             if os.path.exists(font_path):
                 pdfmetrics.registerFont(TTFont('Malgun', font_path))
                 font_name = 'Malgun'
+                font_name_bold = 'Malgun' # Fallback
+            if os.path.exists(font_path_bd):
+                pdfmetrics.registerFont(TTFont('MalgunBold', font_path_bd))
+                font_name_bold = 'MalgunBold'
         except Exception:
             pass
 
-        from .models import Inventory
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=18, alignment=1, spaceAfter=20
+        )
+        date_style = ParagraphStyle(
+            'CustomDate', parent=styles['Normal'],
+            fontName=font_name, fontSize=10, textColor=colors.gray, alignment=2, spaceAfter=15
+        )
+        normal_style = ParagraphStyle(
+            'CustomNormal', parent=styles['Normal'],
+            fontName=font_name, fontSize=9, leading=14
+        )
+        bold_style = ParagraphStyle(
+            'CustomBold', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=10, leading=14
+        )
+        center_style = ParagraphStyle(
+            'CustomCenter', parent=normal_style, alignment=1
+        )
+
+        elements.append(Paragraph("현재 재고 현황", title_style))
+        elements.append(Paragraph(f"출력일시: {timezone.now().strftime('%Y-%m-%d %H:%M')}", date_style))
+
         tools_with_stock = Tool.objects.filter(
             inventory__status='재고'
         ).distinct().select_related('brand').order_by('brand__name', 'model_name')
 
-        c.setFont(font_name, 16)
-        c.drawString(50, 800, "현재 재고 내역")
-        c.setFont(font_name, 10)
-        c.drawRightString(550, 800, f"출력일: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+        data = []
+        data.append([
+            Paragraph("<b>품목명 (Model)</b>", ParagraphStyle('H1', parent=normal_style, fontName=font_name_bold)),
+            Paragraph("<b>수량 (Qty)</b>", ParagraphStyle('H2', parent=center_style, fontName=font_name_bold)),
+            Paragraph("<b>시리얼 내역 (S/N)</b>", ParagraphStyle('H3', parent=normal_style, fontName=font_name_bold))
+        ])
 
-        y = 750
+        table_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#94a3b8')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+        ])
+
         current_brand = None
+        total_qty = 0
+        row_idx = 1
 
         for tool in tools_with_stock:
-            if y < 100:
-                c.showPage()
-                y = 800
-                current_brand = None
-
             if tool.brand != current_brand:
                 current_brand = tool.brand
-                c.setFont(font_name, 12)
-                brand_name = current_brand.name if current_brand else "미지정"
-                c.setStrokeColorRGB(0.7, 0.7, 0.7)
-                c.line(50, y + 15, 550, y + 15)
-                c.setStrokeColorRGB(0, 0, 0)
-                c.drawString(50, y, f"■ 브랜드: {brand_name}")
-                y -= 25
-
+                brand_name = current_brand.name if current_brand else "미지정 브랜드"
+                data.append([Paragraph(f"■ {brand_name}", bold_style), "", ""])
+                table_style.add('SPAN', (0, row_idx), (-1, row_idx))
+                table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#f1f5f9'))
+                table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 6)
+                table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 6)
+                row_idx += 1
+            
             invs = Inventory.objects.filter(tool=tool, status='재고').order_by('date')
             count = invs.count()
+            total_qty += count
+            
             serials = [inv.serial for inv in invs if inv.serial]
             no_serial_count = invs.filter(Q(serial__isnull=True) | Q(serial__exact='')).count()
-
             parts = []
             if serials:
                 parts.append(", ".join(serials))
             if no_serial_count > 0:
                 parts.append(f"S/N 없음: {no_serial_count}개")
-            serial_text = " / ".join(parts) if parts else "재고 없음"
+            
+            serial_text = " / ".join(parts) if parts else "-"
 
-            name_lines = textwrap.wrap(tool.model_name, width=42)
-            serial_lines = textwrap.wrap(serial_text, width=46)
-            if not serial_lines:
-                serial_lines = [""]
-            if not name_lines:
-                name_lines = [""]
+            data.append([
+                Paragraph(tool.model_name, normal_style),
+                Paragraph(str(count), center_style),
+                Paragraph(serial_text, normal_style)
+            ])
+            table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 6)
+            table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 6)
+            row_idx += 1
 
-            max_lines = max(len(name_lines), len(serial_lines))
-            c.setFont(font_name, 10)
+        data.append([
+            Paragraph("<b>총합계 (Total)</b>", ParagraphStyle('T1', parent=bold_style, alignment=1)),
+            Paragraph(f"<b>{total_qty}</b>", ParagraphStyle('T2', parent=bold_style, alignment=1)),
+            ""
+        ])
+        table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#f8fafc'))
+        table_style.add('LINEABOVE', (0, row_idx), (-1, row_idx), 1, colors.HexColor('#94a3b8'))
+        table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 8)
+        table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 8)
 
-            for i in range(max_lines):
-                if y < 70:
-                    c.showPage()
-                    y = 800
-                    c.setFont(font_name, 10)
-                if i == 0:
-                    c.drawString(60, y, "•")
-                    c.drawRightString(320, y, f"수량: {count}개")
-                    c.drawString(340, y, "내역:")
-                    s_x = 365
-                else:
-                    s_x = 340
-                if i < len(name_lines):
-                    c.drawString(70, y, name_lines[i])
-                if i < len(serial_lines):
-                    c.drawString(s_x, y, serial_lines[i])
-                y -= 16
-            y -= 4
-
-        c.save()
+        colWidths = [150, 60, 325]
+        t = Table(data, colWidths=colWidths, repeatRows=1)
+        t.setStyle(table_style)
+        
+        elements.append(t)
+        doc.build(elements)
         buffer.seek(0)
-        filename = f"tool_stock_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        
+        filename = f"재고현황_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
         return FileResponse(buffer, as_attachment=True, filename=filename)
 
     def dashboard_history_pdf(self, request):
         """대시보드: 기간별 입출고 이력 PDF 다운로드"""
-        import io, os, textwrap
+        import io, os
         from datetime import date, datetime
         from django.http import FileResponse
-        from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from .models import Inventory
-        from django.db.models import Q
+        from django.utils import timezone
 
         # 쿼리 파라미터에서 시작일/종료일 수신
         start_str = request.GET.get('start', '')
@@ -170,130 +212,143 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
         ).select_related('tool', 'tool__brand', 'release_company').order_by('release_date', 'tool__model_name')
 
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
+        elements = []
 
         font_name = 'Helvetica'
+        font_name_bold = 'Helvetica-Bold'
         try:
             font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            font_path_bd = "c:\\Windows\\Fonts\\malgunbd.ttf"
             if os.path.exists(font_path):
                 pdfmetrics.registerFont(TTFont('Malgun', font_path))
                 font_name = 'Malgun'
+                font_name_bold = 'Malgun'
+            if os.path.exists(font_path_bd):
+                pdfmetrics.registerFont(TTFont('MalgunBold', font_path_bd))
+                font_name_bold = 'MalgunBold'
         except Exception:
             pass
 
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=18, alignment=1, spaceAfter=15
+        )
+        date_style = ParagraphStyle(
+            'CustomDate', parent=styles['Normal'],
+            fontName=font_name, fontSize=10, textColor=colors.gray, alignment=2, spaceAfter=5
+        )
+        period_style = ParagraphStyle(
+            'CustomPeriod', parent=styles['Normal'],
+            fontName=font_name, fontSize=11, alignment=1, spaceAfter=25
+        )
+        normal_style = ParagraphStyle(
+            'CustomNormal', parent=styles['Normal'],
+            fontName=font_name, fontSize=9, leading=14
+        )
+        bold_style = ParagraphStyle(
+            'CustomBold', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=10, leading=14
+        )
+        center_style = ParagraphStyle(
+            'CustomCenter', parent=normal_style, alignment=1
+        )
+        
+        # Subtitles (Green for inbound, Blue for outbound)
+        inbound_header_style = ParagraphStyle(
+            'InboundHeader', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=13, textColor=colors.HexColor('#059669'), spaceAfter=10
+        )
+        outbound_header_style = ParagraphStyle(
+            'OutboundHeader', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=13, textColor=colors.HexColor('#2563eb'), spaceAfter=10
+        )
+
         period_label = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
 
+        elements.append(Paragraph("입출고 이력 보고서", title_style))
+        elements.append(Paragraph(f"출력일시: {timezone.now().strftime('%Y-%m-%d %H:%M')}", date_style))
+        elements.append(Paragraph(f"조회 기간: {period_label}", period_style))
+
+        # Common table style
+        base_table_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            ('TOPPADDING', (0, 1), (-1, -1), 6),
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#94a3b8')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+        ])
+        
+        colWidths = [65, 150, 120, 200]
+
         # ─── 입고 내역 섹션 ───
-        c.setFont(font_name, 16)
-        c.drawString(50, 800, "입출고 이력 보고서")
-        c.setFont(font_name, 10)
-        c.drawRightString(550, 800, f"출력일: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
-        c.setFont(font_name, 11)
-        c.drawString(50, 778, f"조회 기간: {period_label}")
-
-        y = 748
-
-        # ── 입고 테이블 ──
-        c.setFont(font_name, 13)
-        c.setFillColorRGB(0.06, 0.72, 0.51)
-        c.drawString(50, y, f"■ 입고 내역 ({qs_inbound.count()}건)")
-        c.setFillColorRGB(0, 0, 0)
-        y -= 22
-
+        elements.append(Paragraph(f"■ 입고 내역 ({qs_inbound.count()}건)", inbound_header_style))
+        
         if qs_inbound.exists():
-            # 테이블 헤더
-            c.setFont(font_name, 9)
-            c.setFillColorRGB(0.4, 0.4, 0.4)
-            c.drawString(55, y, "입고일")
-            c.drawString(120, y, "품목명")
-            c.drawString(310, y, "입고처")
-            c.drawString(430, y, "시리얼")
-            c.setFillColorRGB(0, 0, 0)
-            y -= 4
-            c.setStrokeColorRGB(0.8, 0.8, 0.8)
-            c.line(50, y, 550, y)
-            c.setStrokeColorRGB(0, 0, 0)
-            y -= 14
-
-            c.setFont(font_name, 9)
+            inbound_data = [[
+                Paragraph("<b>입고일</b>", ParagraphStyle('H1', parent=center_style, fontName=font_name_bold)),
+                Paragraph("<b>품목명 (Model)</b>", ParagraphStyle('H2', parent=normal_style, fontName=font_name_bold)),
+                Paragraph("<b>입고처 (Supplier)</b>", ParagraphStyle('H3', parent=normal_style, fontName=font_name_bold)),
+                Paragraph("<b>시리얼 내역 (S/N)</b>", ParagraphStyle('H4', parent=normal_style, fontName=font_name_bold))
+            ]]
             for inv in qs_inbound:
-                if y < 60:
-                    c.showPage()
-                    y = 800
-                    c.setFont(font_name, 9)
                 date_str = inv.date.strftime('%Y-%m-%d') if inv.date else "-"
                 tool_name = str(inv.tool) if inv.tool else "-"
-                if len(tool_name) > 28:
-                    tool_name = tool_name[:27] + "…"
                 supplier_name = inv.supplier.name if inv.supplier else "-"
-                if len(supplier_name) > 18:
-                    supplier_name = supplier_name[:17] + "…"
                 serial = inv.serial if inv.serial else "-"
-
-                c.drawString(55, y, date_str)
-                c.drawString(120, y, tool_name)
-                c.drawString(310, y, supplier_name)
-                c.drawString(430, y, serial)
-                y -= 14
+                
+                inbound_data.append([
+                    Paragraph(date_str, center_style),
+                    Paragraph(tool_name, normal_style),
+                    Paragraph(supplier_name, normal_style),
+                    Paragraph(serial, normal_style)
+                ])
+                
+            t_in = Table(inbound_data, colWidths=colWidths, repeatRows=1)
+            t_in.setStyle(base_table_style)
+            elements.append(t_in)
         else:
-            c.setFont(font_name, 10)
-            c.drawString(55, y, "해당 기간 내 입고 내역이 없습니다.")
-            y -= 18
+            elements.append(Paragraph("해당 기간 내 입고 내역이 없습니다.", normal_style))
+            
+        elements.append(Spacer(1, 30))
 
-        # ── 출고 테이블 ──
-        y -= 20
-        if y < 120:
-            c.showPage()
-            y = 800
-
-        c.setFont(font_name, 13)
-        c.setFillColorRGB(0.23, 0.51, 0.96)
-        c.drawString(50, y, f"■ 출고 내역 ({qs_outbound.count()}건)")
-        c.setFillColorRGB(0, 0, 0)
-        y -= 22
-
+        # ─── 출고 내역 섹션 ───
+        elements.append(Paragraph(f"■ 출고 내역 ({qs_outbound.count()}건)", outbound_header_style))
+        
         if qs_outbound.exists():
-            c.setFont(font_name, 9)
-            c.setFillColorRGB(0.4, 0.4, 0.4)
-            c.drawString(55, y, "출고일")
-            c.drawString(120, y, "품목명")
-            c.drawString(310, y, "출고처")
-            c.drawString(430, y, "시리얼")
-            c.setFillColorRGB(0, 0, 0)
-            y -= 4
-            c.setStrokeColorRGB(0.8, 0.8, 0.8)
-            c.line(50, y, 550, y)
-            c.setStrokeColorRGB(0, 0, 0)
-            y -= 14
-
-            c.setFont(font_name, 9)
+            outbound_data = [[
+                Paragraph("<b>출고일</b>", ParagraphStyle('H1', parent=center_style, fontName=font_name_bold)),
+                Paragraph("<b>품목명 (Model)</b>", ParagraphStyle('H2', parent=normal_style, fontName=font_name_bold)),
+                Paragraph("<b>출고처 (Company)</b>", ParagraphStyle('H3', parent=normal_style, fontName=font_name_bold)),
+                Paragraph("<b>시리얼 내역 (S/N)</b>", ParagraphStyle('H4', parent=normal_style, fontName=font_name_bold))
+            ]]
             for inv in qs_outbound:
-                if y < 60:
-                    c.showPage()
-                    y = 800
-                    c.setFont(font_name, 9)
                 date_str = inv.release_date.strftime('%Y-%m-%d') if inv.release_date else "-"
                 tool_name = str(inv.tool) if inv.tool else "-"
-                if len(tool_name) > 28:
-                    tool_name = tool_name[:27] + "…"
                 company_name = inv.release_company.name if inv.release_company else "-"
-                if len(company_name) > 18:
-                    company_name = company_name[:17] + "…"
                 serial = inv.serial if inv.serial else "-"
-
-                c.drawString(55, y, date_str)
-                c.drawString(120, y, tool_name)
-                c.drawString(310, y, company_name)
-                c.drawString(430, y, serial)
-                y -= 14
+                
+                outbound_data.append([
+                    Paragraph(date_str, center_style),
+                    Paragraph(tool_name, normal_style),
+                    Paragraph(company_name, normal_style),
+                    Paragraph(serial, normal_style)
+                ])
+                
+            t_out = Table(outbound_data, colWidths=colWidths, repeatRows=1)
+            t_out.setStyle(base_table_style)
+            elements.append(t_out)
         else:
-            c.setFont(font_name, 10)
-            c.drawString(55, y, "해당 기간 내 출고 내역이 없습니다.")
-            y -= 18
+            elements.append(Paragraph("해당 기간 내 출고 내역이 없습니다.", normal_style))
 
-        c.save()
+        doc.build(elements)
         buffer.seek(0)
-        filename = f"inventory_history_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.pdf"
+        filename = f"기간별_입출고이력_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}_{timezone.now().strftime('%H%M')}.pdf"
         return FileResponse(buffer, as_attachment=True, filename=filename)
 
 tool_admin_site = ToolInventoryAdminSite(name='tool_admin')
@@ -388,31 +443,20 @@ class InventoryAdmin(ModelAdmin):
 
     @unfold_action(description="📄 선택한 내역 PDF 다운로드", url_path="export-selected-pdf", attrs={"style": "background-color: #9333ea; color: white; border: none;"})
     def export_selected_to_pdf(self, request, queryset):
-        import io
-        import os
+        import io, os
         from django.http import FileResponse
-        from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from django.utils import timezone
+        from itertools import groupby
         
-        buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
-        
-        font_name = 'Helvetica'
-        try:
-            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
-            if os.path.exists(font_path):
-                pdfmetrics.registerFont(TTFont('Malgun', font_path))
-                font_name = 'Malgun'
-        except Exception:
-            pass
-
-        # 품명 기준으로 정렬 (브랜드 -> 모델명 우선)
+        # 1. 문서 메타데이터 설정
         queryset = queryset.order_by('tool__brand__name', 'tool__model_name', 'date')
         
-        # 출고 업체명 확인
         outbound_companies = list(set([obj.release_company.name for obj in queryset if obj.release_company and obj.status == '출고']))
         is_all_outbound = all(obj.status == '출고' for obj in queryset)
         
@@ -422,8 +466,7 @@ class InventoryAdmin(ModelAdmin):
             title = "(다중업체) 출고리스트"
         else:
             title = "입출고 이력 내역"
-            
-        # 날짜 추출 (출고리스트인 경우 출고일(release_date) 기준, 아니면 입고일(date))
+
         dates_set = set()
         for obj in queryset:
             if is_all_outbound:
@@ -432,101 +475,169 @@ class InventoryAdmin(ModelAdmin):
             else:
                 if obj.date:
                     dates_set.add(obj.date.strftime('%Y-%m-%d'))
-                    
+        
         dates_list = sorted(list(dates_set))
         if dates_list:
-            # 콤마로 나열
-            date_str = ", ".join(dates_list)
-            # 글자가 너무 길면 텍스트를 일부만 보여주거나 줄바꿈해야 하지만 한 두개 날짜 선택을 보통 합니다.
-            date_range = f"({date_str})"
+            date_range = ", ".join(dates_list)
         else:
             date_range = ""
-            
-        # 대제목 출력
-        c.setFont(font_name, 16)
-        c.drawString(50, 800, title)
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
+        elements = []
         
-        # 날짜 출력 (대제목 옆)
+        font_name = 'Helvetica'
+        font_name_bold = 'Helvetica-Bold'
+        try:
+            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            font_path_bd = "c:\\Windows\\Fonts\\malgunbd.ttf"
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('Malgun', font_path))
+                font_name = 'Malgun'
+                font_name_bold = 'Malgun'
+            if os.path.exists(font_path_bd):
+                pdfmetrics.registerFont(TTFont('MalgunBold', font_path_bd))
+                font_name_bold = 'MalgunBold'
+        except Exception:
+            pass
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=18, alignment=1, spaceAfter=5
+        )
+        date_range_style = ParagraphStyle(
+            'CustomDateRange', parent=styles['Normal'],
+            fontName=font_name, fontSize=11, alignment=1, spaceAfter=20
+        )
+        date_style = ParagraphStyle(
+            'CustomDate', parent=styles['Normal'],
+            fontName=font_name, fontSize=10, textColor=colors.gray, alignment=2, spaceAfter=15
+        )
+        normal_style = ParagraphStyle(
+            'CustomNormal', parent=styles['Normal'],
+            fontName=font_name, fontSize=9, leading=14
+        )
+        bold_style = ParagraphStyle(
+            'CustomBold', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=10, leading=14
+        )
+        center_style = ParagraphStyle(
+            'CustomCenter', parent=normal_style, alignment=1
+        )
+        
+        # 문서 헤더 구성
+        elements.append(Paragraph(title, title_style))
         if date_range:
-            c.setFont(font_name, 12)
-            title_width = c.stringWidth(title, font_name, 16)
-            c.drawString(50 + title_width + 10, 800, date_range)
+            elements.append(Paragraph(f"({date_range})", date_range_style))
+        else:
+            elements.append(Spacer(1, 15))
             
-        c.setFont(font_name, 10)
-        c.drawRightString(550, 800, f"출력일: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+        elements.append(Paragraph(f"출력일시: {timezone.now().strftime('%Y-%m-%d %H:%M')}", date_style))
         
-        y = 750
-        
-        import textwrap
-        from itertools import groupby
-        
+        # 테이블 스타일 구성
+        table_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            ('TOPPADDING', (0, 1), (-1, -1), 6),
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#94a3b8')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+        ])
+
+        # 테이블 헤더
+        data = [[
+            Paragraph("<b>품목명 (Model)</b>", ParagraphStyle('H1', parent=normal_style, fontName=font_name_bold)),
+            Paragraph("<b>수량 (Qty)</b>", ParagraphStyle('H2', parent=center_style, fontName=font_name_bold)),
+            Paragraph("<b>시리얼 내역 (S/N)</b>", ParagraphStyle('H3', parent=normal_style, fontName=font_name_bold))
+        ]]
+
         def get_tool_name(obj):
             return str(obj.tool) if obj.tool else "미지정 품목"
-            
+
         items = list(queryset)
         items.sort(key=get_tool_name)
         grouped_items = groupby(items, key=get_tool_name)
         
+        row_idx = 1
+        total_qty = 0
+        current_brand = None
+        
         for tool_name, group in grouped_items:
             group_list = list(group)
             quantity = len(group_list)
+            total_qty += quantity
             
-            if y < 100:
-                c.showPage()
-                y = 800
-                c.setFont(font_name, 10)
-                
-            # 품명 헤더 (브랜드 및 모델명)
-            c.setFont(font_name, 12)
-            c.setStrokeColorRGB(0.7, 0.7, 0.7)
-            c.line(50, y+15, 550, y+15)
-            c.setStrokeColorRGB(0, 0, 0)
-            c.drawString(50, y, f"■ 품명: {tool_name}")
+            first_obj = group_list[0]
+            brand_name = first_obj.tool.brand.name if first_obj.tool and first_obj.tool.brand else "미지정 브랜드"
+            model_name = first_obj.tool.model_name if first_obj.tool else "미지정 품목"
             
-            # 수량 표시
-            if is_all_outbound:
-                c.drawRightString(550, y, f"출고 수량: {quantity}개")
-            else:
-                c.drawRightString(550, y, f"수량: {quantity}개")
-                
-            y -= 25
-            c.setFont(font_name, 10)
+            if brand_name != current_brand:
+                current_brand = brand_name
+                data.append([Paragraph(f"■ {current_brand}", bold_style), "", ""])
+                table_style.add('SPAN', (0, row_idx), (-1, row_idx))
+                table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#f1f5f9'))
+                table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 6)
+                table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 6)
+                row_idx += 1
             
             # 시리얼 번호 수집
             serials = []
+            no_serial_count = 0
             for obj in group_list:
-                s_text = obj.serial if obj.serial else "S/N 없음"
-                serials.append(s_text)
-                
-            serial_joined = ", ".join(serials)
+                if obj.serial:
+                    serials.append(obj.serial)
+                else:
+                    no_serial_count += 1
             
-            c.drawString(70, y, "• S/N:")
+            parts = []
+            if serials:
+                parts.append(", ".join(serials))
+            if no_serial_count > 0:
+                parts.append(f"S/N 없음: {no_serial_count}개")
             
-            wrapped_serials = textwrap.wrap(serial_joined, width=70)
-            if not wrapped_serials:
-                wrapped_serials = ["(없음)"]
-                
-            for idx, line in enumerate(wrapped_serials):
-                if y < 70:
-                    c.showPage()
-                    y = 800
-                    c.setFont(font_name, 10)
-                    
-                c.drawString(110, y, line)
-                y -= 16
-                
-            y -= 8 # 품목 간 추가 여백
+            serial_text = " / ".join(parts) if parts else "-"
+            
+            data.append([
+                Paragraph(model_name, normal_style),
+                Paragraph(str(quantity), center_style),
+                Paragraph(serial_text, normal_style)
+            ])
+            table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 6)
+            table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 6)
+            row_idx += 1
 
-        c.save()
+        # 총합
+        data.append([
+            Paragraph("<b>총합계 (Total)</b>", ParagraphStyle('T1', parent=bold_style, alignment=1)),
+            Paragraph(f"<b>{total_qty}</b>", ParagraphStyle('T2', parent=bold_style, alignment=1)),
+            ""
+        ])
+        table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#f8fafc'))
+        table_style.add('LINEABOVE', (0, row_idx), (-1, row_idx), 1, colors.HexColor('#94a3b8'))
+        table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 8)
+        table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 8)
+        
+        colWidths = [150, 60, 325]
+        t = Table(data, colWidths=colWidths, repeatRows=1)
+        t.setStyle(table_style)
+        
+        elements.append(t)
+        doc.build(elements)
         buffer.seek(0)
         
-        filename = f"inventory_export_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        safe_title = title.replace(' ', '_').replace('()', '')
+        filename = f"{safe_title}_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
         response = FileResponse(buffer, as_attachment=True, filename=filename)
         return response
 
     @unfold_action(description="📊 선택한 내역 엑셀 다운로드", url_path="export-selected-excel", attrs={"style": "background-color: #10b981; color: white; border: none;"})
     def export_selected_to_excel(self, request, queryset):
         import io
+        import urllib.parse
         import openpyxl
         from django.http import HttpResponse
         from django.utils import timezone
@@ -534,6 +645,17 @@ class InventoryAdmin(ModelAdmin):
         
         # 품명 기준으로 정렬 (브랜드 -> 모델명 우선)
         queryset = queryset.order_by('tool__brand__name', 'tool__model_name', 'date')
+        
+        # 출고 업체명 확인하여 파일명 구성
+        outbound_companies = list(set([obj.release_company.name for obj in queryset if obj.release_company and obj.status == '출고']))
+        is_all_outbound = all(obj.status == '출고' for obj in queryset)
+        
+        if is_all_outbound and len(outbound_companies) == 1:
+            title = f"({outbound_companies[0]}) 출고리스트"
+        elif is_all_outbound and len(outbound_companies) > 1:
+            title = "(다중업체) 출고리스트"
+        else:
+            title = "입출고이력내역"
         
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -575,12 +697,15 @@ class InventoryAdmin(ModelAdmin):
         wb.save(buffer)
         buffer.seek(0)
         
-        filename = f"inventory_export_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        safe_title = title.replace(' ', '_').replace('()', '')
+        filename = f"{safe_title}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
+        
         response = HttpResponse(
             buffer,
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
         return response
 
     def has_add_permission(self, request):
@@ -935,58 +1060,98 @@ class ToolStockSummaryAdmin(ModelAdmin):
 
     @unfold_action(description="재고 내역 출력 (PDF)", attrs={"style": "background-color: #9333ea; color: white; border: none;"})
     def export_stock_pdf(self, request, queryset):
-        import io
+        import io, os
         from django.http import FileResponse
-        from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
-        import os
         from django.db.models import Q
+        from .models import Inventory
         from django.utils import timezone
         
         buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
+        elements = []
         
         font_name = 'Helvetica'
+        font_name_bold = 'Helvetica-Bold'
         try:
             font_path = "c:\\Windows\\Fonts\\malgun.ttf"
+            font_path_bd = "c:\\Windows\\Fonts\\malgunbd.ttf"
             if os.path.exists(font_path):
                 pdfmetrics.registerFont(TTFont('Malgun', font_path))
                 font_name = 'Malgun'
+                font_name_bold = 'Malgun'
+            if os.path.exists(font_path_bd):
+                pdfmetrics.registerFont(TTFont('MalgunBold', font_path_bd))
+                font_name_bold = 'MalgunBold'
         except Exception:
             pass
             
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=18, alignment=1, spaceAfter=20
+        )
+        date_style = ParagraphStyle(
+            'CustomDate', parent=styles['Normal'],
+            fontName=font_name, fontSize=10, textColor=colors.gray, alignment=2, spaceAfter=15
+        )
+        normal_style = ParagraphStyle(
+            'CustomNormal', parent=styles['Normal'],
+            fontName=font_name, fontSize=9, leading=14
+        )
+        bold_style = ParagraphStyle(
+            'CustomBold', parent=styles['Normal'],
+            fontName=font_name_bold, fontSize=10, leading=14
+        )
+        center_style = ParagraphStyle(
+            'CustomCenter', parent=normal_style, alignment=1
+        )
+
+        elements.append(Paragraph("선택 장비 재고 내역", title_style))
+        elements.append(Paragraph(f"출력일시: {timezone.now().strftime('%Y-%m-%d %H:%M')}", date_style))
+
         queryset = queryset.select_related('brand').order_by('brand__name', 'model_name')
-        c.setFont(font_name, 16)
-        c.drawString(50, 800, "현재 재고 내역")
         
-        c.setFont(font_name, 10)
-        c.drawRightString(550, 800, f"출력일: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
-        
-        y = 750
+        data = []
+        data.append([
+            Paragraph("<b>품목명 (Model)</b>", ParagraphStyle('H1', parent=normal_style, fontName=font_name_bold)),
+            Paragraph("<b>수량 (Qty)</b>", ParagraphStyle('H2', parent=center_style, fontName=font_name_bold)),
+            Paragraph("<b>시리얼 내역 (S/N)</b>", ParagraphStyle('H3', parent=normal_style, fontName=font_name_bold))
+        ])
+
+        table_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.HexColor('#94a3b8')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+            ('BOX', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+        ])
+
         current_brand = None
-        
-        import textwrap
+        total_qty = 0
+        row_idx = 1
         
         for tool in queryset:
-            if y < 100:
-                c.showPage()
-                y = 800
-                current_brand = None
-
             if tool.brand != current_brand:
                 current_brand = tool.brand
-                c.setFont(font_name, 12)
-                brand_name = current_brand.name if current_brand else "미지정"
-                c.setStrokeColorRGB(0.7, 0.7, 0.7)
-                c.line(50, y+15, 550, y+15)
-                c.setStrokeColorRGB(0, 0, 0)
-                c.drawString(50, y, f"■ 브랜드: {brand_name}")
-                y -= 25
+                brand_name = current_brand.name if current_brand else "미지정 브랜드"
+                data.append([Paragraph(f"■ {brand_name}", bold_style), "", ""])
+                table_style.add('SPAN', (0, row_idx), (-1, row_idx))
+                table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#f1f5f9'))
+                table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 6)
+                table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 6)
+                row_idx += 1
             
             invs = Inventory.objects.filter(tool=tool, status='재고').order_by('date')
             count = invs.count()
+            total_qty += count
             
             serials = [inv.serial for inv in invs if inv.serial]
             no_serial_count = invs.filter(Q(serial__isnull=True) | Q(serial__exact='')).count()
@@ -997,50 +1162,37 @@ class ToolStockSummaryAdmin(ModelAdmin):
             if no_serial_count > 0:
                 parts.append(f"S/N 없음: {no_serial_count}개")
             
-            serial_text = " / ".join(parts) if parts else "재고 없음"
-            
-            name_lines = textwrap.wrap(tool.model_name, width=42)
-            # "내역: " prefix takes some space, adjust if first line
-            serial_lines = textwrap.wrap(serial_text, width=46)
-            if not serial_lines:
-                serial_lines = [""]
-            if not name_lines:
-                name_lines = [""]
-                
-            max_lines = max(len(name_lines), len(serial_lines))
-            
-            c.setFont(font_name, 10)
-            
-            for i in range(max_lines):
-                if y < 70:
-                    c.showPage()
-                    y = 800
-                    c.setFont(font_name, 10)
-                    
-                if i == 0:
-                    c.drawString(60, y, "•")
-                    c.drawRightString(320, y, f"수량: {count}개")
-                    c.drawString(340, y, "내역:")
-                    s_x = 365
-                else:
-                    s_x = 340
-                    
-                if i < len(name_lines):
-                    c.drawString(70, y, name_lines[i])
-                    
-                if i < len(serial_lines):
-                    c.drawString(s_x, y, serial_lines[i])
-                
-                y -= 16
-                
-            y -= 4 # Extra spacing after each tool
-            
-        c.save()
+            serial_text = " / ".join(parts) if parts else "-"
+
+            data.append([
+                Paragraph(tool.model_name, normal_style),
+                Paragraph(str(count), center_style),
+                Paragraph(serial_text, normal_style)
+            ])
+            table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 6)
+            table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 6)
+            row_idx += 1
+
+        data.append([
+            Paragraph("<b>총합계 (Total)</b>", ParagraphStyle('T1', parent=bold_style, alignment=1)),
+            Paragraph(f"<b>{total_qty}</b>", ParagraphStyle('T2', parent=bold_style, alignment=1)),
+            ""
+        ])
+        table_style.add('BACKGROUND', (0, row_idx), (-1, row_idx), colors.HexColor('#f8fafc'))
+        table_style.add('LINEABOVE', (0, row_idx), (-1, row_idx), 1, colors.HexColor('#94a3b8'))
+        table_style.add('BOTTOMPADDING', (0, row_idx), (-1, row_idx), 8)
+        table_style.add('TOPPADDING', (0, row_idx), (-1, row_idx), 8)
+
+        colWidths = [150, 60, 325]
+        t = Table(data, colWidths=colWidths, repeatRows=1)
+        t.setStyle(table_style)
+        
+        elements.append(t)
+        doc.build(elements)
         buffer.seek(0)
         
-        filename = f"tool_stock_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
-        response = FileResponse(buffer, as_attachment=True, filename=filename)
-        return response
+        filename = f"선택_재고내역_{timezone.now().strftime('%Y%m%d_%H%M')}.pdf"
+        return FileResponse(buffer, as_attachment=True, filename=filename)
 
     @unfold_action(description="재고 내역 출력 (Excel)", attrs={"style": "background-color: #10b981; color: white; border: none;"})
     def export_stock_excel(self, request, queryset):
@@ -1094,12 +1246,15 @@ class ToolStockSummaryAdmin(ModelAdmin):
         wb.save(buffer)
         buffer.seek(0)
         
-        filename = f"tool_stock_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        import urllib.parse
+        filename = f"선택_재고내역_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
+        
         response = HttpResponse(
             buffer,
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
         return response
 
 # ── 투두리스트 관리 ──

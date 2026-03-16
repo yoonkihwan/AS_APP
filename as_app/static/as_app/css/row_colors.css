@@ -12,8 +12,8 @@ tr:has(.status-marker[data-status="waiting"]) {
 }
 
 tr:has(.status-marker[data-status="outsourced"]) {
-    background-color: rgba(249, 115, 22, 0.1) !important;
-    /* Orange */
+    background-color: rgba(234, 179, 8, 0.1) !important;
+    /* Yellow */
 }
 
 tr:has(.status-marker[data-status="repaired"]) {
@@ -41,7 +41,7 @@ html.dark tr:has(.status-marker[data-status="waiting"]) {
 }
 
 html.dark tr:has(.status-marker[data-status="outsourced"]) {
-    background-color: rgba(249, 115, 22, 0.15) !important;
+    background-color: rgba(234, 179, 8, 0.15) !important;
 }
 
 html.dark tr:has(.status-marker[data-status="repaired"]) {

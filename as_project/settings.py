@@ -235,17 +235,17 @@ def sidebar_callback(request):
                     {
                         "title": "매출처",
                         "icon": "local_shipping",
-                        "link": reverse_lazy("tool_admin:master_data_company_changelist"),
+                        "link": reverse_lazy("master_data_admin:master_data_company_changelist"),
                     },
                     {
                         "title": "입고업체",
                         "icon": "store",
-                        "link": reverse_lazy("tool_admin:master_data_outsourcecompany_changelist"),
+                        "link": reverse_lazy("master_data_admin:master_data_outsourcecompany_changelist"),
                     },
                     {
                         "title": "브랜드/툴 관리",
                         "icon": "category",
-                        "link": reverse_lazy("tool_admin:master_data_tool_changelist"),
+                        "link": reverse_lazy("master_data_admin:master_data_tool_changelist"),
                     },
                 ],
             },
@@ -410,6 +410,11 @@ def sidebar_callback(request):
                         "title": "수리 기록 등록",
                         "icon": "build",
                         "link": reverse_lazy("admin:as_app_repairticket_changelist"),
+                    },
+                    {
+                        "title": "수리 의뢰 등록",
+                        "icon": "send",
+                        "link": reverse_lazy("admin:as_app_outsourcedticket_changelist"),
                     },
                     {
                         "title": "출고 등록",

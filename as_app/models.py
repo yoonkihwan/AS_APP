@@ -185,6 +185,7 @@ class ASTicket(models.Model):
 
     class Status(models.TextChoices):
         INBOUND = "inbound", "입고"
+        OUTSOURCED = "outsourced", "수리의뢰"
         REPAIRED = "repaired", "수리완료"
         SHIPPED = "shipped", "출고"
         DISPOSED = "disposed", "자체폐기"
@@ -240,6 +241,7 @@ class ASTicket(models.Model):
         null=True,
         blank=True,
     )
+    outsource_date = models.DateField("의뢰 날짜", null=True, blank=True)
 
     # ── 출고 및 정산 ──
     outbound_date = models.DateField("출고 날짜", null=True, blank=True)
@@ -261,6 +263,7 @@ class ASTicket(models.Model):
         if self.tool_id and self.serial_number:
             active_statuses = [
                 self.Status.INBOUND,
+                self.Status.OUTSOURCED,
                 self.Status.REPAIRED,
             ]
             qs = ASTicket.objects.filter(
@@ -340,6 +343,15 @@ class TaxInvoiceTicket(ASTicket):
         proxy = True
         verbose_name = "세금계산서 등록"
         verbose_name_plural = "세금계산서 등록"
+
+
+class OutsourcedTicket(ASTicket):
+    """수리의뢰 현황 전용 프록시 모델"""
+
+    class Meta:
+        proxy = True
+        verbose_name = "수리의뢰 현황"
+        verbose_name_plural = "수리의뢰 현황"
 
 
 # ──────────────────────────────────────────────
