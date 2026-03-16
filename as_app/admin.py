@@ -703,7 +703,8 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
     actions = None  # 체크박스 + 액션 드롭다운 제거 (상태는 자동 관리)
 
     class Media:
-        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/row_colors.css")}
+        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/parts_table.css")}
+        js = ("as_app/js/parts_table.js",)
 
     # ── 수리 등록 폼 설정 ──
     fieldsets = (
@@ -756,16 +757,30 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
         )
 
     def get_form(self, request, obj=None, **kwargs):
-        """수리 편집 폼: 해당 장비 부품만 필터링 + 체크박스 위젯 + 비고 한 줄"""
+        """수리 편집 폼: 해당 장비 부품만 필터링 + 테이블 위젯 + 비고 한 줄"""
+        from .widgets import PartsTableWidget
         form = super().get_form(request, obj, **kwargs)
         if obj and obj.tool_id:
             from django.db.models import Q
-            form.base_fields["used_parts"].queryset = Part.objects.filter(
+            parts_qs = Part.objects.filter(
                 Q(tools=obj.tool) | Q(tools__isnull=True)
-            ).distinct().order_by("name")
-        # 부품 선택을 체크박스 위젯으로 변경 (빠르고 직관적)
-        if "used_parts" in form.base_fields:
-            form.base_fields["used_parts"].widget = forms.CheckboxSelectMultiple()
+            ).distinct().order_by("part_type", "name")
+            form.base_fields["used_parts"].queryset = parts_qs
+
+            # 부품 메타데이터 구성 (업체 단가 그룹 반영)
+            parts_data = {}
+            for p in parts_qs:
+                parts_data[p.id] = {
+                    "name": p.name,
+                    "code": p.code,
+                    "price": p.get_price_for_company(obj.company),
+                    "part_type": p.part_type,
+                }
+
+            # 커스텀 테이블 위젯 적용
+            form.base_fields["used_parts"].widget = PartsTableWidget(
+                parts_data=parts_data,
+            )
             form.base_fields["used_parts"].help_text = "사용한 부품/공임을 체크하세요. 저장 시 자동으로 비용이 계산되고 수리완료 처리됩니다."
         # 비고 필드를 한 줄 입력으로 축소
         if "repair_content" in form.base_fields:

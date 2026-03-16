@@ -1,0 +1,232 @@
+/* ── 부품/공임 테이블 위젯 스타일 ── */
+
+.parts-table-widget {
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: var(--color-bg, #fff);
+}
+
+/* ── 탭 헤더 ── */
+.parts-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border-color, #e5e7eb);
+    background: var(--color-bg-secondary, #f9fafb);
+}
+
+.parts-tab {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-muted, #6b7280);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.parts-tab:hover {
+    color: #6366f1;
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.parts-tab.active {
+    color: #6366f1;
+    background: var(--color-bg, #fff);
+}
+
+.parts-tab.active::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #6366f1;
+}
+
+.parts-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+}
+
+.parts-tab.active .parts-tab-count {
+    background: #6366f1;
+    color: #fff;
+}
+
+/* ── 탭 콘텐츠 ── */
+.parts-tab-content {
+    display: none;
+}
+
+.parts-tab-content.active {
+    display: block;
+}
+
+/* ── 테이블 ── */
+.parts-select-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.parts-select-table thead th {
+    text-align: left;
+    padding: 0.625rem 1rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #6b7280);
+    background: var(--color-bg-secondary, #f9fafb);
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.parts-select-table tbody td {
+    padding: 0.625rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-color, #374151);
+    border-bottom: 1px solid var(--border-color, #f3f4f6);
+    transition: background 0.15s ease;
+}
+
+.parts-select-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.parts-select-table tbody tr:hover td {
+    background: rgba(99, 102, 241, 0.04);
+}
+
+/* 선택된 행 하이라이트 */
+.parts-row.selected-row td {
+    background: rgba(99, 102, 241, 0.08);
+}
+
+/* 행 클릭으로 체크박스 토글 — 커서 포인터 */
+.parts-row {
+    cursor: pointer;
+}
+
+/* ── 컬럼 너비 ── */
+.col-check {
+    width: 50px;
+    text-align: center !important;
+}
+
+.col-name {
+    min-width: 120px;
+}
+
+.col-code {
+    width: 100px;
+    color: var(--text-muted, #9ca3af) !important;
+    font-size: 0.8rem !important;
+}
+
+.col-price {
+    width: 100px;
+    text-align: right !important;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 체크박스 스타일 */
+.parts-select-table input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #6366f1;
+    cursor: pointer;
+}
+
+/* ── 빈 상태 ── */
+.parts-table-empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-muted, #9ca3af);
+    font-size: 0.85rem;
+}
+
+.parts-table-empty-icon {
+    font-size: 1.5rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* ── 다크 모드 ── */
+.dark .parts-table-widget {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.dark .parts-tabs {
+    background: #1a2332;
+    border-color: #334155;
+}
+
+.dark .parts-tab {
+    color: #94a3b8;
+}
+
+.dark .parts-tab:hover {
+    color: #a5b4fc;
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.dark .parts-tab.active {
+    color: #a5b4fc;
+    background: #1e293b;
+}
+
+.dark .parts-tab.active::after {
+    background: #818cf8;
+}
+
+.dark .parts-tab-count {
+    background: rgba(129, 140, 248, 0.15);
+    color: #a5b4fc;
+}
+
+.dark .parts-tab.active .parts-tab-count {
+    background: #818cf8;
+    color: #fff;
+}
+
+.dark .parts-select-table thead th {
+    background: #1a2332;
+    color: #94a3b8;
+    border-color: #334155;
+}
+
+.dark .parts-select-table tbody td {
+    color: #cbd5e1;
+    border-color: #334155;
+}
+
+.dark .parts-select-table tbody tr:hover td {
+    background: rgba(99, 102, 241, 0.08);
+}
+
+.dark .parts-row.selected-row td {
+    background: rgba(99, 102, 241, 0.12);
+}
+
+.dark .col-code {
+    color: #64748b !important;
+}

@@ -17,9 +17,9 @@ document.addEventListener('DOMContentLoaded', function() {
         metaMap[p.id] = { part_type: p.part_type, price: p.price };
     });
 
-    // 부품 체크박스 영역 찾기
-    const partsField = document.querySelector('.field-used_parts');
-    if (!partsField) return;
+    // 부품 테이블 위젯 영역 찾기
+    const widget = document.querySelector('.parts-table-widget');
+    if (!widget) return;
 
     // 활성 상태 추적
     const activePresets = new Set();
@@ -28,6 +28,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const container = document.createElement('div');
     container.id = 'preset-container';
     container.style.cssText = 'margin-bottom:16px; padding:16px; background:linear-gradient(135deg, #f8f7ff 0%, #f0eeff 100%); border-radius:10px; border:1px solid #e0ddf5;';
+
+    // 다크모드 대응
+    if (document.documentElement.classList.contains('dark')) {
+        container.style.background = 'linear-gradient(135deg, #1e1b4b 0%, #1e2040 100%)';
+        container.style.borderColor = '#312e81';
+    }
 
     // 헤더
     const header = document.createElement('div');
@@ -39,13 +45,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnGroup = document.createElement('div');
     btnGroup.style.cssText = 'display:flex; flex-wrap:wrap; gap:8px;';
 
+    // ── 행 스타일 동기화 함수 ──
+    function syncRowStyles() {
+        widget.querySelectorAll('.parts-row').forEach(function(row) {
+            const cb = row.querySelector('input[type="checkbox"]');
+            if (cb) {
+                row.classList.toggle('selected-row', cb.checked);
+            }
+        });
+    }
+
     // ── 세트 적용 로직 ──
     function applyActivePresets() {
         // 모든 체크박스 해제
-        const checkboxes = partsField.querySelectorAll('input[type="checkbox"]');
+        const checkboxes = widget.querySelectorAll('input[type="checkbox"]');
         checkboxes.forEach(function(cb) { cb.checked = false; });
 
-        if (activePresets.size === 0) return;
+        if (activePresets.size === 0) {
+            syncRowStyles();
+            return;
+        }
 
         // 활성 세트들의 부품/공임 수집
         const allPartIds = new Set();
@@ -69,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 부품 체크
         allPartIds.forEach(function(id) {
-            const cb = partsField.querySelector('input[value="' + id + '"]');
+            const cb = widget.querySelector('input[value="' + id + '"]');
             if (cb) cb.checked = true;
         });
 
@@ -77,9 +96,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (laborCandidates.length > 0) {
             laborCandidates.sort(function(a, b) { return b.price - a.price; });
             const highestLabor = laborCandidates[0];
-            const cb = partsField.querySelector('input[value="' + highestLabor.id + '"]');
+            const cb = widget.querySelector('input[value="' + highestLabor.id + '"]');
             if (cb) cb.checked = true;
         }
+
+        syncRowStyles();
     }
 
     // ── 세트 버튼 생성 ──
@@ -129,8 +150,9 @@ document.addEventListener('DOMContentLoaded', function() {
     resetBtn.style.cssText = 'padding:8px 16px; border-radius:8px; border:2px solid #d1d5db; background:#fff; color:#6b7280; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all .2s ease;';
     resetBtn.addEventListener('click', function() {
         activePresets.clear();
-        const checkboxes = partsField.querySelectorAll('input[type="checkbox"]');
+        const checkboxes = widget.querySelectorAll('input[type="checkbox"]');
         checkboxes.forEach(function(cb) { cb.checked = false; });
+        syncRowStyles();
         // 모든 세트 버튼 비활성화 스타일
         btnGroup.querySelectorAll('button').forEach(function(b) {
             if (b !== resetBtn) {
@@ -144,62 +166,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     container.appendChild(btnGroup);
 
-    // 부품 필드 앞에 삽입
-    const fieldLabel = partsField.querySelector('label, .flex');
-    if (fieldLabel) {
-        fieldLabel.parentNode.insertBefore(container, fieldLabel.nextSibling);
-    } else {
-        partsField.insertBefore(container, partsField.firstChild);
-    }
-
-    // ── 체크박스 목록에 부품/공임 구분 라벨 추가 ──
-    const checkboxList = partsField.querySelector('ul');
-    if (checkboxList) {
-        const items = checkboxList.querySelectorAll('li');
-        let lastType = null;
-
-        // 부품/공임 순서로 정렬하기 위해 분류
-        const partItems = [];
-        const laborItems = [];
-        const otherItems = [];
-
-        items.forEach(function(li) {
-            const input = li.querySelector('input[type="checkbox"]');
-            if (input) {
-                const meta = metaMap[parseInt(input.value)];
-                if (meta && meta.part_type === 'labor') {
-                    laborItems.push(li);
-                } else if (meta && meta.part_type === 'part') {
-                    partItems.push(li);
-                } else {
-                    otherItems.push(li);
-                }
-            }
-        });
-
-        // 목록 재구성: 부품 → 공임
-        checkboxList.innerHTML = '';
-
-        if (partItems.length > 0) {
-            const partHeader = document.createElement('li');
-            partHeader.style.cssText = 'list-style:none; font-weight:700; color:#4338ca; margin:8px 0 4px 0; font-size:0.85rem; border-bottom:1px solid #e0ddf5; padding-bottom:4px;';
-            partHeader.textContent = '🔧 부품';
-            checkboxList.appendChild(partHeader);
-            partItems.forEach(function(li) { checkboxList.appendChild(li); });
-        }
-
-        if (laborItems.length > 0) {
-            const laborHeader = document.createElement('li');
-            laborHeader.style.cssText = 'list-style:none; font-weight:700; color:#dc2626; margin:12px 0 4px 0; font-size:0.85rem; border-bottom:1px solid #fecaca; padding-bottom:4px;';
-            laborHeader.textContent = '💰 공임';
-            checkboxList.appendChild(laborHeader);
-            laborItems.forEach(function(li) { checkboxList.appendChild(li); });
-        }
-
-        if (otherItems.length > 0) {
-            otherItems.forEach(function(li) { checkboxList.appendChild(li); });
-        }
-    }
+    // 위젯 앞에 삽입
+    widget.parentNode.insertBefore(container, widget);
 });
 </script>
 {% endif %}
