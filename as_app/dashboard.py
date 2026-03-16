@@ -1,6 +1,7 @@
 from datetime import timedelta
 from django.utils import timezone
 from django.db.models import Sum
+from django.urls import reverse
 
 
 def dashboard_callback(request, context):
@@ -11,7 +12,7 @@ def dashboard_callback(request, context):
     from .models import ASTicket
 
     today = timezone.localdate()
-    ten_days_ago = today - timedelta(days=10)
+    thirty_days_ago = today - timedelta(days=30)
     
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
@@ -19,9 +20,9 @@ def dashboard_callback(request, context):
     start_of_year = today.replace(month=1, day=1)
 
     # ── KPI 통계 ──
-    # 1. 장기 미처리 (10일 이상 경과)
+    # 1. 장기 미처리 (30일 이상 경과)
     long_pending_count = ASTicket.objects.filter(
-        inbound_date__lte=ten_days_ago,
+        inbound_date__lte=thirty_days_ago,
         status=ASTicket.Status.INBOUND,
     ).count()
 
@@ -30,11 +31,7 @@ def dashboard_callback(request, context):
         status=ASTicket.Status.INBOUND,
     ).count()
 
-    # 3. 이번 달 입고 누적
-    inbound_month_count = ASTicket.objects.filter(
-        inbound_date__month=today.month,
-        inbound_date__year=today.year,
-    ).count()
+
 
     # 4. 수리 완료 (미출고)
     repaired_count = ASTicket.objects.filter(
@@ -46,27 +43,23 @@ def dashboard_callback(request, context):
         status=ASTicket.Status.OUTSOURCED,
     ).count()
 
-    # 5. 이번 달 출고
-    shipped_month_count = ASTicket.objects.filter(
-        status=ASTicket.Status.SHIPPED,
-        outbound_date__month=today.month,
-        outbound_date__year=today.year,
-    ).count()
+
+
+    # ── KPI 카드 링크 생성 ──
+    history_url = reverse("admin:as_app_ashistory_changelist")
+    long_pending_url = f"{history_url}?status__exact=inbound&inbound_date__lte={thirty_days_ago.isoformat()}"
+    waiting_url = f"{history_url}?status__exact=inbound"
+    outsourced_url = f"{history_url}?status__exact=outsourced"
+    repaired_url = f"{history_url}?status__exact=repaired"
 
     kpi = [
         {
-            "title": "이번 달 입고",
-            "metric": inbound_month_count,
-            "footer": f"{today.month}월 입고 누적",
-            "icon": "calendar_month",
-            "color": "#8b5cf6",  # violet
-        },
-        {
             "title": "장기 미처리 대기",
             "metric": long_pending_count,
-            "footer": "10일 이상 방치된 건수",
+            "footer": "30일 이상 방치된 건수",
             "icon": "warning",
             "color": "#ef4444",  # red
+            "link": long_pending_url,
         },
         {
             "title": "수리 대기",
@@ -74,6 +67,7 @@ def dashboard_callback(request, context):
             "footer": "현재 수리 대기 중",
             "icon": "pending_actions",
             "color": "#f59e0b",  # amber
+            "link": waiting_url,
         },
         {
             "title": "수리의뢰 중",
@@ -81,6 +75,7 @@ def dashboard_callback(request, context):
             "footer": "현재 외주 의뢰 중인 건수",
             "icon": "send",
             "color": "#eab308",  # yellow
+            "link": outsourced_url,
         },
         {
             "title": "수리 완료 (미출고)",
@@ -88,27 +83,20 @@ def dashboard_callback(request, context):
             "footer": "출고 대기 중인 건수",
             "icon": "check_circle",
             "color": "#10b981",  # emerald
-        },
-        {
-            "title": "이번 달 출고",
-            "metric": shipped_month_count,
-            "footer": f"{today.month}월 출고 누적",
-            "icon": "local_shipping",
-            "color": "#06b6d4",  # cyan
+            "link": repaired_url,
         },
     ]
 
     # ── 수리 매출 요약 (출고 완료 기준) ──
     shipped_qs = ASTicket.objects.filter(status=ASTicket.Status.SHIPPED)
 
-    today_rev = shipped_qs.filter(outbound_date=today).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
+
     week_rev = shipped_qs.filter(outbound_date__gte=start_of_week, outbound_date__lte=end_of_week).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
     # "이번 달" 통계 기준을 출고 건수 조회 기준과 동일하게 맞춤 (outbound_date__lte=today -> __month=today.month)
     month_rev = shipped_qs.filter(outbound_date__month=today.month, outbound_date__year=today.year).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
     year_rev = shipped_qs.filter(outbound_date__year=today.year).aggregate(Sum('repair_cost'))['repair_cost__sum'] or 0
 
     revenue_data = [
-        {"title": "오늘 수리매출", "amount": f"{today_rev:,}", "icon": "today", "color": "#10b981"},         # emerald
         {"title": "이번 주 수리매출", "amount": f"{week_rev:,}", "icon": "date_range", "color": "#3b82f6"},  # blue
         {"title": "이번 달 수리매출", "amount": f"{month_rev:,}", "icon": "calendar_month", "color": "#8b5cf6"},  # violet
         {"title": "이번 년도 수리매출", "amount": f"{year_rev:,}", "icon": "event_note", "color": "#6366f1"},     # indigo

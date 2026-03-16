@@ -401,20 +401,26 @@ def sidebar_callback(request):
                         "icon": "history",
                         "link": reverse_lazy("admin:as_app_ashistory_changelist"),
                     },
+                ],
+            },
+            {
+                "title": "AS 등록",
+                "separator": True,
+                "items": [
                     {
                         "title": "입고 등록",
                         "icon": "inbox",
                         "link": reverse_lazy("admin:as_app_inboundbatch_add"),
                     },
                     {
-                        "title": "수리 기록 등록",
-                        "icon": "build",
-                        "link": reverse_lazy("admin:as_app_repairticket_changelist"),
-                    },
-                    {
                         "title": "수리 의뢰 등록",
                         "icon": "send",
                         "link": reverse_lazy("admin:as_app_outsourcedticket_changelist"),
+                    },
+                    {
+                        "title": "수리 기록 등록",
+                        "icon": "build",
+                        "link": reverse_lazy("admin:as_app_repairticket_changelist"),
                     },
                     {
                         "title": "출고 등록",

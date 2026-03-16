@@ -353,7 +353,8 @@
 {% if kpi %}
 <div class="dash-grid dash-grid-5" style="margin-bottom: 1.5rem;">
     {% for item in kpi %}
-    <div class="kpi-card">
+    <a href="{{ item.link }}" style="text-decoration: none; color: inherit;">
+    <div class="kpi-card" style="cursor: pointer;">
         <div class="kpi-icon" style="background: {{ item.color }};">
             <span class="material-icons-outlined">{{ item.icon }}</span>
         </div>
@@ -363,6 +364,7 @@
             <span class="kpi-footer">{{ item.footer }}</span>
         </div>
     </div>
+    </a>
     {% endfor %}
 </div>
 {% endif %}
