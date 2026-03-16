@@ -35,15 +35,29 @@ document.addEventListener('DOMContentLoaded', function() {
         container.style.borderColor = '#312e81';
     }
 
-    // 헤더
+    // 헤더 (유지)
     const header = document.createElement('div');
-    header.style.cssText = 'font-size:0.85rem; font-weight:700; color:#4338ca; margin-bottom:10px; display:flex; align-items:center; gap:6px;';
-    header.innerHTML = '📦 수리 세트 빠른 적용 <span style="font-weight:400; color:#6b7280; font-size:0.78rem;">(여러 개 선택 가능 · 공임은 최고가 자동 선택)</span>';
+    header.style.cssText = 'font-size:0.85rem; font-weight:700; color:#4338ca; margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap: wrap; justify-content: space-between;';
+    header.innerHTML = '<div>📦 수리 세트 빠른 적용 <span style="font-weight:400; color:#6b7280; font-size:0.78rem;">(여러 개 선택 가능 · 공임은 최고가 자동 선택)</span></div>';
+    
+    // 초기화 버튼을 헤더 우측으로 배치
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.textContent = '✕ 전체 해제';
+    resetBtn.style.cssText = 'padding:6px 12px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#6b7280; font-size:0.75rem; font-weight:600; cursor:pointer; transition:all .2s ease; margin-left: auto;';
+    
+    resetBtn.addEventListener('mouseenter', function() { this.style.background = '#f3f4f6'; });
+    resetBtn.addEventListener('mouseleave', function() { this.style.background = '#fff'; });
+    
+    if (document.documentElement.classList.contains('dark')) {
+        resetBtn.style.background = '#1e293b';
+        resetBtn.style.borderColor = '#475569';
+        resetBtn.style.color = '#94a3b8';
+        resetBtn.addEventListener('mouseenter', function() { this.style.background = '#334155'; });
+        resetBtn.addEventListener('mouseleave', function() { this.style.background = '#1e293b'; });
+    }
+    header.appendChild(resetBtn);
     container.appendChild(header);
-
-    // 버튼 영역
-    const btnGroup = document.createElement('div');
-    btnGroup.style.cssText = 'display:flex; flex-wrap:wrap; gap:8px;';
 
     // ── 행 스타일 동기화 함수 ──
     function syncRowStyles() {
@@ -103,68 +117,106 @@ document.addEventListener('DOMContentLoaded', function() {
         syncRowStyles();
     }
 
-    // ── 세트 버튼 생성 ──
+    // ── 테이블 영역 생성 ──
+    const presetTable = document.createElement('table');
+    presetTable.style.cssText = 'width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; border:1px solid #e5e7eb; margin-bottom: 5px;';
+    if (document.documentElement.classList.contains('dark')) {
+        presetTable.style.background = '#1e293b';
+        presetTable.style.borderColor = '#334155';
+    }
+
+    const tHead = document.createElement('thead');
+    tHead.innerHTML = `
+        <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+            <th style="width:50px; text-align:center; padding:10px; font-size:0.75rem; color:#6b7280; font-weight:600;">선택</th>
+            <th style="padding:10px; text-align:left; font-size:0.75rem; color:#6b7280; font-weight:600;">수리 세트명</th>
+            <th style="width:120px; text-align:right; padding:10px; font-size:0.75rem; color:#6b7280; font-weight:600;">합계 금액</th>
+        </tr>
+    `;
+    if (document.documentElement.classList.contains('dark')) {
+        tHead.querySelector('tr').style.background = '#1a2332';
+        tHead.querySelector('tr').style.borderColor = '#334155';
+        tHead.querySelectorAll('th').forEach(th => th.style.color = '#94a3b8');
+    }
+    presetTable.appendChild(tHead);
+
+    const tBody = document.createElement('tbody');
+    presetTable.appendChild(tBody);
+
+    // ── 세트 행 일괄 렌더링 ──
     presets.forEach(function(preset) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.dataset.presetId = preset.id;
-        btn.textContent = preset.name + ' (' + preset.total_price.toLocaleString() + '원)';
-        btn.style.cssText = 'padding:8px 16px; border-radius:8px; border:2px solid #6366f1; background:#fff; color:#4338ca; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all .2s ease;';
+        const tr = document.createElement('tr');
+        tr.style.cssText = 'border-bottom:1px solid #f3f4f6; cursor:pointer; transition:background 0.15s ease;';
+        if (document.documentElement.classList.contains('dark')) {
+            tr.style.borderColor = '#334155';
+            tr.style.color = '#cbd5e1';
+        }
 
-        btn.addEventListener('mouseenter', function() {
-            if (!activePresets.has(preset.id)) {
-                this.style.background = '#eef2ff';
+        const tdCheck = document.createElement('td');
+        tdCheck.style.cssText = 'text-align:center; padding:8px 10px;';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.dataset.presetId = preset.id;
+        checkbox.style.cssText = 'width:18px; height:18px; accent-color:#6366f1; cursor:pointer; pointer-events: none;';
+        tdCheck.appendChild(checkbox);
+
+        const tdName = document.createElement('td');
+        tdName.style.cssText = 'padding:8px 10px; font-size:0.85rem; font-weight:600; color:#4338ca;';
+        tdName.textContent = preset.name;
+        if (document.documentElement.classList.contains('dark')) tdName.style.color = '#a5b4fc';
+
+        const tdPrice = document.createElement('td');
+        tdPrice.style.cssText = 'padding:8px 10px; text-align:right; font-size:0.85rem; font-weight:600; font-variant-numeric:tabular-nums;';
+        tdPrice.textContent = preset.total_price.toLocaleString() + '원';
+        if (document.documentElement.classList.contains('dark')) tdPrice.style.color = '#cbd5e1';
+
+        tr.appendChild(tdCheck);
+        tr.appendChild(tdName);
+        tr.appendChild(tdPrice);
+
+        // hover 상태
+        tr.addEventListener('mouseenter', function() {
+            if (!checkbox.checked) {
+                this.style.background = document.documentElement.classList.contains('dark') ? 'rgba(99, 102, 241, 0.04)' : 'rgba(99, 102, 241, 0.04)';
             }
         });
-        btn.addEventListener('mouseleave', function() {
-            if (!activePresets.has(preset.id)) {
-                this.style.background = '#fff';
+        tr.addEventListener('mouseleave', function() {
+            if (!checkbox.checked) {
+                this.style.background = 'transparent';
             }
         });
 
-        btn.addEventListener('click', function() {
-            // 토글
-            if (activePresets.has(preset.id)) {
-                activePresets.delete(preset.id);
-                this.style.background = '#fff';
-                this.style.color = '#4338ca';
-                this.style.borderColor = '#6366f1';
-            } else {
+        // 클릭으로 토글
+        tr.addEventListener('click', function(e) {
+            checkbox.checked = !checkbox.checked;
+
+            if (checkbox.checked) {
                 activePresets.add(preset.id);
-                this.style.background = '#6366f1';
-                this.style.color = '#fff';
-                this.style.borderColor = '#6366f1';
+                this.style.background = document.documentElement.classList.contains('dark') ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.08)';
+            } else {
+                activePresets.delete(preset.id);
+                this.style.background = document.documentElement.classList.contains('dark') ? 'rgba(99, 102, 241, 0.04)' : 'rgba(99, 102, 241, 0.04)'; // hover style retention if mouse is still there
             }
-
-            // 전체 재계산
             applyActivePresets();
         });
 
-        btnGroup.appendChild(btn);
+        tBody.appendChild(tr);
     });
 
-    // "초기화" 버튼
-    const resetBtn = document.createElement('button');
-    resetBtn.type = 'button';
-    resetBtn.textContent = '✕ 전체 해제';
-    resetBtn.style.cssText = 'padding:8px 16px; border-radius:8px; border:2px solid #d1d5db; background:#fff; color:#6b7280; font-size:0.82rem; font-weight:600; cursor:pointer; transition:all .2s ease;';
+    // "초기화" 버튼 동작
     resetBtn.addEventListener('click', function() {
         activePresets.clear();
-        const checkboxes = widget.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach(function(cb) { cb.checked = false; });
-        syncRowStyles();
-        // 모든 세트 버튼 비활성화 스타일
-        btnGroup.querySelectorAll('button').forEach(function(b) {
-            if (b !== resetBtn) {
-                b.style.background = '#fff';
-                b.style.color = '#4338ca';
-                b.style.borderColor = '#6366f1';
-            }
+        tBody.querySelectorAll('tr').forEach(tr => {
+            tr.style.background = 'transparent';
+            const cb = tr.querySelector('input[type="checkbox"]');
+            if (cb) cb.checked = false;
         });
+        const widgetCheckboxes = widget.querySelectorAll('input[type="checkbox"]');
+        widgetCheckboxes.forEach(function(cb) { cb.checked = false; });
+        syncRowStyles();
     });
-    btnGroup.appendChild(resetBtn);
 
-    container.appendChild(btnGroup);
+    container.appendChild(presetTable);
 
     // 위젯 앞에 삽입
     widget.parentNode.insertBefore(container, widget);

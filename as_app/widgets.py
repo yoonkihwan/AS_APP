@@ -43,79 +43,54 @@ class PartsTableWidget(forms.CheckboxSelectMultiple):
         return mark_safe(html)
 
     def _build_html(self, name, labor_items, part_items):
-        """공임 탭(먼저) + 부품 탭 = 테이블 형태 HTML 생성"""
-
-        labor_count = len(labor_items)
-        part_count = len(part_items)
-
-        # 탭 헤더
+        """공임과 부품을 단일 테이블에 섹션으로 나누어 표시"""
         html = '<div class="parts-table-widget">'
-        html += '<div class="parts-tabs">'
-        html += (
-            '<button type="button" class="parts-tab active" data-tab="labor">'
-            f'💰 공임 <span class="parts-tab-count">{labor_count}</span>'
-            "</button>"
-        )
-        html += (
-            '<button type="button" class="parts-tab" data-tab="part">'
-            f'🔧 부품 <span class="parts-tab-count">{part_count}</span>'
-            "</button>"
-        )
-        html += "</div>"
-
-        # 공임 테이블 (기본 활성)
-        html += '<div class="parts-tab-content active" data-tab-content="labor">'
-        html += self._build_table(name, labor_items, is_labor=True)
-        html += "</div>"
-
-        # 부품 테이블
-        html += '<div class="parts-tab-content" data-tab-content="part">'
-        html += self._build_table(name, part_items, is_labor=False)
-        html += "</div>"
-
-        html += "</div>"
-        return html
-
-    def _build_table(self, name, items, is_labor=False):
-        """개별 테이블 HTML 생성"""
-        type_label = "공임명" if is_labor else "품명"
-
-        if not items:
-            empty_text = "등록된 공임이 없습니다." if is_labor else "등록된 부품이 없습니다."
-            return (
-                '<div class="parts-table-empty">'
-                f'<span class="parts-table-empty-icon">📋</span>'
-                f"{empty_text}"
-                "</div>"
-            )
-
-        html = '<table class="parts-select-table">'
+        html += '<table class="parts-select-table">'
         html += "<thead><tr>"
         html += '<th class="col-check">선택</th>'
-        html += f'<th class="col-name">{type_label}</th>'
+        html += '<th class="col-name">공임/부품명</th>'
         html += '<th class="col-code">코드</th>'
         html += '<th class="col-price">단가</th>'
         html += "</tr></thead>"
         html += "<tbody>"
 
-        for item in items:
-            checked_attr = ' checked="checked"' if item["checked"] else ""
-            checked_class = " selected-row" if item["checked"] else ""
-            price_formatted = f'{item["price"]:,}원' if item["price"] else "0원"
-            code_display = item["code"] if item["code"] else "-"
+        # 공임 섹션
+        html += '<tr class="section-separator"><td colspan="4">공임</td></tr>'
+        if not labor_items:
+            html += '<tr><td colspan="4" class="parts-table-empty"><span class="parts-table-empty-icon">📋</span>등록된 공임이 없습니다.</td></tr>'
+        else:
+            for item in labor_items:
+                html += self._build_tr(name, item)
 
-            html += f'<tr class="parts-row{checked_class}" data-part-id="{item["id"]}">'
-            html += (
-                f'<td class="col-check">'
-                f'<input type="checkbox" name="{name}" value="{item["id"]}"{checked_attr}>'
-                f"</td>"
-            )
-            html += f'<td class="col-name">{item["name"]}</td>'
-            html += f'<td class="col-code">{code_display}</td>'
-            html += f'<td class="col-price">{price_formatted}</td>'
-            html += "</tr>"
+        # 부품 섹션
+        html += '<tr class="section-separator"><td colspan="4">부품</td></tr>'
+        if not part_items:
+            html += '<tr><td colspan="4" class="parts-table-empty"><span class="parts-table-empty-icon">📋</span>등록된 부품이 없습니다.</td></tr>'
+        else:
+            for item in part_items:
+                html += self._build_tr(name, item)
 
         html += "</tbody></table>"
+        html += "</div>"
+        return html
+
+    def _build_tr(self, name, item):
+        """개별 행 HTML 생성"""
+        checked_attr = ' checked="checked"' if item["checked"] else ""
+        checked_class = " selected-row" if item["checked"] else ""
+        price_formatted = f'{item["price"]:,}원' if item["price"] else "0원"
+        code_display = item["code"] if item["code"] else "-"
+
+        html = f'<tr class="parts-row{checked_class}" data-part-id="{item["id"]}">'
+        html += (
+            f'<td class="col-check">'
+            f'<input type="checkbox" name="{name}" value="{item["id"]}"{checked_attr}>'
+            f"</td>"
+        )
+        html += f'<td class="col-name">{item["name"]}</td>'
+        html += f'<td class="col-code">{code_display}</td>'
+        html += f'<td class="col-price">{price_formatted}</td>'
+        html += "</tr>"
         return html
 
     def value_from_datadict(self, data, files, name):

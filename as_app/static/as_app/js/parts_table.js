@@ -5,24 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const widget = document.querySelector('.parts-table-widget');
     if (!widget) return;
 
-    // ── 탭 전환 ──
-    const tabs = widget.querySelectorAll('.parts-tab');
-    const contents = widget.querySelectorAll('.parts-tab-content');
 
-    tabs.forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            const target = this.dataset.tab;
-
-            // 활성 탭 변경
-            tabs.forEach(function (t) { t.classList.remove('active'); });
-            this.classList.add('active');
-
-            // 콘텐츠 전환
-            contents.forEach(function (c) {
-                c.classList.toggle('active', c.dataset.tabContent === target);
-            });
-        });
-    });
 
     // ── 행 클릭으로 체크박스 토글 ──
     const rows = widget.querySelectorAll('.parts-row');
