@@ -194,6 +194,7 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     autocomplete_fields = ["brand"]
     filter_horizontal = ["tools"]
     list_per_page = 20
+    ordering = ["brand__name", "name"]
     change_list_template = "admin/as_app/part/change_list.html"
 
     def get_form(self, request, obj=None, **kwargs):
@@ -270,9 +271,32 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 
 
 
+
+
     @admin.display(description="적용 장비")
     def display_tools(self, obj):
-        return obj.tool_list()
+        tools = obj.tools.all()
+        count = tools.count()
+        if count == 0:
+            return "공용 (전체 적용)"
+        elif count == 1:
+            return format_html('<span style="color:#4b5563;">{}</span>', str(tools[0]))
+        else:
+            first_tool = str(tools[0])
+            all_tools_str = ", ".join(str(t) for t in tools)
+            summary_text = f"<strong>{first_tool}</strong> 외 {count - 1}건"
+            
+            # Unfold/Tailwind CSS classes for a clean inline expanding UI without popups.
+            # Using <details> and <summary> for native accordion behavior.
+            html = f"""
+            <details style="cursor: pointer;">
+                <summary style="color: #6366f1; outline: none;">{summary_text} <span style="font-size: 0.75rem;">▼</span></summary>
+                <div style="margin-top: 6px; padding: 8px 10px; background-color: #f3f4f6; border-radius: 6px; font-size: 0.8rem; color: #4b5563; line-height: 1.4;">
+                    {all_tools_str}
+                </div>
+            </details>
+            """
+            return format_html(html)
 
     @admin.display(description="단가")
     def formatted_price(self, obj):
@@ -294,6 +318,7 @@ class RepairPresetAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     autocomplete_fields = ["brand"]
     filter_horizontal = ["parts", "tools"]
     list_per_page = 20
+    ordering = ["brand__name", "name"]
     change_list_template = "admin/as_app/repairpreset/change_list.html"
 
     class Media:
@@ -336,9 +361,25 @@ class RepairPresetAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     @admin.display(description="적용 장비")
     def display_tools(self, obj):
         tools = obj.tools.all()
-        if tools:
-            return ", ".join(str(t) for t in tools[:3])
-        return "전체"
+        count = tools.count()
+        if count == 0:
+            return "공용 (전체 적용)"
+        elif count == 1:
+            return format_html('<span style="color:#4b5563;">{}</span>', str(tools[0]))
+        else:
+            first_tool = str(tools[0])
+            all_tools_str = ", ".join(str(t) for t in tools)
+            summary_text = f"<strong>{first_tool}</strong> 외 {count - 1}건"
+            
+            html = f"""
+            <details style="cursor: pointer;">
+                <summary style="color: #6366f1; outline: none;">{summary_text} <span style="font-size: 0.75rem;">▼</span></summary>
+                <div style="margin-top: 6px; padding: 8px 10px; background-color: #f3f4f6; border-radius: 6px; font-size: 0.8rem; color: #4b5563; line-height: 1.4;">
+                    {all_tools_str}
+                </div>
+            </details>
+            """
+            return format_html(html)
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
