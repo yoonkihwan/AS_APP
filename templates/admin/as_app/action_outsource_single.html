@@ -1,0 +1,164 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}수리의뢰 처리 | {{ site_title }}{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+<style>
+    .date-pick-container {
+        max-width: 520px;
+        margin: 2rem auto;
+        background: var(--color-bg, #fff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.75rem;
+        padding: 2rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .dark .date-pick-container {
+        background: #1e293b;
+        border-color: #334155;
+    }
+    .date-pick-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: var(--text-color, #111827);
+    }
+    .dark .date-pick-title {
+        color: #f1f5f9;
+    }
+    .date-pick-desc {
+        font-size: 0.85rem;
+        color: var(--text-muted, #6b7280);
+        margin-bottom: 1.5rem;
+        line-height: 1.5;
+    }
+    .dark .date-pick-desc {
+        color: #94a3b8;
+    }
+    .date-pick-summary {
+        background: var(--color-bg-secondary, #f9fafb);
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.8rem;
+        color: var(--text-color, #374151);
+    }
+    .dark .date-pick-summary {
+        background: #1a2332;
+        color: #cbd5e1;
+    }
+    .date-pick-summary strong {
+        color: #f59e0b;
+    }
+    .date-pick-input {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        border: 1px solid var(--border-color, #d1d5db);
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+        background: var(--color-bg, #fff);
+        color: var(--text-color, #111827);
+    }
+    .dark .date-pick-input {
+        background: #0f172a;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+    .date-pick-input:focus {
+        outline: none;
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245,158,11,0.15);
+    }
+    .date-pick-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+    }
+    .date-pick-btn {
+        padding: 0.5rem 1.25rem;
+        border-radius: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid var(--border-color, #d1d5db);
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .date-pick-btn-cancel {
+        background: var(--color-bg, #fff);
+        color: var(--text-color, #374151);
+    }
+    .dark .date-pick-btn-cancel {
+        background: #334155;
+        border-color: #475569;
+        color: #e2e8f0;
+    }
+    .date-pick-btn-cancel:hover {
+        background: #f3f4f6;
+    }
+    .dark .date-pick-btn-cancel:hover {
+        background: #475569;
+    }
+    .date-pick-btn-submit {
+        background: #f59e0b;
+        color: #fff;
+        border-color: #f59e0b;
+    }
+    .date-pick-btn-submit:hover {
+        background: #d97706;
+        border-color: #d97706;
+    }
+    .date-pick-label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--text-color, #374151);
+    }
+    .dark .date-pick-label {
+        color: #cbd5e1;
+    }
+</style>
+
+<div class="date-pick-container">
+    <div class="date-pick-title">📦 수리 의뢰 등록</div>
+    <div class="date-pick-desc">
+        선택한 장비를 수리의뢰 상태로 변경하고 지정된 외주 업체에 접수 처리합니다.
+    </div>
+
+    <div class="date-pick-summary">
+        대상 장비: <strong>{{ ticket.tool }}</strong> (S/N: {{ ticket.serial_number }})
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <label class="date-pick-label" for="outsource_company">의뢰업체</label>
+        <select name="outsource_company" id="outsource_company" class="date-pick-input" required>
+            <option value="">-- 업체를 선택하세요 --</option>
+            {% for company in companies %}
+            <option value="{{ company.id }}">{{ company.name }}</option>
+            {% endfor %}
+        </select>
+
+        <label class="date-pick-label" for="outsource_date">의뢰 날짜</label>
+        <input type="date" name="outsource_date" id="outsource_date"
+               class="date-pick-input" required
+               value="{{ default_date }}">
+
+        <div class="date-pick-actions">
+            <a href="{% url 'admin:as_app_outsourcedticket_changelist' %}"
+               class="date-pick-btn date-pick-btn-cancel">취소</a>
+            <button type="submit" class="date-pick-btn date-pick-btn-submit">
+                수리의뢰 처리
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

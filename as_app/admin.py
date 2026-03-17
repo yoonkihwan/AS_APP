@@ -67,6 +67,39 @@ class CustomTitleMixin:
         extra_context['title'] = self.get_custom_title()
         return super().change_view(request, object_id, form_url, extra_context=extra_context)
 
+
+class CompositeDisplayMixin:
+    """복합 컬럼(Multi-line Cell) 공유 display 메서드"""
+
+    @admin.display(description="매출처 · 담당자")
+    def display_company_info(self, obj):
+        company_name = obj.company.name if obj.company_id else "-"
+        manager = obj.manager or ""
+        if manager:
+            return format_html(
+                '<div class="cell-wrap">'
+                '<span class="cell-main">{}</span>'
+                '<span class="cell-sub">{}</span>'
+                '</div>',
+                company_name,
+                manager,
+            )
+        return format_html('<span class="cell-main">{}</span>', company_name)
+
+    @admin.display(description="장비 · S/N")
+    def display_tool_info(self, obj):
+        tool_str = str(obj.tool) if obj.tool_id else "-"
+        sn = obj.serial_number or "-"
+        return format_html(
+            '<div class="cell-wrap">'
+            '<span class="cell-main">{}</span>'
+            '<span class="cell-sub">S/N: {}</span>'
+            '</div>',
+            tool_str,
+            sn,
+        )
+
+
 from .models import (
     ASHistory,
     ASTicket,
@@ -725,7 +758,7 @@ class InboundTicketAdmin(StatusColorMixin, ModelAdmin):
         css = {"all": ("as_app/css/row_colors.css",)}
 
 @admin.register(RepairTicket)
-class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "수리 기록 등록"
     """수리 기록 - 목록에서 버튼 클릭으로 수리 등록 페이지 이동"""
 
@@ -733,9 +766,8 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
     list_display = [
         "display_status",
         "inbound_date",
-        "company",
-        "tool",
-        "serial_number",
+        "display_company_info",
+        "display_tool_info",
         "display_repair_button",
     ]
     list_display_links = None  # 행 클릭 비활성화 (버튼으로만 이동)
@@ -744,7 +776,7 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
     actions = None  # 체크박스 + 액션 드롭다운 제거 (상태는 자동 관리)
 
     class Media:
-        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/parts_table.css")}
+        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/parts_table.css", "as_app/css/multiline_cell.css")}
         js = ("as_app/js/parts_table.js",)
 
     # ── 수리 등록 폼 설정 ──
@@ -949,17 +981,16 @@ class RepairTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixi
 
 
 @admin.register(OutsourcedTicket)
-class OutsourcedTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class OutsourcedTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "수리 의뢰 등록"
     """수리 의뢰 등록 - 입고 목록에서 선택하여 수리의뢰 처리"""
 
     list_display = [
         "display_status",
         "inbound_date",
-        "company",
-        "tool",
-        "serial_number",
-        "symptom",
+        "display_company_info",
+        "display_tool_info",
+        "display_outsource_button",
     ]
     list_display_links = None  # 행 클릭 시 상세 페이지 이동 안 함 (체크만)
     list_filter = ["company", "tool__brand"]
@@ -969,7 +1000,95 @@ class OutsourcedTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtons
     ordering = ["-inbound_date", "-created_at"]
 
     class Media:
-        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/text_truncate.css")}
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/multiline_cell.css")}
+
+    @admin.display(description="수리 의뢰")
+    def display_outsource_button(self, obj):
+        """목록에서 개별 수리 의뢰 버튼 표시"""
+        url = reverse("admin:as_app_outsourcedticket_outsource_single", args=[obj.pk])
+        return format_html(
+            '<a href="{}" style="'
+            'display:inline-flex; align-items:center; gap:6px; '
+            'padding:6px 14px; border-radius:6px; font-size:0.8rem; '
+            'font-weight:600; text-decoration:none; '
+            'background:#f59e0b; color:#fff; '
+            'transition:all .15s ease;'
+            '" '
+            'onmouseover="this.style.background=\'#d97706\'" '
+            'onmouseout="this.style.background=\'#f59e0b\'">'
+            '📦 수리 의뢰 등록</a>',
+            url
+        )
+
+    def get_urls(self):
+        custom_urls = [
+            path(
+                "outsource-single/<int:pk>/",
+                self.admin_site.admin_view(self.outsource_single_view),
+                name="as_app_outsourcedticket_outsource_single",
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def outsource_single_view(self, request, pk):
+        """개별 티켓 수리의뢰 처리 (의뢰업체 선택 페이지)"""
+        from django.template.response import TemplateResponse
+        import datetime
+
+        try:
+            ticket = ASTicket.objects.select_related("company", "tool", "tool__brand").get(
+                pk=pk, status=ASTicket.Status.INBOUND
+            )
+        except ASTicket.DoesNotExist:
+            from django.contrib import messages
+            messages.error(request, "해당 티켓을 찾을 수 없거나 입고 상태가 아닙니다.")
+            return HttpResponseRedirect(reverse("admin:as_app_outsourcedticket_changelist"))
+
+        if request.method == "POST":
+            company_id = request.POST.get("outsource_company")
+            date_str = request.POST.get("outsource_date", "")
+
+            if not company_id:
+                from django.contrib import messages
+                messages.error(request, "의뢰업체를 선택해야 합니다.")
+                return HttpResponseRedirect(request.get_full_path())
+
+            try:
+                outsource_date = datetime.date.fromisoformat(date_str) if date_str else timezone.localdate()
+            except (ValueError, TypeError):
+                from django.contrib import messages
+                messages.error(request, "올바른 날짜 형식이 아닙니다.")
+                return HttpResponseRedirect(request.get_full_path())
+
+            try:
+                company = OutsourceCompany.objects.get(pk=company_id)
+            except OutsourceCompany.DoesNotExist:
+                from django.contrib import messages
+                messages.error(request, "존재하지 않는 의뢰업체입니다.")
+                return HttpResponseRedirect(request.get_full_path())
+
+            ticket.status = ASTicket.Status.OUTSOURCED
+            ticket.outsource_company = company
+            ticket.outsource_date = outsource_date
+            ticket.save(update_fields=["status", "outsource_company", "outsource_date"])
+
+            from django.contrib import messages
+            messages.success(
+                request,
+                "%s (S/N: %s) → 수리의뢰 처리되었습니다. (의뢰업체: %s)" % (ticket.tool, ticket.serial_number, company.name)
+            )
+            return HttpResponseRedirect(reverse("admin:as_app_outsourcedticket_changelist"))
+
+        # GET: 의뢰업체 선택 페이지 렌더링
+        companies = OutsourceCompany.objects.all().order_by("name")
+        context = dict(
+            self.admin_site.each_context(request),
+            title="수리의뢰 처리 (의뢰업체 선택)",
+            ticket=ticket,
+            companies=companies,
+            default_date=timezone.localdate().strftime("%Y-%m-%d"),
+        )
+        return TemplateResponse(request, "admin/as_app/action_outsource_single.html", context)
 
     def get_queryset(self, request):
         """입고 상태인 티켓만 표시"""
@@ -993,7 +1112,7 @@ class OutsourcedTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtons
 
     @unfold_action(description="📦 선택 항목 수리의뢰 처리")
     def mark_as_outsourced(self, request, queryset):
-        """외주업체 선택 중간 페이지를 통해 수리의뢰 처리"""
+        """외주업체 선택 중간 페이지를 통해 수리의뢰 처리 (일괄)"""
         from django.template.response import TemplateResponse
         import datetime
 
@@ -1047,18 +1166,18 @@ class OutsourcedTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtons
 
 
 @admin.register(OutboundTicket)
-class OutboundTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class OutboundTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "출고 등록"
     """출고 등록 - 수리완료 목록에서 선택하여 출고 처리"""
 
     list_display = [
         "display_status",
         "inbound_date",
-        "company",
-        "tool",
-        "serial_number",
-        "display_used_parts",
+        "display_company_info",
+        "display_tool_info",
+        "display_repair_summary",
         "formatted_repair_cost",
+        "display_outbound_button",
     ]
     list_display_links = None  # 행 클릭 시 상세 페이지 이동 안 함 (체크만)
     list_filter = ["company", "tool__brand"]
@@ -1068,24 +1187,131 @@ class OutboundTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
     ordering = ["-inbound_date", "-created_at"]
 
     class Media:
-        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/text_truncate.css")}
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/multiline_cell.css")}
         js = ("as_app/js/outbound_row_click.js",)
 
-    @admin.display(description="사용 부품")
-    def display_used_parts(self, obj):
-        parts = obj.used_parts.all()
-        if parts:
-            full_text = ", ".join(p.name for p in parts)
+    @admin.display(description="수리 내역")
+    def display_repair_summary(self, obj):
+        """아코디언 형태의 수리 내역 표시 (공임먼저 → 가격순)"""
+        parts_list = list(obj.used_parts.all())
+        if not parts_list:
+            return "-"
+        company = obj.company if obj.company_id else None
+        parts_list.sort(
+            key=lambda p: (0 if p.part_type == 'labor' else 1, -p.get_price_for_company(company))
+        )
+        count = len(parts_list)
+        first = parts_list[0]
+        first_price = first.get_price_for_company(company)
+        first_code = f" ({first.code})" if first.code else ""
+        first_label = "공임" if first.part_type == "labor" else "부품"
+        summary_text = f"[{first_label}] {first.name}{first_code}"
+        if count == 1:
             return format_html(
-                '<span class="truncate-text" title="{}">{}</span>',
-                full_text,
-                full_text
+                '<span title="{}">{}</span>',
+                f"{summary_text} ({first_price:,}원)", summary_text,
             )
-        return "-"
+        detail_rows = []
+        for p in parts_list:
+            p_price = p.get_price_for_company(company)
+            p_code = f" ({p.code})" if p.code else ""
+            p_label = "공임" if p.part_type == "labor" else "부품"
+            detail_rows.append(
+                f'<div style="padding:2px 0;">[{p_label}] {p.name}{p_code}'
+                f' <span style="opacity:0.7;">({p_price:,}원)</span></div>'
+            )
+        details_html = "".join(detail_rows)
+        return format_html(
+            '<details style="cursor:pointer;">'
+            '<summary style="color:#6366f1; outline:none;">'
+            '<strong>{}</strong> 외 {}건'
+            ' <span style="font-size:0.75rem;">▼</span>'
+            '</summary>'
+            '<div style="margin-top:4px; padding:6px 8px; '
+            'background-color:rgba(99,102,241,0.06); border-radius:6px; '
+            'font-size:0.82rem; line-height:1.5;">'
+            '{}'
+            '</div>'
+            '</details>',
+            summary_text, count - 1, format_html(details_html),
+        )
 
     @admin.display(description="수리 비용")
     def formatted_repair_cost(self, obj):
         return f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
+
+    @admin.display(description="출고 등록")
+    def display_outbound_button(self, obj):
+        """목록에서 개별 출고 처리 버튼 표시"""
+        url = reverse("admin:as_app_outboundticket_outbound_single", args=[obj.pk])
+        return format_html(
+            '<a href="{}" style="'
+            'display:inline-flex; align-items:center; gap:6px; '
+            'padding:6px 14px; border-radius:6px; font-size:0.8rem; '
+            'font-weight:600; text-decoration:none; '
+            'background:#6366f1; color:#fff; '
+            'transition:all .15s ease;'
+            '" '
+            'onmouseover="this.style.background=\'#4f46e5\'" '
+            'onmouseout="this.style.background=\'#6366f1\'">'
+            '📤 출고 등록</a>',
+            url
+        )
+
+    def get_urls(self):
+        custom_urls = [
+            path(
+                "outbound-single/<int:pk>/",
+                self.admin_site.admin_view(self.outbound_single_view),
+                name="as_app_outboundticket_outbound_single",
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def outbound_single_view(self, request, pk):
+        """개별 티켓 출고 처리 (날짜 선택 페이지)"""
+        from django.template.response import TemplateResponse
+        import datetime
+
+        try:
+            ticket = ASTicket.objects.select_related("company", "tool", "tool__brand").get(
+                pk=pk, status=ASTicket.Status.REPAIRED
+            )
+        except ASTicket.DoesNotExist:
+            from django.contrib import messages
+            messages.error(request, "해당 티켓을 찾을 수 없거나 수리완료 상태가 아닙니다.")
+            return HttpResponseRedirect(reverse("admin:as_app_outboundticket_changelist"))
+
+        if request.method == "POST":
+            date_str = request.POST.get("outbound_date", "")
+            try:
+                outbound_date = datetime.date.fromisoformat(date_str) if date_str else timezone.localdate()
+            except (ValueError, TypeError):
+                from django.contrib import messages
+                messages.error(request, "올바른 날짜 형식이 아닙니다.")
+                return HttpResponseRedirect(request.get_full_path())
+
+            ticket.status = ASTicket.Status.SHIPPED
+            ticket.outbound_date = outbound_date
+            ticket.save(update_fields=["status", "outbound_date"])
+
+            from django.contrib import messages
+            messages.success(
+                request,
+                "%s (S/N: %s) → 출고 처리되었습니다. (출고일: %s)" % (
+                    ticket.tool, ticket.serial_number, outbound_date.strftime("%Y-%m-%d")
+                )
+            )
+            return HttpResponseRedirect(reverse("admin:as_app_outboundticket_changelist"))
+
+        # GET: 날짜 선택 페이지 렌더링
+        context = dict(
+            self.admin_site.each_context(request),
+            title="출고 날짜 선택",
+            ticket=ticket,
+            today=timezone.localdate().strftime("%Y-%m-%d"),
+        )
+        return TemplateResponse(request, "admin/as_app/outbound_single.html", context)
 
     def get_queryset(self, request):
         """수리완료 상태인 티켓만 표시"""
@@ -1094,7 +1320,7 @@ class OutboundTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
             .get_queryset(request)
             .filter(status=ASTicket.Status.REPAIRED)
             .select_related("company", "tool", "tool__brand")
-            .prefetch_related("used_parts")
+            .prefetch_related("used_parts", "used_parts__group_prices", "used_parts__group_prices__category")
         )
 
     def has_add_permission(self, request):
@@ -1491,18 +1717,17 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
 
 
 @admin.register(EstimateTicket)
-class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class EstimateTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "견적서 발행"
     """견적서 발행 기능 (데모 버전)"""
 
     list_display = [
         "display_status",
-        "inbound_date",
-        "outbound_date",
-        "company",
-        "tool",
-        "serial_number",
-        "formatted_repair_cost",
+        "display_dates",
+        "display_company_info",
+        "display_tool_info",
+        "display_repair_summary",
+        "display_cost_estimate",
     ]
     list_filter = [
         "status",
@@ -1516,19 +1741,95 @@ class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
         "company__name",
         "tool__model_name",
         "tool__brand__name",
-        "symptom",
         "repair_content",
     ]
     list_per_page = 30
     actions = ["export_estimate"]
 
     class Media:
-        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css")}
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/multiline_cell.css")}
+
+    @admin.display(description="입고일 / 출고일")
+    def display_dates(self, obj):
+        inbound = obj.inbound_date.strftime("%Y-%m-%d") if obj.inbound_date else "-"
+        outbound = obj.outbound_date.strftime("%Y-%m-%d") if obj.outbound_date else "-"
+        return format_html(
+            '<div class="cell-wrap">'
+            '<span class="cell-main">{}</span>'
+            '<span class="cell-sub">{}</span>'
+            '</div>',
+            inbound, outbound,
+        )
+
+    @admin.display(description="수리 내역")
+    def display_repair_summary(self, obj):
+        """아코디언 형태의 수리 내역 표시 (공임먼저 → 가격순)"""
+        parts_list = list(obj.used_parts.all())
+        if not parts_list:
+            return "-"
+        company = obj.company if obj.company_id else None
+        parts_list.sort(
+            key=lambda p: (0 if p.part_type == 'labor' else 1, -p.get_price_for_company(company))
+        )
+        count = len(parts_list)
+        first = parts_list[0]
+        first_price = first.get_price_for_company(company)
+        first_code = f" ({first.code})" if first.code else ""
+        first_label = "공임" if first.part_type == "labor" else "부품"
+        summary_text = f"[{first_label}] {first.name}{first_code}"
+        if count == 1:
+            return format_html(
+                '<span title="{}">{}</span>',
+                f"{summary_text} ({first_price:,}원)", summary_text,
+            )
+        detail_rows = []
+        for p in parts_list:
+            p_price = p.get_price_for_company(company)
+            p_code = f" ({p.code})" if p.code else ""
+            p_label = "공임" if p.part_type == "labor" else "부품"
+            detail_rows.append(
+                f'<div style="padding:2px 0;">[{p_label}] {p.name}{p_code}'
+                f' <span style="opacity:0.7;">({p_price:,}원)</span></div>'
+            )
+        details_html = "".join(detail_rows)
+        return format_html(
+            '<details style="cursor:pointer;">'
+            '<summary style="color:#6366f1; outline:none;">'
+            '<strong>{}</strong> 외 {}건'
+            ' <span style="font-size:0.75rem;">▼</span>'
+            '</summary>'
+            '<div style="margin-top:4px; padding:6px 8px; '
+            'background-color:rgba(99,102,241,0.06); border-radius:6px; '
+            'font-size:0.82rem; line-height:1.5;">'
+            '{}'
+            '</div>'
+            '</details>',
+            summary_text, count - 1, format_html(details_html),
+        )
+
+    @admin.display(description="비용 · 견적")
+    def display_cost_estimate(self, obj):
+        cost_str = f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
+        est_cls = "doc-yes" if obj.estimate_status else "doc-no"
+        est_txt = "견적 ✓" if obj.estimate_status else "견적 ✗"
+        return format_html(
+            '<div class="cell-wrap">'
+            '<span class="cell-main">{}</span>'
+            '<span class="cell-sub">'
+            '<span class="doc-label {}">{}</span>'
+            '</span>'
+            '</div>',
+            cost_str,
+            est_cls, est_txt,
+        )
 
     def get_queryset(self, request):
         """견적서 발행은 수리완료 또는 출고 상태인 데이터만 표시"""
-        return super().get_queryset(request).filter(
-            status__in=[ASTicket.Status.REPAIRED, ASTicket.Status.SHIPPED]
+        return (
+            super().get_queryset(request)
+            .filter(status__in=[ASTicket.Status.REPAIRED, ASTicket.Status.SHIPPED])
+            .select_related("company", "tool", "tool__brand")
+            .prefetch_related("used_parts", "used_parts__group_prices", "used_parts__group_prices__category")
         )
 
     def get_urls(self):
@@ -1655,22 +1956,18 @@ class EstimateTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMi
     def has_delete_permission(self, request, obj=None):
         return False
 
-    @admin.display(description="수리 비용")
-    def formatted_repair_cost(self, obj):
-        return f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
+    # formatted_repair_cost 제거 — display_cost_estimate로 대체됨
 
 
 @admin.register(TaxInvoiceTicket)
-class TaxInvoiceTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class TaxInvoiceTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "세금계산서 등록"
     
     list_display = [
         "display_status",
-        "inbound_date",
-        "outbound_date",
-        "company",
-        "tool",
-        "serial_number",
+        "display_dates",
+        "display_company_info",
+        "display_tool_info",
         "formatted_repair_cost",
         "tax_invoice",
     ]
@@ -1688,26 +1985,39 @@ class TaxInvoiceTicketAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtons
         "company__name",
         "tool__model_name",
         "tool__brand__name",
-        "symptom",
         "repair_content",
     ]
     list_per_page = 30
 
     class Media:
-        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css")}
+        css = {"all": ("as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/multiline_cell.css")}
 
-    def get_queryset(self, request):
-        """출고 상태인 데이터만 표시"""
-        return super().get_queryset(request).filter(
-            status=ASTicket.Status.SHIPPED
+    @admin.display(description="입고일 / 출고일")
+    def display_dates(self, obj):
+        inbound = obj.inbound_date.strftime("%Y-%m-%d") if obj.inbound_date else "-"
+        outbound = obj.outbound_date.strftime("%Y-%m-%d") if obj.outbound_date else "-"
+        return format_html(
+            '<div class="cell-wrap">'
+            '<span class="cell-main">{}</span>'
+            '<span class="cell-sub">{}</span>'
+            '</div>',
+            inbound, outbound,
         )
-
-    def has_add_permission(self, request):
-        return False
 
     @admin.display(description="수리 비용")
     def formatted_repair_cost(self, obj):
         return f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
+
+    def get_queryset(self, request):
+        """출고 상태인 데이터만 표시"""
+        return (
+            super().get_queryset(request)
+            .filter(status=ASTicket.Status.SHIPPED)
+            .select_related("company", "tool", "tool__brand")
+        )
+
+    def has_add_permission(self, request):
+        return False
 
     def has_delete_permission(self, request, obj=None):
         return False
