@@ -937,8 +937,18 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
         if obj.repair_cost != total_with_vat:
             obj.repair_cost = total_with_vat
             update_fields.append("repair_cost")
+            
         # 부품이 선택되어 있으면 자동으로 수리완료 상태로 변경
         if obj.ticket_used_parts.exists() and obj.status != ASTicket.Status.REPAIRED:
+            if obj.status == ASTicket.Status.OUTSOURCED and obj.outsource_date and obj.outsource_company and obj.repair_content:
+                import re
+                today_str = timezone.localdate().strftime('%Y-%m-%d')
+                pattern = rf"{re.escape(obj.outsource_company.name)} 수리의뢰 \({re.escape(obj.outsource_date.strftime('%Y-%m-%d'))}~\)"
+                replacement = f"{obj.outsource_company.name} 수리의뢰 ({obj.outsource_date.strftime('%Y-%m-%d')}~{today_str})"
+                obj.repair_content = re.sub(pattern, replacement, obj.repair_content)
+                if "repair_content" not in update_fields:
+                    update_fields.append("repair_content")
+                    
             obj.status = ASTicket.Status.REPAIRED
             update_fields.append("status")
         if update_fields:
@@ -1107,7 +1117,14 @@ class OutsourcedTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitle
             ticket.status = ASTicket.Status.OUTSOURCED
             ticket.outsource_company = company
             ticket.outsource_date = outsource_date
-            ticket.save(update_fields=["status", "outsource_company", "outsource_date"])
+            
+            remarks_text = f"{company.name} 수리의뢰 ({outsource_date.strftime('%Y-%m-%d')}~)"
+            if ticket.repair_content:
+                ticket.repair_content = f"{ticket.repair_content}\n{remarks_text}"
+            else:
+                ticket.repair_content = remarks_text
+                
+            ticket.save(update_fields=["status", "outsource_company", "outsource_date", "repair_content"])
 
             from django.contrib import messages
             messages.success(
@@ -1177,11 +1194,24 @@ class OutsourcedTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitle
                 messages.error(request, "존재하지 않는 의뢰업체입니다.")
                 return None
 
-            updated = queryset.update(
-                status=ASTicket.Status.OUTSOURCED,
-                outsource_company=company,
-                outsource_date=outsource_date,
+            tickets_to_update = []
+            for ticket in queryset:
+                ticket.status = ASTicket.Status.OUTSOURCED
+                ticket.outsource_company = company
+                ticket.outsource_date = outsource_date
+                
+                remarks_text = f"{company.name} 수리의뢰 ({outsource_date.strftime('%Y-%m-%d')}~)"
+                if ticket.repair_content:
+                    ticket.repair_content = f"{ticket.repair_content}\n{remarks_text}"
+                else:
+                    ticket.repair_content = remarks_text
+                tickets_to_update.append(ticket)
+                
+            ASTicket.objects.bulk_update(
+                tickets_to_update,
+                fields=["status", "outsource_company", "outsource_date", "repair_content"]
             )
+            updated = len(tickets_to_update)
             from django.contrib import messages
             messages.success(
                 request,
