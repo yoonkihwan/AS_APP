@@ -12,6 +12,7 @@ from master_data.models import (  # noqa: F401
     Tool,
     OutsourceCompany,
 )
+from simple_history.models import HistoricalRecords
 
 
 # ──────────────────────────────────────────────
@@ -49,6 +50,7 @@ class Part(models.Model):
     name = models.CharField("부품명", max_length=200)
     code = models.CharField("부품코드", max_length=100, blank=True)
     remarks = models.TextField("비고", blank=True)
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "수리부품"
@@ -104,6 +106,34 @@ class PartPrice(models.Model):
         return f"[{self.category.name}] {self.price:,}원"
 
 
+class TicketUsedPart(models.Model):
+    """AS 티켓과 사용 부품의 연결 테이블 (단가 스냅샷 보존)"""
+
+    ticket = models.ForeignKey(
+        "ASTicket",
+        on_delete=models.CASCADE,
+        verbose_name="AS 티켓",
+        related_name="ticket_used_parts",
+    )
+    part = models.ForeignKey(
+        Part,
+        on_delete=models.PROTECT,
+        verbose_name="부품",
+    )
+    applied_price = models.PositiveIntegerField(
+        "적용 단가",
+        default=0,
+        help_text="수리 완료 시점의 마스터 부품 단가 (스냅샷)",
+    )
+    created_at = models.DateTimeField("등록일시", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "수리 사용 부품 (스냅샷)"
+        verbose_name_plural = "수리 사용 부품 (스냅샷)"
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.ticket_id}번 티켓 - {self.part.name} ({self.applied_price:,}원)"
 
 
 class RepairPreset(models.Model):
@@ -220,6 +250,7 @@ class ASTicket(models.Model):
     repair_content = models.TextField("비고", blank=True, help_text="추가 메모 (선택사항)")
     used_parts = models.ManyToManyField(
         Part,
+        through="TicketUsedPart",
         verbose_name="사용 부품/공임",
         related_name="tickets",
         blank=True,

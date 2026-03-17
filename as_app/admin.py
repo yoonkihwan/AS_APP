@@ -117,6 +117,7 @@ from .models import (
     RepairPreset,
     RepairTicket,
     TaxInvoiceTicket,
+    TicketUsedPart,
     Tool,
 )
 from .forms import ASTicketForm, PartForm
@@ -757,6 +758,26 @@ class InboundTicketAdmin(StatusColorMixin, ModelAdmin):
     class Media:
         css = {"all": ("as_app/css/row_colors.css",)}
 
+from django import forms
+
+class RepairTicketForm(forms.ModelForm):
+    selected_parts = forms.ModelMultipleChoiceField(
+        queryset=Part.objects.none(),
+        required=False,
+        label="사용 부품/공임",
+        help_text="사용한 부품/공임을 체크하세요. 저장 시 자동으로 단가가 기록되며 비용이 계산됩니다.",
+    )
+
+    class Meta:
+        model = ASTicket
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["selected_parts"].initial = self.instance.used_parts.all()
+
+
 @admin.register(RepairTicket)
 class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "수리 기록 등록"
@@ -796,7 +817,7 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
             "수리 부품 선택",
             {
                 "fields": (
-                    "used_parts",
+                    "selected_parts",
                     "repair_content",
                 ),
                 "description": "해당 장비에 적용 가능한 부품/공임이 표시됩니다. 체크하고 저장하면 AS 비용이 자동 계산되며 수리완료 처리됩니다.",
@@ -831,6 +852,7 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
 
     def get_form(self, request, obj=None, **kwargs):
         """수리 편집 폼: 해당 장비 부품만 필터링 + 테이블 위젯 + 비고 한 줄"""
+        kwargs["form"] = RepairTicketForm
         from .widgets import PartsTableWidget
         form = super().get_form(request, obj, **kwargs)
         if obj and obj.tool_id:
@@ -838,7 +860,7 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
             parts_qs = Part.objects.filter(
                 Q(tools=obj.tool) | Q(tools__isnull=True)
             ).distinct().order_by("part_type", "name")
-            form.base_fields["used_parts"].queryset = parts_qs
+            form.base_fields["selected_parts"].queryset = parts_qs
 
             # 부품 메타데이터 구성 (업체 단가 그룹 반영)
             parts_data = {}
@@ -851,10 +873,9 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
                 }
 
             # 커스텀 테이블 위젯 적용
-            form.base_fields["used_parts"].widget = PartsTableWidget(
+            form.base_fields["selected_parts"].widget = PartsTableWidget(
                 parts_data=parts_data,
             )
-            form.base_fields["used_parts"].help_text = "사용한 부품/공임을 체크하세요. 저장 시 자동으로 비용이 계산되고 수리완료 처리됩니다."
         # 비고 필드를 한 줄 입력으로 축소
         if "repair_content" in form.base_fields:
             form.base_fields["repair_content"].widget = forms.TextInput(
@@ -888,12 +909,28 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
 
     # ── 저장 로직 ──
     def save_related(self, request, form, formsets, change):
-        """M2M 저장 후 사용 부품/공임 단가 합산으로 AS 비용 자동 계산 + 수리완료 상태 변경"""
+        """M2M 저장 후 사용 부품/공임 단가 스냅샷 보존 및 수리 비용 계산"""
         super().save_related(request, form, formsets, change)
         obj = form.instance
 
-        # 기존 부품 선택 로직 (수리완료)
-        total_parts = sum(part.get_price_for_company(obj.company) for part in obj.used_parts.all())
+        if "selected_parts" in form.cleaned_data:
+            selected_parts = form.cleaned_data["selected_parts"]
+            current_parts = set(obj.used_parts.all())
+            new_parts = set(selected_parts)
+            
+            # Remove unselected parts
+            to_remove = current_parts - new_parts
+            if to_remove:
+                obj.ticket_used_parts.filter(part__in=to_remove).delete()
+            
+            # Add newly selected parts with current snapshot price
+            to_add = new_parts - current_parts
+            for part in to_add:
+                price = part.get_price_for_company(obj.company)
+                obj.ticket_used_parts.create(part=part, applied_price=price)
+
+        # 기존 부품 선택 로직 (수리완료) - 스냅샷 단가 기준 합산
+        total_parts = sum(tup.applied_price for tup in obj.ticket_used_parts.all())
         nego_price = int(total_parts * 0.9)  # 네고가 (10% 할인)
         total_with_vat = int(nego_price * 1.1)  # 부가세 10% 포함
         update_fields = []
@@ -901,7 +938,7 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
             obj.repair_cost = total_with_vat
             update_fields.append("repair_cost")
         # 부품이 선택되어 있으면 자동으로 수리완료 상태로 변경
-        if obj.used_parts.exists() and obj.status != ASTicket.Status.REPAIRED:
+        if obj.ticket_used_parts.exists() and obj.status != ASTicket.Status.REPAIRED:
             obj.status = ASTicket.Status.REPAIRED
             update_fields.append("status")
         if update_fields:
@@ -1193,27 +1230,30 @@ class OutboundTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
     @admin.display(description="수리 내역")
     def display_repair_summary(self, obj):
         """아코디언 형태의 수리 내역 표시 (공임먼저 → 가격순)"""
-        parts_list = list(obj.used_parts.all())
+        parts_list = list(obj.ticket_used_parts.all())
         if not parts_list:
             return "-"
-        company = obj.company if obj.company_id else None
+        
         parts_list.sort(
-            key=lambda p: (0 if p.part_type == 'labor' else 1, -p.get_price_for_company(company))
+            key=lambda tup: (0 if tup.part.part_type == 'labor' else 1, -tup.applied_price)
         )
         count = len(parts_list)
-        first = parts_list[0]
-        first_price = first.get_price_for_company(company)
+        first = parts_list[0].part
+        first_price = parts_list[0].applied_price
         first_code = f" ({first.code})" if first.code else ""
         first_label = "공임" if first.part_type == "labor" else "부품"
         summary_text = f"[{first_label}] {first.name}{first_code}"
+        
         if count == 1:
             return format_html(
                 '<span title="{}">{}</span>',
                 f"{summary_text} ({first_price:,}원)", summary_text,
             )
+            
         detail_rows = []
-        for p in parts_list:
-            p_price = p.get_price_for_company(company)
+        for tup in parts_list:
+            p = tup.part
+            p_price = tup.applied_price
             p_code = f" ({p.code})" if p.code else ""
             p_label = "공임" if p.part_type == "labor" else "부품"
             detail_rows.append(
@@ -1320,7 +1360,7 @@ class OutboundTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
             .get_queryset(request)
             .filter(status=ASTicket.Status.REPAIRED)
             .select_related("company", "tool", "tool__brand")
-            .prefetch_related("used_parts", "used_parts__group_prices", "used_parts__group_prices__category")
+            .prefetch_related("ticket_used_parts", "ticket_used_parts__part")
         )
 
     def has_add_permission(self, request):
@@ -1389,6 +1429,16 @@ class OutboundTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
         )
 
 
+from unfold.admin import TabularInline
+
+class TicketUsedPartInline(TabularInline):
+    model = TicketUsedPart
+    extra = 0
+    autocomplete_fields = ["part"]
+    fields = ["part", "applied_price"]
+    verbose_name = "사용 부품/공임 (스냅샷)"
+    verbose_name_plural = "수리 사용 부품/공임 (스냅샷)"
+
 @admin.register(ASHistory)
 class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "통합 이력"
@@ -1417,8 +1467,9 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "symptom",
         "repair_content",
     ]
-    autocomplete_fields = ["company", "tool", "used_parts"]
+    autocomplete_fields = ["company", "tool"]
     list_per_page = 30
+    inlines = [TicketUsedPartInline]
     actions = [
         "revert_shipped_to_repaired",
         "revert_repaired_to_inbound",
@@ -1448,7 +1499,6 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
             {
                 "fields": (
                     "repair_content",
-                    "used_parts",
                     "repair_cost",
                     "status",
                 ),
@@ -1491,7 +1541,7 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
             super()
             .get_queryset(request)
             .select_related("company", "tool", "tool__brand", "outsource_company")
-            .prefetch_related("used_parts", "used_parts__group_prices", "used_parts__group_prices__category")
+            .prefetch_related("ticket_used_parts", "ticket_used_parts__part")
         )
 
     def has_add_permission(self, request):
@@ -1537,9 +1587,9 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
     def revert_repaired_to_inbound(self, request, queryset):
         if not self._validate_status(request, queryset, ASTicket.Status.REPAIRED, "수리완료"):
             return
-        # M2M(used_parts) clear는 개별 처리 필요
+        # M2M(ticket_used_parts) clear는 개별 처리 필요
         for ticket in queryset:
-            ticket.used_parts.clear()
+            ticket.ticket_used_parts.all().delete()
         queryset.update(
             status=ASTicket.Status.INBOUND,
             repair_cost=0,
@@ -1642,22 +1692,22 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
 
     @admin.display(description="수리 내역")
     def display_repair_summary(self, obj):
-        parts_list = list(obj.used_parts.all())
+        parts_list = list(obj.ticket_used_parts.all())
         if not parts_list:
             return "-"
 
         # 정렬: 공임 먼저(labor) → 부품(part), 같은 구분 안에서는 가격 내림차순
-        company = obj.company if obj.company_id else None
         parts_list.sort(
-            key=lambda p: (0 if p.part_type == 'labor' else 1, -p.get_price_for_company(company))
+            key=lambda tup: (0 if tup.part.part_type == 'labor' else 1, -tup.applied_price)
         )
 
         count = len(parts_list)
-        first = parts_list[0]
-        first_price = first.get_price_for_company(company)
-        first_code = f" ({first.code})" if first.code else ""
-        first_label = "공임" if first.part_type == "labor" else "부품"
-        summary_text = f"[{first_label}] {first.name}{first_code}"
+        first_tup = parts_list[0]
+        first_part = first_tup.part
+        first_price = first_tup.applied_price
+        first_code = f" ({first_part.code})" if first_part.code else ""
+        first_label = "공임" if first_part.part_type == "labor" else "부품"
+        summary_text = f"[{first_label}] {first_part.name}{first_code}"
 
         if count == 1:
             return format_html(
@@ -1668,8 +1718,9 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
 
         # 2건 이상: 아코디언 UI
         detail_rows = []
-        for p in parts_list:
-            p_price = p.get_price_for_company(company)
+        for tup in parts_list:
+            p = tup.part
+            p_price = tup.applied_price
             p_code = f" ({p.code})" if p.code else ""
             p_label = "공임" if p.part_type == "labor" else "부품"
             detail_rows.append(
@@ -1764,27 +1815,30 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
     @admin.display(description="수리 내역")
     def display_repair_summary(self, obj):
         """아코디언 형태의 수리 내역 표시 (공임먼저 → 가격순)"""
-        parts_list = list(obj.used_parts.all())
+        parts_list = list(obj.ticket_used_parts.all())
         if not parts_list:
             return "-"
-        company = obj.company if obj.company_id else None
+        
         parts_list.sort(
-            key=lambda p: (0 if p.part_type == 'labor' else 1, -p.get_price_for_company(company))
+            key=lambda tup: (0 if tup.part.part_type == 'labor' else 1, -tup.applied_price)
         )
         count = len(parts_list)
-        first = parts_list[0]
-        first_price = first.get_price_for_company(company)
+        first = parts_list[0].part
+        first_price = parts_list[0].applied_price
         first_code = f" ({first.code})" if first.code else ""
         first_label = "공임" if first.part_type == "labor" else "부품"
         summary_text = f"[{first_label}] {first.name}{first_code}"
+        
         if count == 1:
             return format_html(
                 '<span title="{}">{}</span>',
                 f"{summary_text} ({first_price:,}원)", summary_text,
             )
+            
         detail_rows = []
-        for p in parts_list:
-            p_price = p.get_price_for_company(company)
+        for tup in parts_list:
+            p = tup.part
+            p_price = tup.applied_price
             p_code = f" ({p.code})" if p.code else ""
             p_label = "공임" if p.part_type == "labor" else "부품"
             detail_rows.append(
@@ -1829,7 +1883,7 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
             super().get_queryset(request)
             .filter(status__in=[ASTicket.Status.REPAIRED, ASTicket.Status.SHIPPED])
             .select_related("company", "tool", "tool__brand")
-            .prefetch_related("used_parts", "used_parts__group_prices", "used_parts__group_prices__category")
+            .prefetch_related("ticket_used_parts", "ticket_used_parts__part")
         )
 
     def get_urls(self):
@@ -1896,7 +1950,7 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
             return HttpResponseRedirect(reverse("admin:as_app_estimateticket_changelist"))
 
         ticket_ids = [int(pk) for pk in ids_str.split(",") if pk.isdigit()]
-        tickets = ASTicket.objects.filter(id__in=ticket_ids).select_related("company", "tool", "tool__brand").prefetch_related("used_parts")
+        tickets = ASTicket.objects.filter(id__in=ticket_ids).select_related("company", "tool", "tool__brand").prefetch_related("ticket_used_parts", "ticket_used_parts__part")
 
         if not tickets.exists():
             from django.contrib import messages
@@ -1912,8 +1966,9 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
             
             parts = []
             part_sum = 0
-            for part in ticket.used_parts.all():
-                price = part.get_price_for_company(company)
+            for tup in ticket.ticket_used_parts.all():
+                part = tup.part
+                price = tup.applied_price
                 part_sum += price
                 parts.append({
                     "name": part.name,
