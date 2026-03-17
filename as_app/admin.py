@@ -1170,15 +1170,11 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
 
     list_display = [
         "display_status",
-        "inbound_date",
-        "outbound_date",
-        "company",
-        "tool",
-        "serial_number",
-        "used_parts_summary",
-        "formatted_repair_cost",
-        "estimate_status",
-        "tax_invoice",
+        "display_dates",
+        "display_company_info",
+        "display_tool_info",
+        "display_repair_summary",
+        "display_cost_and_docs",
     ]
     list_filter = [
         "status",
@@ -1259,8 +1255,18 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
                 "as_app/css/hide_fab.css",
                 "as_app/css/row_colors.css",
                 "as_app/css/text_truncate.css",
+                "as_app/css/multiline_cell.css",
             )
         }
+
+    def get_queryset(self, request):
+        """N+1 방지: FK/M2M 최적화"""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("company", "tool", "tool__brand", "outsource_company")
+            .prefetch_related("used_parts", "used_parts__group_prices", "used_parts__group_prices__category")
+        )
 
     def has_add_permission(self, request):
         return False
@@ -1359,22 +1365,129 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         from django.contrib import messages
         messages.success(request, f"{updated}건이 자체폐기 처리되었습니다.")
 
-    @admin.display(description="사용 부품")
-    def used_parts_summary(self, obj):
-        parts = obj.used_parts.all()
-        if parts:
-            full_text = ", ".join(p.name for p in parts)
+    # ── 복합 컬럼 display 메서드 ──
+
+    @admin.display(description="입고일 / 출고일")
+    def display_dates(self, obj):
+        inbound = obj.inbound_date.strftime("%Y-%m-%d") if obj.inbound_date else "-"
+        if obj.outbound_date:
+            outbound = obj.outbound_date.strftime("%Y-%m-%d")
+        else:
+            outbound = "-"
+        return format_html(
+            '<div class="cell-wrap">'
+            '<span class="cell-main">{}</span>'
+            '<span class="cell-sub">{}</span>'
+            '</div>',
+            inbound,
+            outbound,
+        )
+
+    @admin.display(description="매출처 · 담당자")
+    def display_company_info(self, obj):
+        company_name = obj.company.name if obj.company_id else "-"
+        manager = obj.manager or ""
+        if manager:
             return format_html(
-                '<span class="truncate-text" title="{}">{}</span>',
-                full_text,
-                full_text
+                '<div class="cell-wrap">'
+                '<span class="cell-main">{}</span>'
+                '<span class="cell-sub">{}</span>'
+                '</div>',
+                company_name,
+                manager,
             )
-        return "-"
+        return format_html('<span class="cell-main">{}</span>', company_name)
 
+    @admin.display(description="장비 · S/N")
+    def display_tool_info(self, obj):
+        if obj.tool_id:
+            tool_str = str(obj.tool)
+        else:
+            tool_str = "-"
+        sn = obj.serial_number or "-"
+        return format_html(
+            '<div class="cell-wrap">'
+            '<span class="cell-main">{}</span>'
+            '<span class="cell-sub">S/N: {}</span>'
+            '</div>',
+            tool_str,
+            sn,
+        )
 
-    @admin.display(description="수리 비용")
-    def formatted_repair_cost(self, obj):
-        return f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
+    @admin.display(description="수리 내역")
+    def display_repair_summary(self, obj):
+        parts_list = list(obj.used_parts.all())
+        if not parts_list:
+            return "-"
+
+        # 정렬: 공임 먼저(labor) → 부품(part), 같은 구분 안에서는 가격 내림차순
+        company = obj.company if obj.company_id else None
+        parts_list.sort(
+            key=lambda p: (0 if p.part_type == 'labor' else 1, -p.get_price_for_company(company))
+        )
+
+        count = len(parts_list)
+        first = parts_list[0]
+        first_price = first.get_price_for_company(company)
+        first_code = f" ({first.code})" if first.code else ""
+        first_label = "공임" if first.part_type == "labor" else "부품"
+        summary_text = f"[{first_label}] {first.name}{first_code}"
+
+        if count == 1:
+            return format_html(
+                '<span title="{}">{}</span>',
+                f"{summary_text} ({first_price:,}원)",
+                summary_text,
+            )
+
+        # 2건 이상: 아코디언 UI
+        detail_rows = []
+        for p in parts_list:
+            p_price = p.get_price_for_company(company)
+            p_code = f" ({p.code})" if p.code else ""
+            p_label = "공임" if p.part_type == "labor" else "부품"
+            detail_rows.append(
+                f'<div style="padding:2px 0;">[{p_label}] {p.name}{p_code}'
+                f' <span style="opacity:0.7;">({p_price:,}원)</span></div>'
+            )
+        details_html = "".join(detail_rows)
+
+        return format_html(
+            '<details style="cursor:pointer;">'
+            '<summary style="color:#6366f1; outline:none;">'
+            '<strong>{}</strong> 외 {}건'
+            ' <span style="font-size:0.75rem;">▼</span>'
+            '</summary>'
+            '<div style="margin-top:4px; padding:6px 8px; '
+            'background-color:rgba(99,102,241,0.06); border-radius:6px; '
+            'font-size:0.82rem; line-height:1.5;">'
+            '{}'
+            '</div>'
+            '</details>',
+            summary_text,
+            count - 1,
+            format_html(details_html),
+        )
+
+    @admin.display(description="비용 · 증빙")
+    def display_cost_and_docs(self, obj):
+        cost_str = f"{obj.repair_cost:,}원" if obj.repair_cost else "0원"
+        est_cls = "doc-yes" if obj.estimate_status else "doc-no"
+        est_txt = "견적 ✓" if obj.estimate_status else "견적 ✗"
+        tax_cls = "doc-yes" if obj.tax_invoice else "doc-no"
+        tax_txt = "세금 ✓" if obj.tax_invoice else "세금 ✗"
+        return format_html(
+            '<div class="cell-wrap">'
+            '<span class="cell-main">{}</span>'
+            '<span class="cell-sub">'
+            '<span class="doc-label {}">{}</span>'
+            '<span class="doc-label {}">{}</span>'
+            '</span>'
+            '</div>',
+            cost_str,
+            est_cls, est_txt,
+            tax_cls, tax_txt,
+        )
 
 
 @admin.register(EstimateTicket)

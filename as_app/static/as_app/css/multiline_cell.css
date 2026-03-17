@@ -1,0 +1,77 @@
+/* 복합 컬럼(Multi-line Cell) 스타일링 — 통합 이력 목록용 */
+
+/* 셀 컨테이너: 줄바꿈 허용 */
+.cell-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+/* 윗줄 (메인 데이터) */
+.cell-main {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+/* 아랫줄 (보조 데이터 — 윗줄과 동일 크기/색상) */
+.cell-sub {
+    font-weight: 500;
+    color: #1f2937;
+}
+
+/* 증상 텍스트: 말줄임표 + hover 전체 보기 */
+.cell-symptom {
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+    cursor: default;
+}
+
+/* 증빙 상태 라벨 */
+.doc-label {
+    font-size: 0.72rem;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-right: 3px;
+}
+
+.doc-yes {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #16a34a;
+}
+
+.doc-no {
+    background-color: rgba(156, 163, 175, 0.15);
+    color: #9ca3af;
+}
+
+/* ── 다크모드 대응 ── */
+html.dark .cell-main {
+    color: #e5e7eb;
+}
+
+html.dark .cell-sub {
+    color: #e5e7eb;
+}
+
+html.dark .doc-yes {
+    background-color: rgba(34, 197, 94, 0.25);
+    color: #4ade80;
+}
+
+html.dark .doc-no {
+    background-color: rgba(107, 114, 128, 0.2);
+    color: #6b7280;
+}
+
+/* ── 모바일 대응 ── */
+@media (max-width: 768px) {
+    .cell-symptom {
+        max-width: 100px;
+    }
+}
