@@ -9,12 +9,16 @@ class PartsTableWidget(forms.CheckboxSelectMultiple):
     단가는 업체의 단가 그룹에 맞게 표시됩니다.
     """
 
-    def __init__(self, parts_data=None, *args, **kwargs):
+    def __init__(self, parts_data=None, disabled_message=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # parts_data: {part_id: {name, code, price, part_type}}
         self.parts_data = parts_data or {}
+        self.disabled_message = disabled_message
 
     def render(self, name, value, attrs=None, renderer=None):
+        if self.disabled_message:
+            return mark_safe(f'<div class="parts-table-widget" style="padding:16px; background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; color:#ef4444; font-weight:600;">{self.disabled_message}</div>')
+        
         if value is None:
             value = []
         value = [str(v) for v in value]

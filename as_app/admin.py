@@ -777,6 +777,23 @@ class RepairTicketForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.fields["selected_parts"].initial = self.instance.used_parts.all()
 
+    def clean(self):
+        cleaned_data = super().clean()
+        company = cleaned_data.get("company") or getattr(self.instance, 'company', None)
+        selected_parts = cleaned_data.get("selected_parts")
+
+        # 업체에 단가 그룹이 없다면 편집 자체를 방지 (부품뿐만 아니라 메모 등도 방어)
+        if not company or not company.price_group:
+            err_msg = format_html(
+                "⚠️ <strong>[{}]</strong>에 단가 그룹이 설정되어 있지 않아 수리 기록을 저장할 수 없습니다. "
+                "업체관리에서 단가 그룹을 먼저 지정해주세요.",
+                company.name if company else '업체'
+            )
+            self.add_error(None, err_msg) # 전체 폼 에러도 띄우기 (선택)
+            self.add_error("selected_parts", err_msg)
+            
+        return cleaned_data
+
 
 @admin.register(RepairTicket)
 class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
@@ -862,20 +879,33 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
             ).distinct().order_by("part_type", "name")
             form.base_fields["selected_parts"].queryset = parts_qs
 
-            # 부품 메타데이터 구성 (업체 단가 그룹 반영)
-            parts_data = {}
-            for p in parts_qs:
-                parts_data[p.id] = {
-                    "name": p.name,
-                    "code": p.code,
-                    "price": p.get_price_for_company(obj.company),
-                    "part_type": p.part_type,
-                }
+            # 단가 그룹 유무 체크
+            has_category = obj.company and obj.company.price_group
 
-            # 커스텀 테이블 위젯 적용
-            form.base_fields["selected_parts"].widget = PartsTableWidget(
-                parts_data=parts_data,
-            )
+            if not has_category:
+                # 단가 그룹이 없으면 위젯에 경고 메시지 전달 (테이블 대신 메시지 렌더링)
+                msg = format_html(
+                    '⚠️ <strong>[{}]</strong>에 단가 그룹이 설정되어 있지 않습니다.<br>'
+                    '수리 기록을 저장할 수 없으므로, <a href="{}" style="color:#b91c1c; text-decoration:underline;">[업체관리]</a>에서 단가 그룹을 먼저 지정해주세요.',
+                    obj.company.name if obj.company else "업체",
+                    reverse("admin:master_data_company_change", args=[obj.company.id]) if obj.company else "#"
+                )
+                form.base_fields["selected_parts"].widget = PartsTableWidget(disabled_message=msg)
+            else:
+                # 부품 메타데이터 구성 (업체 단가 그룹 반영)
+                parts_data = {}
+                for p in parts_qs:
+                    parts_data[p.id] = {
+                        "name": p.name,
+                        "code": p.code,
+                        "price": p.get_price_for_company(obj.company),
+                        "part_type": p.part_type,
+                    }
+
+                # 커스텀 테이블 위젯 적용
+                form.base_fields["selected_parts"].widget = PartsTableWidget(
+                    parts_data=parts_data,
+                )
         # 비고 필드를 한 줄 입력으로 축소
         if "repair_content" in form.base_fields:
             form.base_fields["repair_content"].widget = forms.TextInput(
