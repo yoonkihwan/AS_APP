@@ -3,7 +3,7 @@
 이 파일은 AI 및 개발자가 프로젝트 작업 시 **무조건 준수해야 하는 규칙과 가이드라인**을 정의합니다.
 
 ## 1. 기본 원칙 (Core Principles)
-- **Single Source of Truth:** 기능 명세와 비즈니스 로직에 대한 정의는 `GEMINI.MD`를 최우선으로 참고한다.
+- **Single Source of Truth:** 기능 명세와 비즈니스 로직에 대한 정의는 `GEMINI_SPEC.MD`를 최우선으로 참고한다.
 - **User-Centric:** 개발 편의성보다 **실제 사용자의 업무 효율성(빠른 입력, 실수 방지)**을 우선한다.
 - **Safety First:** 데이터 삭제나 변경 작업은 신중하게 처리하며, 특히 `drop`, `delete` 등의 파괴적 작업 전에는 백업이나 확인 절차를 고려한다.
 

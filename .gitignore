@@ -7,3 +7,19 @@ venv/
 .idea/
 .cursor/
 .gemini/
+
+# 로그 및 임시 파일
+*.log
+*.txt
+!requirements.txt
+!README.md
+
+# 정적 파일 (collectstatic 결과물)
+staticfiles/
+
+# 임시 데이터/디버깅 출력
+*.csv
+*.json
+!package.json
+investigate_*.py
+extract_*.py

@@ -102,6 +102,9 @@ class PartForm(forms.ModelForm):
             "remarks",
             "tools",
         ]
+        widgets = {
+            "remarks": forms.TextInput(attrs={'class': 'vTextField', 'placeholder': '비고 입력 (선택)'}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

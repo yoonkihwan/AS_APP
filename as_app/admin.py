@@ -222,7 +222,7 @@ class ToolAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     form = PartForm
     custom_title = "수리부품 관리"
-    list_display = ["brand", "name", "code", "part_type", "formatted_price", "display_tools", "remarks"]
+    list_display = ["brand", "part_type", "name", "code", "formatted_price", "remarks", "display_tools"]
     list_filter = ["brand", "part_type", "tools__brand"]
     search_fields = ["name", "code"]
     autocomplete_fields = ["brand"]
@@ -230,6 +230,11 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     list_per_page = 20
     ordering = ["brand__name", "name"]
     change_list_template = "admin/as_app/part/change_list.html"
+
+    class Media:
+        css = {
+            "all": ("as_app/css/part_admin.css",)
+        }
 
     def get_form(self, request, obj=None, **kwargs):
         from django import forms
@@ -239,12 +244,10 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
         categories = CompanyCategory.objects.all().order_by('name')
         for cat in categories:
             field_name = f'price_group_{cat.id}'
-            is_das = (cat.name == "다스")
             form_attrs[field_name] = forms.IntegerField(
                 label=f"{cat.name} 단가",
-                required=is_das,
-                help_text="모든 단가의 기준이 되는 기본 단가입니다." if is_das else f"빈 칸인 경우 기본 단가(다스 단가)가 자동 적용됩니다.",
-                widget=forms.NumberInput(attrs={'placeholder': '기준 단가 필수 입력' if is_das else '기본 단가 자동 적용'})
+                required=False,
+                widget=forms.NumberInput(attrs={'placeholder': f'{cat.name} 단가 입력'})
             )
         
         kwargs['form'] = type('DynamicPartForm', (self.form,), form_attrs)
@@ -334,7 +337,36 @@ class PartAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
 
     @admin.display(description="단가")
     def formatted_price(self, obj):
-        return f"{obj.default_price:,}"
+        group_prices = list(obj.group_prices.select_related('category').all().order_by('category__name'))
+        
+        # 1. 단가가 한 개도 없을 경우 (기본값)
+        if not group_prices:
+            return f"{obj.default_price:,}"
+            
+        # 2. 다스(기본단가) 찾기
+        default_price_obj = next((gp for gp in group_prices if gp.category.name == "다스"), None)
+        default_price_str = f"{default_price_obj.price:,}" if default_price_obj else f"{obj.default_price:,}"
+        
+        # 3. 단가 그룹이 1개 이하라면 기존처럼 텍스트만 리턴
+        if len(group_prices) <= 1:
+            return default_price_str
+            
+        # 4. 단가 그룹이 2개 이상이면 Expandable UI 제공
+        from django.utils.html import format_html
+        
+        prices_html = "<br>".join([f"<b>{gp.category.name}</b>: {gp.price:,}원" for gp in group_prices])
+        
+        html = f"""
+        <details style="cursor: pointer;">
+            <summary style="color: #6366f1; outline: none; font-weight: bold;">
+                {default_price_str} <span style="font-weight: normal; color: #6b7280; font-size: 0.8rem;">(단가 {len(group_prices)}개)</span> <span style="font-size: 0.75rem;">▼</span>
+            </summary>
+            <div style="margin-top: 6px; padding: 8px 10px; background-color: #f3f4f6; border-radius: 6px; font-size: 0.8rem; color: #4b5563; line-height: 1.5;">
+                {prices_html}
+            </div>
+        </details>
+        """
+        return format_html(html)
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
@@ -947,7 +979,25 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
             selected_parts = form.cleaned_data["selected_parts"]
             current_parts = set(obj.used_parts.all())
             new_parts = set(selected_parts)
-            
+
+            # ── 0원 단가 부품 차단 ──
+            zero_price_parts = [
+                p for p in new_parts
+                if p.get_price_for_company(obj.company) == 0
+            ]
+            if zero_price_parts:
+                group_name = obj.company.price_group.name if (obj.company and obj.company.price_group) else "미지정"
+                part_names = ", ".join(p.name for p in zero_price_parts)
+                from django.contrib import messages
+                messages.error(
+                    request,
+                    f"⚠️ 다음 부품의 [{group_name}] 단가가 설정되지 않았습니다: {part_names}. "
+                    f"부품 관리에서 해당 단가 그룹의 가격을 먼저 입력해주세요."
+                )
+                # 0원 부품은 저장하지 않음 — 기존에 이미 등록된 것도 제거
+                obj.ticket_used_parts.filter(part__in=zero_price_parts).delete()
+                new_parts -= set(zero_price_parts)
+
             # Remove unselected parts
             to_remove = current_parts - new_parts
             if to_remove:
@@ -1750,10 +1800,49 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
             sn,
         )
 
-    @admin.display(description="수리 내역")
+    @admin.display(description="수리 내역 · 비고")
     def display_repair_summary(self, obj):
         parts_list = list(obj.ticket_used_parts.all())
+        repair_content = (obj.repair_content or "").strip()
+
+        # ── 비고 HTML 생성 헬퍼 ──
+        def _build_remarks_html(content):
+            """비고를 아코디언 스타일로 렌더링"""
+            if not content:
+                return ""
+            lines = content.replace("\r\n", "\n").split("\n")
+            is_long = len(content) > 50 or len(lines) > 1
+            if is_long:
+                escaped_content = content.replace("\n", "<br>")
+                return (
+                    '<div style="margin-top:6px;">'
+                    '<details style="cursor:pointer;">'
+                    '<summary style="color:#a78bfa; outline:none; font-size:0.82rem;">'
+                    '<strong>비고</strong>'
+                    ' <span style="font-size:0.75rem;">▼</span>'
+                    '</summary>'
+                    '<div style="margin-top:4px; padding:6px 8px; '
+                    'background-color:rgba(167,139,250,0.08); border-radius:6px; '
+                    'font-size:0.82rem; line-height:1.5;">'
+                    f'{escaped_content}'
+                    '</div>'
+                    '</details>'
+                    '</div>'
+                )
+            else:
+                return (
+                    '<div style="margin-top:6px; padding:4px 8px; '
+                    'background-color:rgba(167,139,250,0.08); border-radius:6px; '
+                    'font-size:0.82rem; line-height:1.5;">'
+                    f'<strong>비고</strong>: {content}'
+                    '</div>'
+                )
+
+        # ── 수리 내역이 없는 경우 ──
         if not parts_list:
+            if repair_content:
+                remarks_html = _build_remarks_html(repair_content)
+                return format_html('{}', format_html(remarks_html))
             return "-"
 
         # 정렬: 공임 먼저(labor) → 부품(part), 같은 구분 안에서는 가격 내림차순
@@ -1769,7 +1858,19 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         first_label = "공임" if first_part.part_type == "labor" else "부품"
         summary_text = f"[{first_label}] {first_part.name}{first_code}"
 
+        remarks_html = _build_remarks_html(repair_content)
+
         if count == 1:
+            if remarks_html:
+                return format_html(
+                    '<div>'
+                    '<span title="{}">{}</span>'
+                    '{}'
+                    '</div>',
+                    f"{summary_text} ({first_price:,}원)",
+                    summary_text,
+                    format_html(remarks_html),
+                )
             return format_html(
                 '<span title="{}">{}</span>',
                 f"{summary_text} ({first_price:,}원)",
@@ -1800,10 +1901,12 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
             'font-size:0.82rem; line-height:1.5;">'
             '{}'
             '</div>'
-            '</details>',
+            '</details>'
+            '{}',
             summary_text,
             count - 1,
             format_html(details_html),
+            format_html(remarks_html),
         )
 
     @admin.display(description="비용 · 증빙")

@@ -74,12 +74,12 @@ class Part(models.Model):
         return "공용 (전체 적용)"
 
     def get_price_for_company(self, company):
-        """업체의 단가 그룹에 맞는 부품 단가를 반환. 설정된 그룹 단가가 없으면 다스 기본 단가 반환"""
+        """업체의 단가 그룹에 맞는 부품 단가를 반환. 미설정 시 0 반환 (fallback 없음)"""
         if company and company.price_group:
             group_price = self.group_prices.filter(category=company.price_group).first()
             if group_price:
                 return group_price.price
-        return self.default_price
+        return 0
 
 class PartPrice(models.Model):
     """수리부품의 단가 그룹별 차등 단가"""

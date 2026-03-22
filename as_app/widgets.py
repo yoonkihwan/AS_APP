@@ -82,10 +82,19 @@ class PartsTableWidget(forms.CheckboxSelectMultiple):
         """개별 행 HTML 생성"""
         checked_attr = ' checked="checked"' if item["checked"] else ""
         checked_class = " selected-row" if item["checked"] else ""
+        is_zero_price = item["price"] == 0
         price_formatted = f'{item["price"]:,}원' if item["price"] else "0원"
         code_display = item["code"] if item["code"] else "-"
 
-        html = f'<tr class="parts-row{checked_class}" data-part-id="{item["id"]}">'
+        # 0원 단가 경고 스타일
+        if is_zero_price:
+            checked_class += " zero-price-row"
+            price_formatted = '⚠️ 단가 미설정'
+
+        html = f'<tr class="parts-row{checked_class}" data-part-id="{item["id"]}"'
+        if is_zero_price:
+            html += ' style="background-color:rgba(239,68,68,0.08);"'
+        html += '>'
         html += (
             f'<td class="col-check">'
             f'<input type="checkbox" name="{name}" value="{item["id"]}"{checked_attr}>'
@@ -93,7 +102,10 @@ class PartsTableWidget(forms.CheckboxSelectMultiple):
         )
         html += f'<td class="col-name">{item["name"]}</td>'
         html += f'<td class="col-code">{code_display}</td>'
-        html += f'<td class="col-price">{price_formatted}</td>'
+        if is_zero_price:
+            html += f'<td class="col-price" style="color:#ef4444; font-weight:600;">{price_formatted}</td>'
+        else:
+            html += f'<td class="col-price">{price_formatted}</td>'
         html += "</tr>"
         return html
 

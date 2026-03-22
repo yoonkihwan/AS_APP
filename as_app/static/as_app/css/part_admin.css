@@ -1,0 +1,5 @@
+/* 적용 장비(tools) 목록 상자의 높이를 대폭 늘려 많은 항목을 한눈에 볼 수 있도록 함 */
+.selector-available select,
+.selector-chosen select {
+    min-height: 400px !important;
+}
