@@ -1561,6 +1561,7 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "display_tool_info",
         "display_repair_summary",
         "display_cost_and_docs",
+        "display_edit_button",
     ]
     list_filter = [
         "status",
@@ -1927,6 +1928,26 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
             cost_str,
             est_cls, est_txt,
             tax_cls, tax_txt,
+        )
+
+    @admin.display(description="수정")
+    def display_edit_button(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        
+        url = reverse("admin:as_app_ashistory_change", args=[obj.pk])
+        return format_html(
+            '<a href="{}" style="'
+            'display:inline-flex; align-items:center; gap:4px; '
+            'padding:5px 12px; border-radius:6px; font-size:0.75rem; '
+            'font-weight:600; text-decoration:none; '
+            'background:#fff; color:#374151; border:1px solid #d1d5db; '
+            'transition:all .15s ease;'
+            '" '
+            'onmouseover="this.style.background=\'#f3f4f6\'" '
+            'onmouseout="this.style.background=\'#fff\'">'
+            '✏️ 상세/수정</a>',
+            url
         )
 
 
