@@ -980,23 +980,23 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
             current_parts = set(obj.used_parts.all())
             new_parts = set(selected_parts)
 
-            # ── 0원 단가 부품 차단 ──
-            zero_price_parts = [
+            # ── 미설정 단가 부품 차단 ──
+            missing_price_parts = [
                 p for p in new_parts
-                if p.get_price_for_company(obj.company) == 0
+                if p.get_price_for_company(obj.company) is None
             ]
-            if zero_price_parts:
+            if missing_price_parts:
                 group_name = obj.company.price_group.name if (obj.company and obj.company.price_group) else "미지정"
-                part_names = ", ".join(p.name for p in zero_price_parts)
+                part_names = ", ".join(p.name for p in missing_price_parts)
                 from django.contrib import messages
                 messages.error(
                     request,
                     f"⚠️ 다음 부품의 [{group_name}] 단가가 설정되지 않았습니다: {part_names}. "
                     f"부품 관리에서 해당 단가 그룹의 가격을 먼저 입력해주세요."
                 )
-                # 0원 부품은 저장하지 않음 — 기존에 이미 등록된 것도 제거
-                obj.ticket_used_parts.filter(part__in=zero_price_parts).delete()
-                new_parts -= set(zero_price_parts)
+                # 단가 미설정 부품은 저장하지 않음 — 기존에 이미 등록된 것도 제거
+                obj.ticket_used_parts.filter(part__in=missing_price_parts).delete()
+                new_parts -= set(missing_price_parts)
 
             # Remove unselected parts
             to_remove = current_parts - new_parts
@@ -1049,7 +1049,7 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
                 parts = preset.parts.all()
                 part_ids = [p.id for p in parts if p.part_type == 'part']
                 labor_ids = [p.id for p in parts if p.part_type == 'labor']
-                company_total = sum(p.get_price_for_company(obj.company) for p in parts)
+                company_total = sum((p.get_price_for_company(obj.company) or 0) for p in parts)
                 preset_data.append({
                     "id": preset.id,
                     "name": preset.name,

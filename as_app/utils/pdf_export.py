@@ -127,7 +127,7 @@ def generate_pdf_estimate(tickets) -> io.BytesIO:
         sn = ticket.serial_number if ticket.serial_number else ""
         parts = list(ticket.used_parts.all())
         # 업체별 단가 그룹에 따른 차등 가격 적용
-        part_prices = {p: p.get_price_for_company(company) for p in parts}
+        part_prices = {p: (p.get_price_for_company(company) or 0) for p in parts}
         total_price = sum(part_prices.values())
         nego_price = int(total_price * 0.9)
         today = datetime.now()

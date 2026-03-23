@@ -35,7 +35,7 @@ class PartsTableWidget(forms.CheckboxSelectMultiple):
                 "id": option_value,
                 "name": meta.get("name", str(option_label)),
                 "code": meta.get("code", ""),
-                "price": meta.get("price", 0),
+                "price": meta.get("price", None),
                 "checked": checked,
             }
             if meta.get("part_type") == "labor":
@@ -82,17 +82,16 @@ class PartsTableWidget(forms.CheckboxSelectMultiple):
         """개별 행 HTML 생성"""
         checked_attr = ' checked="checked"' if item["checked"] else ""
         checked_class = " selected-row" if item["checked"] else ""
-        is_zero_price = item["price"] == 0
-        price_formatted = f'{item["price"]:,}원' if item["price"] else "0원"
+        is_missing_price = item["price"] is None
+        price_formatted = f'{item["price"]:,}원' if not is_missing_price else "⚠️ 단가 미설정"
         code_display = item["code"] if item["code"] else "-"
 
-        # 0원 단가 경고 스타일
-        if is_zero_price:
+        # 단가 미설정 경고 스타일
+        if is_missing_price:
             checked_class += " zero-price-row"
-            price_formatted = '⚠️ 단가 미설정'
 
         html = f'<tr class="parts-row{checked_class}" data-part-id="{item["id"]}"'
-        if is_zero_price:
+        if is_missing_price:
             html += ' style="background-color:rgba(239,68,68,0.08);"'
         html += '>'
         html += (
@@ -102,7 +101,7 @@ class PartsTableWidget(forms.CheckboxSelectMultiple):
         )
         html += f'<td class="col-name">{item["name"]}</td>'
         html += f'<td class="col-code">{code_display}</td>'
-        if is_zero_price:
+        if is_missing_price:
             html += f'<td class="col-price" style="color:#ef4444; font-weight:600;">{price_formatted}</td>'
         else:
             html += f'<td class="col-price">{price_formatted}</td>'

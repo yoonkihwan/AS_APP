@@ -74,12 +74,12 @@ class Part(models.Model):
         return "공용 (전체 적용)"
 
     def get_price_for_company(self, company):
-        """업체의 단가 그룹에 맞는 부품 단가를 반환. 미설정 시 0 반환 (fallback 없음)"""
+        """업체의 단가 그룹에 맞는 부품 단가를 반환. 미설정 시 None 반환 (fallback 없음)"""
         if company and company.price_group:
             group_price = self.group_prices.filter(category=company.price_group).first()
             if group_price:
                 return group_price.price
-        return 0
+        return None
 
 class PartPrice(models.Model):
     """수리부품의 단가 그룹별 차등 단가"""
