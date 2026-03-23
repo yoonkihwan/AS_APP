@@ -26,6 +26,13 @@ class Company(models.Model):
     """매출처 관리 - AS 매출 거래처"""
 
     name = models.CharField("업체명", max_length=200)
+    estimate_company_name = models.CharField(
+        "견적서용 업체명",
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="견적서에 표시될 업체 이름을 입력하세요. 미설정 시 견적서 발행이 차단됩니다.",
+    )
     business_number = models.CharField(
         "사업자등록번호",
         max_length=20,

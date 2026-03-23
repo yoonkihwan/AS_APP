@@ -159,6 +159,7 @@ class CompanyAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
             {
                 "fields": (
                     "name",
+                    "estimate_company_name",
                     "business_number",
                     "representative",
                 ),
@@ -2085,9 +2086,27 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
     @unfold_action(description="📄 선택 항목 견적서 출력 (미리보기)")
     def export_estimate(self, request, queryset):
         """선택된 티켓들을 미리보기 페이지로 넘깁니다."""
-        selected_ids = ",".join(str(obj.pk) for obj in queryset)
         from django.http import HttpResponseRedirect
         from django.urls import reverse
+
+        # 견적서용 업체명이 누락된 업체가 있는지 검사
+        missing_estimate_names = [
+            obj.company.name 
+            for obj in queryset 
+            if obj.company and not obj.company.estimate_company_name
+        ]
+        
+        if missing_estimate_names:
+            company_names = ", ".join(set(missing_estimate_names))
+            from django.contrib import messages
+            messages.error(
+                request, 
+                f"⚠️ 다음 업체의 '견적서용 업체명'이 설정되지 않아 견적서를 발행할 수 없습니다: {company_names}. "
+                f"업체관리에서 이름을 먼저 설정해주세요."
+            )
+            return HttpResponseRedirect(request.get_full_path())
+
+        selected_ids = ",".join(str(obj.pk) for obj in queryset)
         url = reverse("admin:as_app_estimateticket_estimate_preview")
         return HttpResponseRedirect(f"{url}?ids={selected_ids}")
 
@@ -2144,7 +2163,10 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
         tickets_data = []
         for ticket in tickets:
             company = ticket.company
-            company_name = company.name if company else "업체미정"
+            if company and company.estimate_company_name:
+                company_name = company.estimate_company_name
+            else:
+                company_name = company.name if company else "업체미정"
             model_name = ticket.tool.model_name if ticket.tool else "품목미정"
             serial_number = ticket.serial_number if ticket.serial_number else ""
             

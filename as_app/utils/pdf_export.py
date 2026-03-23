@@ -121,7 +121,7 @@ def generate_pdf_estimate(tickets) -> io.BytesIO:
             elements.append(PageBreak())
 
         company = ticket.company
-        company_name = company.name if company else "업체미정"
+        company_name = (company.estimate_company_name if company and company.estimate_company_name else company.name) if company else "업체미정"
         model_name = ticket.tool.model_name if ticket.tool else "품목미정"
         brand_name = ticket.tool.brand.name if ticket.tool and ticket.tool.brand else ""
         sn = ticket.serial_number if ticket.serial_number else ""
