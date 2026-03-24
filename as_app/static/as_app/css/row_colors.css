@@ -31,6 +31,11 @@ tr:has(.status-marker[data-status="disposed"]) {
     /* Red */
 }
 
+tr:has(.status-marker[data-status="hold"]) {
+    background-color: rgba(147, 51, 234, 0.1) !important;
+    /* Purple - 수리보류 */
+}
+
 /* Dark Mode Colors */
 html.dark tr:has(.status-marker[data-status="inbound"]) {
     background-color: rgba(234, 179, 8, 0.15) !important;
@@ -54,6 +59,11 @@ html.dark tr:has(.status-marker[data-status="shipped"]) {
 
 html.dark tr:has(.status-marker[data-status="disposed"]) {
     background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+html.dark tr:has(.status-marker[data-status="hold"]) {
+    background-color: rgba(147, 51, 234, 0.15) !important;
+    /* Purple - 수리보류 */
 }
 
 /* Maintain hover effect brightness */

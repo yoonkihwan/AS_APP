@@ -219,6 +219,7 @@ class ASTicket(models.Model):
         REPAIRED = "repaired", "수리완료"
         SHIPPED = "shipped", "출고"
         DISPOSED = "disposed", "자체폐기"
+        HOLD = "hold", "수리보류"
 
     # ── 입고 정보 ──
     inbound_batch = models.ForeignKey(
@@ -262,6 +263,7 @@ class ASTicket(models.Model):
         choices=Status.choices,
         default=Status.INBOUND,
     )
+    hold_date = models.DateField("보류 처리일", null=True, blank=True, help_text="수리보류 상태로 변경된 날짜 (자동 기록)")
 
     # ── 의뢰 정보 ──
     outsource_company = models.ForeignKey(
@@ -296,6 +298,7 @@ class ASTicket(models.Model):
                 self.Status.INBOUND,
                 self.Status.OUTSOURCED,
                 self.Status.REPAIRED,
+                self.Status.HOLD,
             ]
             qs = ASTicket.objects.filter(
                 tool=self.tool,
@@ -383,6 +386,15 @@ class OutsourcedTicket(ASTicket):
         proxy = True
         verbose_name = "수리의뢰 현황"
         verbose_name_plural = "수리의뢰 현황"
+
+
+class HoldTicket(ASTicket):
+    """수리보류 등록 전용 프록시 모델"""
+
+    class Meta:
+        proxy = True
+        verbose_name = "수리보류 등록"
+        verbose_name_plural = "수리보류 등록"
 
 
 # ──────────────────────────────────────────────

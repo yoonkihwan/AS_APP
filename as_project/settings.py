@@ -425,6 +425,11 @@ def sidebar_callback(request):
                         "link": reverse_lazy("admin:as_app_repairticket_changelist"),
                     },
                     {
+                        "title": "수리보류 등록",
+                        "icon": "pause_circle",
+                        "link": reverse_lazy("admin:as_app_holdticket_changelist"),
+                    },
+                    {
                         "title": "출고 등록",
                         "icon": "local_shipping",
                         "link": reverse_lazy("admin:as_app_outboundticket_changelist"),

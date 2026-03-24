@@ -38,6 +38,8 @@ class StatusColorMixin:
             css_status = "repaired"  # 출고는 초록색
         elif obj.status == "repaired":
             css_status = "shipped"   # 수리완료는 파란색
+        elif obj.status == "hold":
+            css_status = "hold"      # 수리보류는 보라색
             
         return format_html(
             '<span class="status-marker" data-status="{}">{}</span>',
@@ -107,6 +109,7 @@ from .models import (
     Company,
     CompanyCategory,
     EstimateTicket,
+    HoldTicket,
     ImprovementRequest,
     InboundBatch,
     InboundTicket,
@@ -725,6 +728,7 @@ class InboundBatchAdmin(CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
             ASTicket.Status.INBOUND,
             ASTicket.Status.OUTSOURCED,
             ASTicket.Status.REPAIRED,
+            ASTicket.Status.HOLD,
         ]
         conflicts = []
         for instance in expanded:
@@ -1106,6 +1110,249 @@ class RepairTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixi
             Q(tools__id=tool_id) | Q(tools__isnull=True)
         ).distinct().values("id", "name", "code", "price")
         return JsonResponse({"parts": list(parts)})
+
+
+@admin.register(HoldTicket)
+class HoldTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+    custom_title = "수리보류 등록"
+    """수리보류 등록 - 부품/공임 입력 후 보류 상태로 저장 (견적서 출력 가능)"""
+
+    # ── 목록 화면 설정 ──
+    list_display = [
+        "display_status",
+        "inbound_date",
+        "display_company_info",
+        "display_tool_info",
+        "display_hold_button",
+    ]
+    list_display_links = None  # 행 클릭 비활성화 (버튼으로만 이동)
+    search_fields = ["serial_number", "company__name", "tool__model_name"]
+    list_per_page = 30
+    actions = None
+
+    class Media:
+        css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/row_colors.css", "as_app/css/parts_table.css", "as_app/css/multiline_cell.css")}
+        js = ("as_app/js/parts_table.js",)
+
+    # ── 수리보류 등록 폼 설정 ──
+    fieldsets = (
+        (
+            "입고 정보",
+            {
+                "fields": (
+                    "inbound_date",
+                    "company",
+                    "tool",
+                    "serial_number",
+                ),
+            },
+        ),
+        (
+            "수리보류 부품/공임 선택",
+            {
+                "fields": (
+                    "selected_parts",
+                    "repair_content",
+                ),
+                "description": "견적용 부품/공임을 선택하세요. 저장하면 수리보류(보라색) 상태로 저장되며, 견적서를 출력할 수 있습니다.",
+            },
+        ),
+    )
+
+    readonly_fields = [
+        "inbound_date",
+        "company",
+        "tool",
+        "serial_number",
+    ]
+
+    @admin.display(description="수리보류")
+    def display_hold_button(self, obj):
+        """목록에서 수리보류 등록 버튼을 표시"""
+        url = reverse("admin:as_app_holdticket_change", args=[obj.pk])
+        return format_html(
+            '<a href="{}" style="'
+            'display:inline-flex; align-items:center; gap:6px; '
+            'padding:6px 14px; border-radius:6px; font-size:0.8rem; '
+            'font-weight:600; text-decoration:none; '
+            'background:#9333ea; color:#fff; '
+            'transition:all .15s ease;'
+            '" '
+            'onmouseover="this.style.background=\'#7e22ce\'" '
+            'onmouseout="this.style.background=\'#9333ea\'">'
+            '⏸️ 수리보류 등록</a>',
+            url
+        )
+
+    def get_form(self, request, obj=None, **kwargs):
+        """수리보류 편집 폼: 수리기록등록과 동일한 PartsTableWidget 사용"""
+        kwargs["form"] = RepairTicketForm
+        from .widgets import PartsTableWidget
+        form = super().get_form(request, obj, **kwargs)
+        if obj and obj.tool_id:
+            from django.db.models import Q
+            parts_qs = Part.objects.filter(
+                Q(tools=obj.tool) | Q(tools__isnull=True)
+            ).distinct().order_by("part_type", "name")
+            form.base_fields["selected_parts"].queryset = parts_qs
+
+            has_category = obj.company and obj.company.price_group
+
+            if not has_category:
+                msg = format_html(
+                    '⚠️ <strong>[{}]</strong>에 단가 그룹이 설정되어 있지 않습니다.<br>'
+                    '수리보류 기록을 저장할 수 없으므로, <a href="{}" style="color:#b91c1c; text-decoration:underline;">[업체관리]</a>에서 단가 그룹을 먼저 지정해주세요.',
+                    obj.company.name if obj.company else "업체",
+                    reverse("admin:master_data_company_change", args=[obj.company.id]) if obj.company else "#"
+                )
+                form.base_fields["selected_parts"].widget = PartsTableWidget(disabled_message=msg)
+            else:
+                parts_data = {}
+                for p in parts_qs:
+                    parts_data[p.id] = {
+                        "name": p.name,
+                        "code": p.code,
+                        "price": p.get_price_for_company(obj.company),
+                        "part_type": p.part_type,
+                    }
+                form.base_fields["selected_parts"].widget = PartsTableWidget(
+                    parts_data=parts_data,
+                )
+        if "repair_content" in form.base_fields:
+            form.base_fields["repair_content"].widget = forms.TextInput(
+                attrs={"placeholder": "추가 메모가 있으면 입력하세요 (선택사항)", "style": "width:100%"}
+            )
+        return form
+
+    def get_queryset(self, request):
+        """입고/수리의뢰 상태인 티켓만 표시 (수리보류 등록 대상)"""
+        return (
+            super()
+            .get_queryset(request)
+            .filter(
+                status__in=[
+                    ASTicket.Status.INBOUND,
+                    ASTicket.Status.OUTSOURCED,
+                ]
+            )
+            .select_related("company", "tool", "tool__brand")
+            .prefetch_related("used_parts")
+        )
+
+    # ── 권한 제어 ──
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    # ── 저장 로직 (수리보류 상태로 저장) ──
+    def save_related(self, request, form, formsets, change):
+        """M2M 저장 후 사용 부품/공임 단가 스냅샷 보존 및 수리보류 상태로 변경"""
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+
+        if "selected_parts" in form.cleaned_data:
+            selected_parts = form.cleaned_data["selected_parts"]
+            current_parts = set(obj.used_parts.all())
+            new_parts = set(selected_parts)
+
+            # ── 미설정 단가 부품 차단 ──
+            missing_price_parts = [
+                p for p in new_parts
+                if p.get_price_for_company(obj.company) is None
+            ]
+            if missing_price_parts:
+                group_name = obj.company.price_group.name if (obj.company and obj.company.price_group) else "미지정"
+                part_names = ", ".join(p.name for p in missing_price_parts)
+                from django.contrib import messages
+                messages.error(
+                    request,
+                    f"⚠️ 다음 부품의 [{group_name}] 단가가 설정되지 않았습니다: {part_names}. "
+                    f"부품 관리에서 해당 단가 그룹의 가격을 먼저 입력해주세요."
+                )
+                obj.ticket_used_parts.filter(part__in=missing_price_parts).delete()
+                new_parts -= set(missing_price_parts)
+
+            # Remove unselected parts
+            to_remove = current_parts - new_parts
+            if to_remove:
+                obj.ticket_used_parts.filter(part__in=to_remove).delete()
+
+            # Add newly selected parts with current snapshot price
+            to_add = new_parts - current_parts
+            for part in to_add:
+                price = part.get_price_for_company(obj.company)
+                obj.ticket_used_parts.create(part=part, applied_price=price)
+
+        # 수리보류 비용 계산 (수리기록과 동일 계산식)
+        total_parts = sum(tup.applied_price for tup in obj.ticket_used_parts.all())
+        nego_price = int(total_parts * 0.9)
+        total_with_vat = int(nego_price * 1.1)
+        update_fields = []
+        if obj.repair_cost != total_with_vat:
+            obj.repair_cost = total_with_vat
+            update_fields.append("repair_cost")
+
+        # 부품이 선택되어 있으면 수리보류(HOLD) 상태로 변경
+        if obj.ticket_used_parts.exists() and obj.status != ASTicket.Status.HOLD:
+            obj.status = ASTicket.Status.HOLD
+            obj.hold_date = timezone.localdate()
+            update_fields.append("status")
+            update_fields.append("hold_date")
+        if update_fields:
+            obj.save(update_fields=update_fields)
+
+    # ── 화면 커스터마이징 ──
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        context["show_save_and_add_another"] = False
+        context["show_save_and_continue"] = False
+        # 프리셋 데이터를 context에 추가
+        if obj and obj.tool_id:
+            from django.db.models import Q
+            presets = RepairPreset.objects.filter(
+                Q(tools=obj.tool) | Q(tools__isnull=True)
+            ).distinct().prefetch_related("parts")
+            preset_data = []
+            for preset in presets:
+                parts = preset.parts.all()
+                part_ids = [p.id for p in parts if p.part_type == 'part']
+                labor_ids = [p.id for p in parts if p.part_type == 'labor']
+                company_total = sum((p.get_price_for_company(obj.company) or 0) for p in parts)
+                preset_data.append({
+                    "id": preset.id,
+                    "name": preset.name,
+                    "part_ids": part_ids,
+                    "labor_ids": labor_ids,
+                    "total_price": company_total,
+                })
+            context["repair_presets"] = preset_data
+            from django.db.models import Q as Q2
+            all_parts = Part.objects.filter(
+                Q2(tools=obj.tool) | Q2(tools__isnull=True)
+            ).distinct().prefetch_related('group_prices')
+
+            parts_meta = []
+            for p in all_parts:
+                p_price = p.get_price_for_company(obj.company)
+                parts_meta.append({"id": p.id, "part_type": p.part_type, "price": p_price})
+            context["parts_meta"] = parts_meta
+        else:
+            context["repair_presets"] = []
+            context["parts_meta"] = []
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["show_history"] = False
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def response_change(self, request, obj):
+        from django.contrib import messages
+        messages.success(request, "⏸️ 수리보류 등록이 완료되었습니다. (%s)" % obj)
+        return HttpResponseRedirect(
+            reverse("admin:as_app_holdticket_changelist")
+        )
 
 
 @admin.register(OutsourcedTicket)
@@ -1587,6 +1834,8 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "revert_repaired_to_inbound",
         "revert_outsourced_to_inbound",
         "revert_disposed_to_inbound",
+        "mark_as_hold",
+        "revert_hold_to_previous",
         "reset_estimate_status",
         "reset_tax_invoice",
         "mark_as_disposed",
@@ -1744,6 +1993,50 @@ class ASHistoryAdmin(StatusColorMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         updated = queryset.update(tax_invoice=False)
         from django.contrib import messages
         messages.success(request, f"{updated}건의 세금계산서 발행 상태가 초기화되었습니다.")
+
+    @unfold_action(description="⏸️ 선택 항목 → 수리보류 처리")
+    def mark_as_hold(self, request, queryset):
+        """선택된 티켓들을 수리보류 상태로 변경 (수리완료/수리의뢰/입고 상태 모두 가능)"""
+        valid_statuses = [
+            ASTicket.Status.INBOUND,
+            ASTicket.Status.OUTSOURCED,
+            ASTicket.Status.REPAIRED,
+        ]
+        invalid = queryset.exclude(status__in=valid_statuses)
+        if invalid.exists():
+            invalid_items = ", ".join(
+                f"{t.tool} (S/N: {t.serial_number}, 현재: {t.get_status_display()})"
+                for t in invalid[:5]
+            )
+            from django.contrib import messages
+            messages.error(
+                request,
+                f"수리보류로 변경할 수 없는 상태의 항목이 포함되어 있습니다: {invalid_items}. "
+                f"입고/수리의뢰/수리완료 상태인 항목만 선택해 주세요."
+            )
+            return
+        updated = queryset.filter(status__in=valid_statuses).update(
+            status=ASTicket.Status.HOLD,
+            hold_date=timezone.localdate(),
+        )
+        from django.contrib import messages
+        messages.success(request, f"{updated}건이 수리보류 처리되었습니다.")
+
+    @unfold_action(description="▶️ 수리보류 해제 → 수리완료로 변경")
+    def revert_hold_to_previous(self, request, queryset):
+        """수리보류 상태를 수리완료로 전환 (단가 변동 경고 필수)"""
+        if not self._validate_status(request, queryset, ASTicket.Status.HOLD, "수리보류"):
+            return
+        updated = queryset.update(
+            status=ASTicket.Status.REPAIRED,
+            hold_date=None,
+        )
+        from django.contrib import messages
+        messages.warning(
+            request,
+            f"⚠️ {updated}건의 수리보류가 해제되어 수리완료 상태로 변경되었습니다. "
+            f"기존 견적 단가가 현재와 다를 수 있으니 반드시 견적서 및 부품 단가를 재확인하시기 바랍니다."
+        )
 
     @unfold_action(description="🗑️ 입고 → 자체폐기 처리")
     def mark_as_disposed(self, request, queryset):
@@ -2063,10 +2356,10 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusColorMixin, CustomTitleMi
         )
 
     def get_queryset(self, request):
-        """견적서 발행은 수리완료 또는 출고 상태인 데이터만 표시"""
+        """견적서 발행은 수리완료, 출고, 수리보류 상태인 데이터만 표시"""
         return (
             super().get_queryset(request)
-            .filter(status__in=[ASTicket.Status.REPAIRED, ASTicket.Status.SHIPPED])
+            .filter(status__in=[ASTicket.Status.REPAIRED, ASTicket.Status.SHIPPED, ASTicket.Status.HOLD])
             .select_related("company", "tool", "tool__brand")
             .prefetch_related("ticket_used_parts", "ticket_used_parts__part")
         )

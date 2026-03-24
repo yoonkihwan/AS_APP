@@ -43,6 +43,11 @@ def dashboard_callback(request, context):
         status=ASTicket.Status.OUTSOURCED,
     ).count()
 
+    # 4-2. 수리보류 중
+    hold_count = ASTicket.objects.filter(
+        status=ASTicket.Status.HOLD,
+    ).count()
+
 
 
     # ── KPI 카드 링크 생성 ──
@@ -51,6 +56,7 @@ def dashboard_callback(request, context):
     waiting_url = f"{history_url}?status__exact=inbound"
     outsourced_url = f"{history_url}?status__exact=outsourced"
     repaired_url = f"{history_url}?status__exact=repaired"
+    hold_url = f"{history_url}?status__exact=hold"
 
     kpi = [
         {
@@ -84,6 +90,14 @@ def dashboard_callback(request, context):
             "icon": "check_circle",
             "color": "#10b981",  # emerald
             "link": repaired_url,
+        },
+        {
+            "title": "수리보류",
+            "metric": hold_count,
+            "footer": "견적 발송 후 결정 대기 중",
+            "icon": "pause_circle",
+            "color": "#9333ea",  # purple
+            "link": hold_url,
         },
     ]
 
