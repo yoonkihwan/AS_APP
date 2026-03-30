@@ -4,27 +4,36 @@
 
 ---
 
+## ⚠️ 포트 충돌 주의
+
+> **AS_APP은 `8001`번 포트를 사용합니다.**
+> 
+> 8000번 포트는 다른 프로그램(Video Manager 등)이 사용하고 있을 수 있으므로,  
+> AS_APP은 반드시 **8001번 포트**로 실행하세요. 포트 충돌 시 다른 앱의 화면이 표시됩니다.
+
+---
+
 ## 🚀 빠르게 실행하는 방법 (요약)
 
 Cloudflare Tunnel을 사용하려면 **터미널(Terminal) 창이 2개** 필요합니다. 각각의 터미널에 아래 명령어를 실행하세요.
 
 ### 터미널 1: Django 웹 서버 실행
-먼저 웹 어플리케이션(서버)을 켭니다. 구동 시 포트번호는 기본 8000번입니다.
+먼저 웹 어플리케이션(서버)을 켭니다. **포트번호는 8001번**입니다.
 
 ```powershell
 # 1. 가상환경 활성화
 .\venv\Scripts\activate
 
-# 2. 서버 구동
-python manage.py runserver
+# 2. 서버 구동 (포트 8001 — 8000은 다른 프로젝트가 사용 중)
+python manage.py runserver 8001
 ```
 
 ### 터미널 2: Cloudflare Tunnel 실행
-위에서 켠 서버(8000포트)를 외부로 연결해주는 터널을 켭니다. (Node.js의 `npx` 명령어 사용)
+위에서 켠 서버(**8001**포트)를 외부로 연결해주는 터널을 켭니다. (Node.js의 `npx` 명령어 사용)
 
 ```powershell
-# 터널 구동 (포트 8000을 대상)
-npx cloudflared tunnel --url http://localhost:8000
+# 터널 구동 (포트 8001을 대상 — 반드시 서버 포트와 동일하게!)
+npx cloudflared tunnel --url http://localhost:8001
 ```
 
 * 위 명령어를 입력하면 터미널 화면 중간쯤에 `your url is: https://XXXXX.trycloudflare.com` 형태의 임시 주소가 생성되어 나타납니다.
@@ -43,6 +52,8 @@ npx cloudflared tunnel --url http://localhost:8000
    - Cloudflare Tunnel 명령어를 새로 실행할 때마다 `https://...trycloudflare.com` 이라는 임시 주소는 매번 다른 주소로 생성됩니다. 만약 터널을 재시작했다면 바뀐 주소를 다시 알려주어야 합니다.
 4. **보안 유의**
    - 불특정 다수가 알면 서버 자원을 소모하거나 의도치 않은 행위를 할 수 있으므로, 보여주고자 하는 분들에게만 주소를 안내하세요.
+5. **포트 중복 확인**
+   - 8001번 포트에서 이미 다른 프로그램이 실행 중이라면, `8002` 등 다른 포트를 사용하세요. 이 경우 터널 명령어의 포트도 함께 변경해야 합니다.
 
 ---
 
@@ -54,8 +65,12 @@ npx cloudflared tunnel --url http://localhost:8000
 CSRF_TRUSTED_ORIGINS = [
     "https://*.onrender.com",
     "http://127.0.0.1:8000",
+    "http://127.0.0.1:8001",      # AS_APP 전용 포트
     "http://localhost:8000",
-    "https://*.trycloudflare.com",    # 이 부분이 Cloudflare 터널을 위해 필요합니다!
+    "http://localhost:8001",       # AS_APP 전용 포트
+    "https://*.trycloudflare.com", # Cloudflare 터널용
     "https://*.loca.lt",
 ]
 ```
+
+> **참고:** `settings.py`에 8001 포트에 대한 `CSRF_TRUSTED_ORIGINS` 항목이 아직 없다면 위의 두 줄(`8001`)을 추가해야 합니다.
