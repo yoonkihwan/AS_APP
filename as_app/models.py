@@ -215,11 +215,13 @@ class ASTicket(models.Model):
 
     class Status(models.TextChoices):
         INBOUND = "inbound", "입고"
+        ESTIMATE_DONE = "estimate_done", "견적완료"
         OUTSOURCED = "outsourced", "수리의뢰"
         REPAIRED = "repaired", "수리완료"
-        SHIPPED = "shipped", "출고"
-        DISPOSED = "disposed", "자체폐기"
         HOLD = "hold", "수리보류"
+        SHIPPED = "shipped", "출고(수리완료)"
+        SHIPPED_UNREPAIRED = "shipped_unrepaired", "출고(미수리)"
+        DISPOSED = "disposed", "자체폐기"
 
     # ── 입고 정보 ──
     inbound_batch = models.ForeignKey(
@@ -259,7 +261,7 @@ class ASTicket(models.Model):
     repair_cost = models.PositiveIntegerField("AS 비용", default=0, help_text="사용 부품/공임 단가 합산 (자동 계산)")
     status = models.CharField(
         "상태",
-        max_length=15,
+        max_length=20,
         choices=Status.choices,
         default=Status.INBOUND,
     )
@@ -296,6 +298,7 @@ class ASTicket(models.Model):
         if self.tool_id and self.serial_number:
             active_statuses = [
                 self.Status.INBOUND,
+                self.Status.ESTIMATE_DONE,
                 self.Status.OUTSOURCED,
                 self.Status.REPAIRED,
                 self.Status.HOLD,
@@ -395,6 +398,24 @@ class HoldTicket(ASTicket):
         proxy = True
         verbose_name = "수리보류 등록"
         verbose_name_plural = "수리보류 등록"
+
+
+class EstimateRegistration(ASTicket):
+    """견적등록 전용 프록시 모델 (기존 수리기록등록 + 수리보류등록을 대체)"""
+
+    class Meta:
+        proxy = True
+        verbose_name = "견적등록"
+        verbose_name_plural = "견적등록"
+
+
+class StatusRegistration(ASTicket):
+    """상태 등록 전용 프록시 모델 (출고/의뢰/보류 일괄처리를 통합)"""
+
+    class Meta:
+        proxy = True
+        verbose_name = "상태 등록"
+        verbose_name_plural = "상태 등록"
 
 
 # ──────────────────────────────────────────────

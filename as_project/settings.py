@@ -415,40 +415,30 @@ def sidebar_callback(request):
                         "link": reverse_lazy("admin:as_app_inboundbatch_add"),
                     },
                     {
-                        "title": "수리 의뢰 등록",
-                        "icon": "send",
-                        "link": reverse_lazy("admin:as_app_outsourcedticket_changelist"),
+                        "title": "견적등록",
+                        "icon": "request_quote",
+                        "link": reverse_lazy("admin:as_app_estimateregistration_changelist"),
                     },
                     {
-                        "title": "수리 기록 등록",
-                        "icon": "build",
-                        "link": reverse_lazy("admin:as_app_repairticket_changelist"),
+                        "title": "상태 등록",
+                        "icon": "swap_horiz",
+                        "link": reverse_lazy("admin:as_app_statusregistration_changelist"),
                     },
+                ],
+            },
+            {
+                "title": "정산 및 문서",
+                "separator": True,
+                "items": [
                     {
-                        "title": "수리보류 등록",
-                        "icon": "pause_circle",
-                        "link": reverse_lazy("admin:as_app_holdticket_changelist"),
-                    },
-                    {
-                        "title": "출고 등록",
-                        "icon": "local_shipping",
-                        "link": reverse_lazy("admin:as_app_outboundticket_changelist"),
+                        "title": "견적서 발행",
+                        "icon": "description",
+                        "link": reverse_lazy("admin:as_app_estimateticket_changelist"),
                     },
                     {
                         "title": "세금계산서 등록",
                         "icon": "receipt_long",
                         "link": reverse_lazy("admin:as_app_taxinvoiceticket_changelist"),
-                    },
-                ],
-            },
-            {
-                "title": "추출",
-                "separator": True,
-                "items": [
-                    {
-                        "title": "견적서 발행 (데모)",
-                        "icon": "request_quote",
-                        "link": reverse_lazy("admin:as_app_estimateticket_changelist"),
                     },
                 ],
             },

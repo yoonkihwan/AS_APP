@@ -48,6 +48,11 @@ def dashboard_callback(request, context):
         status=ASTicket.Status.HOLD,
     ).count()
 
+    # 4-3. 견적완료 (고객 결정 대기)
+    estimate_done_count = ASTicket.objects.filter(
+        status=ASTicket.Status.ESTIMATE_DONE,
+    ).count()
+
 
 
     # ── KPI 카드 링크 생성 ──
@@ -57,6 +62,7 @@ def dashboard_callback(request, context):
     outsourced_url = f"{history_url}?status__exact=outsourced"
     repaired_url = f"{history_url}?status__exact=repaired"
     hold_url = f"{history_url}?status__exact=hold"
+    estimate_done_url = f"{history_url}?status__exact=estimate_done"
 
     kpi = [
         {
@@ -94,14 +100,22 @@ def dashboard_callback(request, context):
         {
             "title": "수리보류",
             "metric": hold_count,
-            "footer": "견적 발송 후 결정 대기 중",
+            "footer": "비용 등의 이유로 보류 중",
             "icon": "pause_circle",
-            "color": "#9333ea",  # purple
+            "color": "#f97316",  # orange
             "link": hold_url,
+        },
+        {
+            "title": "견적완료",
+            "metric": estimate_done_count,
+            "footer": "고객 결정 대기 중",
+            "icon": "receipt_long",
+            "color": "#22c55e",  # green
+            "link": estimate_done_url,
         },
     ]
 
-    # ── 수리 매출 요약 (출고 완료 기준) ──
+    # ── 수리 매출 요약 (출고(수리완료) 기준만 집계 — 출고(미수리)는 제외) ──
     shipped_qs = ASTicket.objects.filter(status=ASTicket.Status.SHIPPED)
 
 

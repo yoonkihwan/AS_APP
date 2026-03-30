@@ -1,0 +1,92 @@
+/* Status Badge Styling — 행 전체 배경색을 제거하고 텍스트 옆 미니 배지로 교체 */
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* 입고 - 노란색 */
+.status-badge[data-status="inbound"] {
+    background: rgba(234, 179, 8, 0.15);
+    color: #a16207;
+}
+html.dark .status-badge[data-status="inbound"] {
+    background: rgba(234, 179, 8, 0.2);
+    color: #fbbf24;
+}
+
+/* 견적완료 - 연두색 */
+.status-badge[data-status="estimate_done"] {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+}
+html.dark .status-badge[data-status="estimate_done"] {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+}
+
+/* 수리보류 - 주황색 */
+.status-badge[data-status="hold"] {
+    background: rgba(249, 115, 22, 0.15);
+    color: #c2410c;
+}
+html.dark .status-badge[data-status="hold"] {
+    background: rgba(249, 115, 22, 0.2);
+    color: #fb923c;
+}
+
+/* 수리의뢰 - 보라색 */
+.status-badge[data-status="outsourced"] {
+    background: rgba(147, 51, 234, 0.15);
+    color: #7e22ce;
+}
+html.dark .status-badge[data-status="outsourced"] {
+    background: rgba(147, 51, 234, 0.2);
+    color: #c084fc;
+}
+
+/* 수리완료 - 파란색 */
+.status-badge[data-status="repaired"] {
+    background: rgba(59, 130, 246, 0.15);
+    color: #1d4ed8;
+}
+html.dark .status-badge[data-status="repaired"] {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+}
+
+/* 출고(미수리) - 갈색 */
+.status-badge[data-status="shipped_unrepaired"] {
+    background: rgba(161, 98, 7, 0.15);
+    color: #92400e;
+}
+html.dark .status-badge[data-status="shipped_unrepaired"] {
+    background: rgba(161, 98, 7, 0.2);
+    color: #d97706;
+}
+
+/* 자체폐기 - 빨간색 */
+.status-badge[data-status="disposed"] {
+    background: rgba(239, 68, 68, 0.15);
+    color: #b91c1c;
+}
+html.dark .status-badge[data-status="disposed"] {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+/* 출고(수리완료) - 검은색/회색 */
+.status-badge[data-status="shipped"] {
+    background: rgba(107, 114, 128, 0.15);
+    color: #374151;
+}
+html.dark .status-badge[data-status="shipped"] {
+    background: rgba(107, 114, 128, 0.2);
+    color: #9ca3af;
+}
