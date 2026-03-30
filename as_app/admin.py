@@ -2816,14 +2816,13 @@ class EstimateRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomT
         return form
 
     def get_queryset(self, request):
-        """입고/수리의뢰/견적완료/수리보류 상태인 티켓만 표시 (견적 작성 대상)"""
+        """입고/수리의뢰/수리보류 상태인 티켓만 표시 (견적완료된 건은 제외됨)"""
         return (
             super()
             .get_queryset(request)
             .filter(
                 status__in=[
                     ASTicket.Status.INBOUND,
-                    ASTicket.Status.ESTIMATE_DONE,
                     ASTicket.Status.OUTSOURCED,
                     ASTicket.Status.HOLD,
                 ]
@@ -2839,7 +2838,14 @@ class EstimateRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomT
     def has_delete_permission(self, request, obj=None):
         return False
 
-    # ── 저장 로직 (부품 스냅샷 + 비용 계산, 상태 자동변경 없음) ──
+    # ── 저장 로직 (상태 자동변경 제한적 허용 및 예외 처리, 부품 스냅샷 + 비용 계산) ──
+    def save_model(self, request, obj, form, change):
+        """사용자가 상태를 변경하지 않고 견적을 기록할 경우 자동으로 '견적완료'로 전환"""
+        if "status" not in form.changed_data and obj.status in [ASTicket.Status.INBOUND, ASTicket.Status.OUTSOURCED]:
+            obj.status = ASTicket.Status.ESTIMATE_DONE
+            from django.contrib import messages
+            messages.success(request, "✅ 견적이 등록되어 '견적완료' 상태로 자동 전환되었습니다.")
+        super().save_model(request, obj, form, change)
     def save_related(self, request, form, formsets, change):
         """M2M 저장 후 사용 부품/공임 단가 스냅샷 보존 및 비용 계산"""
         super().save_related(request, form, formsets, change)
