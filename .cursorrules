@@ -29,6 +29,14 @@
     - 읽기 전용 뷰/숨김 메뉴: 불필요한 목록 상단 보라색 '+' 버튼은 `has_add_permission = False`로 차단.
     - 데이터 표출: 데이터가 길거나 표를 망가뜨릴 우려가 있는 경우, `textwrap` 모듈을 활용하여 UI 깨짐 및 PDF 렌더링 잘림을 방지.
 
+### 3.3. 상태 관리 패턴 (V5 개편) ❗ 필수 준수
+- **자동 트리거 금지:** 부품/공임 등록 시 `save_related()`에서 자동으로 상태를 변경하는 코드를 절대 작성하지 않는다. 모든 상태 변경은 사용자의 수동 조작(드롭다운 선택 또는 액션 실행)을 통해서만 가능.
+- **상태 변경 채널 분리:**
+    - **견적등록(드롭다운):** 입고/견적완료/수리완료/수리보류/자체폐기 내에서만 변경 허용. 출고/의뢰는 숨김.
+    - **상태등록(액션):** 출고/의뢰 등 필수값(날짜, 업체)이 필요한 예민한 상태 변경 전담.
+    - **통합이력(롤백):** 깠깐한 상태 복구만 허용 (엄격한 현재상태 검증).
+- **매출 집계:** 오직 `출고(수리완료)` 상태의 `repair_cost`만 매출에 합산. `출고(미수리)`는 절대 매출에 포함 금지.
+
 ## 4. 코드 스타일 및 네이밍 (Naming Convention)
 - **Variables/Functions:** `snake_case` (예: `repair_cost`, `calculate_total_price`)
 - **Classes:** `PascalCase` (예: `RepairTicket`, `ToolStockSummaryAdmin`)
@@ -38,7 +46,7 @@
 - **전역 테마 동기화:** 포탈 및 모든 Admin Site는 다크/라이트 모드를 지원하며, 로컬스토리지(`theme`) 기반으로 사용자 선택이 모든 화면에 동기화 유지된다.
 - **포인트 컬러/스타일링:** Unfold의 데코레이터(`@unfold_action(attrs=...)`)를 활용해 버튼 색상(예: 보라색 `#9333ea`)을 커스텀 적용.
 - **글로벌 액션 버튼 (`actions_list`):** 왼쪽 체크박스가 필요 없는 "리스트 전체 화면 대상 동작(예: 전체 PDF 다운로드)"의 경우, `actions_list`에 액션을 명시하고 `list_disable_select_all = True`, `actions = None`으로 맞춰서 리스트 UI를 깔끔하게 유지한다.
-- **상태 컬러 마킹:** 티켓 및 진행 상태에 따라 행 전체 또는 셀 컬러를 적용해 직관적 구분을 돕는다.
+- **상태 컬러 마킹 (V5):** ~~행 전체 배경색~~ 폐기. **미니 컬러 배지(pill badge)** 방식으로 전환. `StatusBadgeMixin` + `status_badge.css` 사용. 기존 `StatusColorMixin` + `row_colors.css`는 사용 금지.
 - **로컬라이징:** 모든 버튼, 툴팁, 플레이스홀더 텍스트는 한국어(`ko-kr`)를 최우선 지원한다.
 
 ## 6. 다중 사이트 분리 아키텍처 (Multi-Admin Sites)
@@ -49,6 +57,14 @@
   - **관리자 (`is_superuser=True`):** 모든 사이트 + 시스템 계정 관리 접근 가능.
   - **작업자 (`is_staff=True`):** AS/장비/근태 관리 접근 가능, 시스템 계정 관리 접근 불가.
   - 개별 Permission/Group 관리 불필요. "작업자 승인"/"관리자 승격" 액션으로 일괄 처리.
+
+## 7. V5 개편 핵심 참조 (Quick Reference)
+- **폐기된 파일/Mixin:** `StatusColorMixin`, `row_colors.css`
+- **신규 파일/Mixin:** `StatusBadgeMixin`, `status_badge.css`, `EstimateRegistration`, `StatusRegistration`
+- **숨김 처리된 Admin:** `RepairTicketAdmin`, `HoldTicketAdmin` (`has_module_permission=False`)
+- **사이드바 위치:** `settings.py` > `sidebar_callback()` > AS 섹션
+- **기획안 문서:** `as_system_revision_plan.md` (Antigravity 아티팩트)
+- **롤백 가이드:** `back.md`
 
 ## 7. Git 커밋 컨벤션 (Conventional Commits)
 - **feat:** 새로운 기능 추가

@@ -50,8 +50,9 @@ git checkout main
 본진(`main`)으로 피난 가기 **"최소 직전"**에 이 명령어를 먼저 쳐서 DB 구조를 되돌립니다.
 
 ```bash
-# as_app의 마이그레이션 최신 버전을 확인하고, 옛날 버전 번호(예: 0034)로 타임머신
-python manage.py migrate as_app 0034_이전마이그레이션이름
+# as_app의 마이그레이션을 V5 직전(0034)으로 타임머신
+python manage.py migrate as_app 0034_holdticket
+# 위 번호는 V5 개편 마이그레이션(0035) 직전의 안전한 마이그레이션 이름입니다.
 ```
 
 ## 💡 요약 팁
