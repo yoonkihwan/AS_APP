@@ -1,0 +1,226 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block after_field_sets %}
+{{ block.super }}
+
+{% if repair_presets %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const presets = {{ repair_presets|safe }};
+    const partsMeta = {{ parts_meta|safe }};
+    if (!presets.length) return;
+
+    // 부품 메타 정보 맵 생성 (id -> {part_type, price})
+    const metaMap = {};
+    partsMeta.forEach(function(p) {
+        metaMap[p.id] = { part_type: p.part_type, price: p.price };
+    });
+
+    // 부품 테이블 위젯 영역 찾기
+    const widget = document.querySelector('.parts-table-widget');
+    if (!widget) return;
+
+    // 활성 상태 추적
+    const activePresets = new Set();
+
+    // ── 프리셋 컨테이너 생성 ──
+    const container = document.createElement('div');
+    container.id = 'preset-container';
+    container.style.cssText = 'margin-bottom:16px; padding:16px; background:linear-gradient(135deg, #f8f7ff 0%, #f0eeff 100%); border-radius:10px; border:1px solid #e0ddf5;';
+
+    // 다크모드 대응
+    if (document.documentElement.classList.contains('dark')) {
+        container.style.background = 'linear-gradient(135deg, #1e1b4b 0%, #1e2040 100%)';
+        container.style.borderColor = '#312e81';
+    }
+
+    // 헤더 (유지)
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:0.85rem; font-weight:700; color:#4338ca; margin-bottom:10px; display:flex; align-items:center; gap:6px; flex-wrap: wrap; justify-content: space-between;';
+    header.innerHTML = '<div>📦 수리 세트 빠른 적용 <span style="font-weight:400; color:#6b7280; font-size:0.78rem;">(여러 개 선택 가능 · 공임은 최고가 자동 선택)</span></div>';
+    
+    // 초기화 버튼을 헤더 우측으로 배치
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.textContent = '✕ 전체 해제';
+    resetBtn.style.cssText = 'padding:6px 12px; border-radius:6px; border:1px solid #d1d5db; background:#fff; color:#6b7280; font-size:0.75rem; font-weight:600; cursor:pointer; transition:all .2s ease; margin-left: auto;';
+    
+    resetBtn.addEventListener('mouseenter', function() { this.style.background = '#f3f4f6'; });
+    resetBtn.addEventListener('mouseleave', function() { this.style.background = '#fff'; });
+    
+    if (document.documentElement.classList.contains('dark')) {
+        resetBtn.style.background = '#1e293b';
+        resetBtn.style.borderColor = '#475569';
+        resetBtn.style.color = '#94a3b8';
+        resetBtn.addEventListener('mouseenter', function() { this.style.background = '#334155'; });
+        resetBtn.addEventListener('mouseleave', function() { this.style.background = '#1e293b'; });
+    }
+    header.appendChild(resetBtn);
+    container.appendChild(header);
+
+    // ── 행 스타일 동기화 함수 ──
+    function syncRowStyles() {
+        widget.querySelectorAll('.parts-row').forEach(function(row) {
+            const cb = row.querySelector('input[type="checkbox"]');
+            if (cb) {
+                row.classList.toggle('selected-row', cb.checked);
+            }
+        });
+    }
+
+    // ── 세트 적용 로직 ──
+    function applyActivePresets() {
+        // 모든 체크박스 해제
+        const checkboxes = widget.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(function(cb) { cb.checked = false; });
+
+        if (activePresets.size === 0) {
+            syncRowStyles();
+            return;
+        }
+
+        // 활성 세트들의 부품/공임 수집
+        const allPartIds = new Set();
+        const laborCandidates = []; // {id, price}
+
+        activePresets.forEach(function(presetId) {
+            const preset = presets.find(function(p) { return p.id === presetId; });
+            if (!preset) return;
+
+            // 부품 추가
+            preset.part_ids.forEach(function(id) { allPartIds.add(id); });
+
+            // 공임 후보 수집
+            preset.labor_ids.forEach(function(id) {
+                const meta = metaMap[id];
+                if (meta) {
+                    laborCandidates.push({ id: id, price: meta.price });
+                }
+            });
+        });
+
+        // 부품 체크
+        allPartIds.forEach(function(id) {
+            const cb = widget.querySelector('input[value="' + id + '"]');
+            if (cb) cb.checked = true;
+        });
+
+        // 공임: 최고가 1개만 선택
+        if (laborCandidates.length > 0) {
+            laborCandidates.sort(function(a, b) { return b.price - a.price; });
+            const highestLabor = laborCandidates[0];
+            const cb = widget.querySelector('input[value="' + highestLabor.id + '"]');
+            if (cb) cb.checked = true;
+        }
+
+        syncRowStyles();
+    }
+
+    // ── 테이블 영역 생성 ──
+    const presetTable = document.createElement('table');
+    presetTable.style.cssText = 'width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; border:1px solid #e5e7eb; margin-bottom: 5px;';
+    if (document.documentElement.classList.contains('dark')) {
+        presetTable.style.background = '#1e293b';
+        presetTable.style.borderColor = '#334155';
+    }
+
+    const tHead = document.createElement('thead');
+    tHead.innerHTML = `
+        <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+            <th style="width:50px; text-align:center; padding:10px; font-size:0.75rem; color:#6b7280; font-weight:600;">선택</th>
+            <th style="padding:10px; text-align:left; font-size:0.75rem; color:#6b7280; font-weight:600;">수리 세트명</th>
+            <th style="width:120px; text-align:right; padding:10px; font-size:0.75rem; color:#6b7280; font-weight:600;">합계 금액</th>
+        </tr>
+    `;
+    if (document.documentElement.classList.contains('dark')) {
+        tHead.querySelector('tr').style.background = '#1a2332';
+        tHead.querySelector('tr').style.borderColor = '#334155';
+        tHead.querySelectorAll('th').forEach(th => th.style.color = '#94a3b8');
+    }
+    presetTable.appendChild(tHead);
+
+    const tBody = document.createElement('tbody');
+    presetTable.appendChild(tBody);
+
+    // ── 세트 행 일괄 렌더링 ──
+    presets.forEach(function(preset) {
+        const tr = document.createElement('tr');
+        tr.style.cssText = 'border-bottom:1px solid #f3f4f6; cursor:pointer; transition:background 0.15s ease;';
+        if (document.documentElement.classList.contains('dark')) {
+            tr.style.borderColor = '#334155';
+            tr.style.color = '#cbd5e1';
+        }
+
+        const tdCheck = document.createElement('td');
+        tdCheck.style.cssText = 'text-align:center; padding:8px 10px;';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.dataset.presetId = preset.id;
+        checkbox.style.cssText = 'width:18px; height:18px; accent-color:#6366f1; cursor:pointer; pointer-events: none;';
+        tdCheck.appendChild(checkbox);
+
+        const tdName = document.createElement('td');
+        tdName.style.cssText = 'padding:8px 10px; font-size:0.85rem; font-weight:600; color:#4338ca;';
+        tdName.textContent = preset.name;
+        if (document.documentElement.classList.contains('dark')) tdName.style.color = '#a5b4fc';
+
+        const tdPrice = document.createElement('td');
+        tdPrice.style.cssText = 'padding:8px 10px; text-align:right; font-size:0.85rem; font-weight:600; font-variant-numeric:tabular-nums;';
+        tdPrice.textContent = preset.total_price.toLocaleString() + '원';
+        if (document.documentElement.classList.contains('dark')) tdPrice.style.color = '#cbd5e1';
+
+        tr.appendChild(tdCheck);
+        tr.appendChild(tdName);
+        tr.appendChild(tdPrice);
+
+        // hover 상태
+        tr.addEventListener('mouseenter', function() {
+            if (!checkbox.checked) {
+                this.style.background = document.documentElement.classList.contains('dark') ? 'rgba(99, 102, 241, 0.04)' : 'rgba(99, 102, 241, 0.04)';
+            }
+        });
+        tr.addEventListener('mouseleave', function() {
+            if (!checkbox.checked) {
+                this.style.background = 'transparent';
+            }
+        });
+
+        // 클릭으로 토글
+        tr.addEventListener('click', function(e) {
+            checkbox.checked = !checkbox.checked;
+
+            if (checkbox.checked) {
+                activePresets.add(preset.id);
+                this.style.background = document.documentElement.classList.contains('dark') ? 'rgba(99, 102, 241, 0.12)' : 'rgba(99, 102, 241, 0.08)';
+            } else {
+                activePresets.delete(preset.id);
+                this.style.background = document.documentElement.classList.contains('dark') ? 'rgba(99, 102, 241, 0.04)' : 'rgba(99, 102, 241, 0.04)'; // hover style retention if mouse is still there
+            }
+            applyActivePresets();
+        });
+
+        tBody.appendChild(tr);
+    });
+
+    // "초기화" 버튼 동작
+    resetBtn.addEventListener('click', function() {
+        activePresets.clear();
+        tBody.querySelectorAll('tr').forEach(tr => {
+            tr.style.background = 'transparent';
+            const cb = tr.querySelector('input[type="checkbox"]');
+            if (cb) cb.checked = false;
+        });
+        const widgetCheckboxes = widget.querySelectorAll('input[type="checkbox"]');
+        widgetCheckboxes.forEach(function(cb) { cb.checked = false; });
+        syncRowStyles();
+    });
+
+    container.appendChild(presetTable);
+
+    // 위젯 앞에 삽입
+    widget.parentNode.insertBefore(container, widget);
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -2696,6 +2696,8 @@ class EstimateRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomT
     search_fields = ["serial_number", "company__name", "tool__model_name"]
     list_per_page = 30
     actions = None
+    
+    change_form_template = "admin/as_app/estimateregistration/change_form.html"
 
     class Media:
         css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/status_badge.css", "as_app/css/parts_table.css", "as_app/css/multiline_cell.css")}
