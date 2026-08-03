@@ -38,6 +38,7 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
+        from as_app.utils.pdf_fonts import register_korean_fonts
         from django.db.models import Q
         from master_data.models import Tool
         from .models import Inventory
@@ -47,20 +48,7 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
         doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
         elements = []
 
-        font_name = 'Helvetica'
-        font_name_bold = 'Helvetica-Bold'
-        try:
-            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
-            font_path_bd = "c:\\Windows\\Fonts\\malgunbd.ttf"
-            if os.path.exists(font_path):
-                pdfmetrics.registerFont(TTFont('Malgun', font_path))
-                font_name = 'Malgun'
-                font_name_bold = 'Malgun' # Fallback
-            if os.path.exists(font_path_bd):
-                pdfmetrics.registerFont(TTFont('MalgunBold', font_path_bd))
-                font_name_bold = 'MalgunBold'
-        except Exception:
-            pass
+        font_name, font_name_bold = register_korean_fonts()
 
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
@@ -177,6 +165,7 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
+        from as_app.utils.pdf_fonts import register_korean_fonts
         from .models import Inventory
         from django.utils import timezone
 
@@ -215,20 +204,7 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
         doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
         elements = []
 
-        font_name = 'Helvetica'
-        font_name_bold = 'Helvetica-Bold'
-        try:
-            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
-            font_path_bd = "c:\\Windows\\Fonts\\malgunbd.ttf"
-            if os.path.exists(font_path):
-                pdfmetrics.registerFont(TTFont('Malgun', font_path))
-                font_name = 'Malgun'
-                font_name_bold = 'Malgun'
-            if os.path.exists(font_path_bd):
-                pdfmetrics.registerFont(TTFont('MalgunBold', font_path_bd))
-                font_name_bold = 'MalgunBold'
-        except Exception:
-            pass
+        font_name, font_name_bold = register_korean_fonts()
 
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(
@@ -451,6 +427,7 @@ class InventoryAdmin(ModelAdmin):
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
+        from as_app.utils.pdf_fonts import register_korean_fonts
         from django.utils import timezone
         from itertools import groupby
         
@@ -486,20 +463,7 @@ class InventoryAdmin(ModelAdmin):
         doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
         elements = []
         
-        font_name = 'Helvetica'
-        font_name_bold = 'Helvetica-Bold'
-        try:
-            font_path = "c:\\Windows\\Fonts\\malgun.ttf"
-            font_path_bd = "c:\\Windows\\Fonts\\malgunbd.ttf"
-            if os.path.exists(font_path):
-                pdfmetrics.registerFont(TTFont('Malgun', font_path))
-                font_name = 'Malgun'
-                font_name_bold = 'Malgun'
-            if os.path.exists(font_path_bd):
-                pdfmetrics.registerFont(TTFont('MalgunBold', font_path_bd))
-                font_name_bold = 'MalgunBold'
-        except Exception:
-            pass
+        font_name, font_name_bold = register_korean_fonts()
 
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle(

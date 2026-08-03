@@ -11,6 +11,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 from reportlab.lib import colors
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
+from as_app.utils.pdf_fonts import register_korean_fonts
 
 # ── 이미지 경로 ──
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,13 +21,6 @@ LOGO_YOKOTA_APEX = os.path.join(IMG_DIR, "YOKOTA,APEX 로고.png")
 STAMP_IMG = os.path.join(IMG_DIR, "회사직인.png")
 
 
-def _register_fonts():
-    font_path = "C:\\Windows\\Fonts\\malgun.ttf"
-    font_bold_path = "C:\\Windows\\Fonts\\malgunbd.ttf"
-    if os.path.exists(font_path):
-        pdfmetrics.registerFont(TTFont('Malgun', font_path))
-    if os.path.exists(font_bold_path):
-        pdfmetrics.registerFont(TTFont('Malgun-Bold', font_bold_path))
 
 
 def _safe_image(path, width=None, height=None):
@@ -46,7 +40,7 @@ def generate_pdf_estimate(tickets) -> io.BytesIO:
     
     업체별 단가 그룹에 따른 차등 가격이 자동 적용됩니다.
     """
-    _register_fonts()
+    font_name, font_bold = register_korean_fonts()
     buffer = io.BytesIO()
 
     doc = SimpleDocTemplate(
@@ -59,8 +53,6 @@ def generate_pdf_estimate(tickets) -> io.BytesIO:
     )
 
     elements = []
-    font_name = 'Malgun' if 'Malgun' in pdfmetrics.getRegisteredFontNames() else 'Helvetica'
-    font_bold = 'Malgun-Bold' if 'Malgun-Bold' in pdfmetrics.getRegisteredFontNames() else font_name
 
     # ── 스타일 정의 ──
     styles = getSampleStyleSheet()
@@ -342,7 +334,7 @@ def generate_pdf_estimate(tickets) -> io.BytesIO:
 
 def generate_custom_pdf_estimate(custom_data_list) -> io.BytesIO:
     """커스텀 딕셔너리 데이터를 기반으로 다스 공구실 견적서 PDF 생성"""
-    _register_fonts()
+    font_name, font_bold = register_korean_fonts()
     buffer = io.BytesIO()
 
     doc = SimpleDocTemplate(
@@ -355,8 +347,6 @@ def generate_custom_pdf_estimate(custom_data_list) -> io.BytesIO:
     )
 
     elements = []
-    font_name = 'Malgun' if 'Malgun' in pdfmetrics.getRegisteredFontNames() else 'Helvetica'
-    font_bold = 'Malgun-Bold' if 'Malgun-Bold' in pdfmetrics.getRegisteredFontNames() else font_name
 
     # ── 스타일 정의 ──
     styles = getSampleStyleSheet()
