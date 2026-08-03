@@ -488,7 +488,7 @@ def site_header_callback(request):
         return "근무 관리 포털"
     elif request.path.startswith('/master/'):
         return "기준정보 관리 포털"
-    return "AS 시스템"
+    return "AS 관리"
 
 def site_symbol_callback(request):
     if request.path.startswith('/inventory/'):

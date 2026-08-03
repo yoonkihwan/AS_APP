@@ -7,6 +7,7 @@ from django import forms
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action as unfold_action, display
 from unfold.contrib.filters.admin import RangeDateFilter
+from .filters import MultiSelectFilterMixin
 
 
 class NoRelatedButtonsMixin:
@@ -1784,7 +1785,7 @@ class TicketUsedPartInline(TabularInline):
     verbose_name_plural = "수리 사용 부품/공임 (스냅샷)"
 
 @admin.register(ASHistory)
-class ASHistoryAdmin(StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class ASHistoryAdmin(MultiSelectFilterMixin, StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "통합 이력"
     """AS 통합 이력 조회 + 상태 정정 액션"""
 
@@ -1797,13 +1798,15 @@ class ASHistoryAdmin(StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "display_cost_and_docs",
         "display_edit_button",
     ]
-    list_filter = [
-        "status",
-        "company",
-        "tool__brand",
-        ("inbound_date", RangeDateFilter),
-        ("outbound_date", RangeDateFilter),
+    list_filter = []
+    multi_select_filters = [
+        {"key": "status", "label": "상태", "type": "choices", "field": "status"},
+        {"key": "company", "label": "매출처", "type": "fk", "field": "company", "model": Company, "searchable": True},
+        {"key": "brand", "label": "브랜드", "type": "fk", "field": "tool__brand", "model": Brand},
+        {"key": "inbound_date", "label": "입고일", "type": "date_range"},
+        {"key": "outbound_date", "label": "출고일", "type": "date_range"},
     ]
+    change_list_template = "admin/as_app/change_list_with_filters.html"
     search_fields = [
         "serial_number",
         "company__name",
@@ -1812,6 +1815,7 @@ class ASHistoryAdmin(StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
         "symptom",
         "repair_content",
     ]
+    search_help_text = "시리얼 번호, 매출처, 장비명, 브랜드, 증상, 수리 내용을 검색"
     autocomplete_fields = ["company", "tool"]
     list_per_page = 30
     inlines = [TicketUsedPartInline]
@@ -2250,7 +2254,7 @@ class ASHistoryAdmin(StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, 
 
 
 @admin.register(EstimateTicket)
-class EstimateTicketAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class EstimateTicketAdmin(MultiSelectFilterMixin, CompositeDisplayMixin, StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "견적서 발행"
     """견적서 발행 기능 (데모 버전)"""
 
@@ -2262,13 +2266,15 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTitleMi
         "display_repair_summary",
         "display_cost_estimate",
     ]
-    list_filter = [
-        "status",
-        "company",
-        "tool__brand",
-        ("inbound_date", RangeDateFilter),
-        ("outbound_date", RangeDateFilter),
+    list_filter = []
+    multi_select_filters = [
+        {"key": "status", "label": "상태", "type": "choices", "field": "status"},
+        {"key": "company", "label": "매출처", "type": "fk", "field": "company", "model": Company, "searchable": True},
+        {"key": "brand", "label": "브랜드", "type": "fk", "field": "tool__brand", "model": Brand},
+        {"key": "inbound_date", "label": "입고일", "type": "date_range"},
+        {"key": "outbound_date", "label": "출고일", "type": "date_range"},
     ]
+    change_list_template = "admin/as_app/change_list_with_filters.html"
     search_fields = [
         "serial_number",
         "company__name",
@@ -2518,7 +2524,7 @@ class EstimateTicketAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTitleMi
 
 
 @admin.register(TaxInvoiceTicket)
-class TaxInvoiceTicketAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class TaxInvoiceTicketAdmin(MultiSelectFilterMixin, CompositeDisplayMixin, StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "세금계산서 등록"
     
     list_display = [
@@ -2530,14 +2536,16 @@ class TaxInvoiceTicketAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTitle
         "tax_invoice",
     ]
     list_editable = ["tax_invoice"]
-    list_filter = [
-        "status",
-        "company",
-        "tool__brand",
-        ("inbound_date", RangeDateFilter),
-        ("outbound_date", RangeDateFilter),
-        "tax_invoice",
+    list_filter = []
+    multi_select_filters = [
+        {"key": "status", "label": "상태", "type": "choices", "field": "status"},
+        {"key": "company", "label": "매출처", "type": "fk", "field": "company", "model": Company, "searchable": True},
+        {"key": "brand", "label": "브랜드", "type": "fk", "field": "tool__brand", "model": Brand},
+        {"key": "inbound_date", "label": "입고일", "type": "date_range"},
+        {"key": "outbound_date", "label": "출고일", "type": "date_range"},
+        {"key": "tax_invoice", "label": "세금계산서", "type": "boolean", "field": "tax_invoice"},
     ]
+    change_list_template = "admin/as_app/change_list_with_filters.html"
     search_fields = [
         "serial_number",
         "company__name",
@@ -2951,7 +2959,7 @@ class EstimateRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomT
 # ──────────────────────────────────────────────
 
 @admin.register(StatusRegistration)
-class StatusRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
+class StatusRegistrationAdmin(MultiSelectFilterMixin, CompositeDisplayMixin, StatusBadgeMixin, CustomTitleMixin, NoRelatedButtonsMixin, ModelAdmin):
     custom_title = "상태 등록"
     """상태 등록 - 체크박스 선택 후 일괄 액션으로 출고/의뢰/보류를 처리하는 스피드 화면"""
 
@@ -2964,12 +2972,14 @@ class StatusRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTit
         "formatted_repair_cost",
     ]
     list_display_links = None
-    list_filter = [
-        "status",
-        "company",
-        "tool__brand",
-        ("inbound_date", RangeDateFilter),
+    list_filter = []
+    multi_select_filters = [
+        {"key": "status", "label": "상태", "type": "choices", "field": "status"},
+        {"key": "company", "label": "매출처", "type": "fk", "field": "company", "model": Company, "searchable": True},
+        {"key": "brand", "label": "브랜드", "type": "fk", "field": "tool__brand", "model": Brand},
+        {"key": "inbound_date", "label": "입고일", "type": "date_range"},
     ]
+    change_list_template = "admin/as_app/change_list_with_filters.html"
     search_fields = ["serial_number", "company__name", "tool__model_name", "tool__brand__name"]
     list_per_page = 30
     actions = [
@@ -2986,6 +2996,7 @@ class StatusRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTit
 
     class Media:
         css = {"all": ("as_app/css/hide_fab.css", "as_app/css/status_badge.css", "as_app/css/multiline_cell.css")}
+        js = ("as_app/js/action_auto_submit.js",)
 
     @admin.display(description="수리 내역")
     def display_repair_summary(self, obj):
@@ -3074,6 +3085,8 @@ class StatusRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTit
             "selected_pks": list(queryset.values_list("pk", flat=True)),
             "today": timezone.localdate().isoformat(),
             "opts": self.model._meta,
+            "action_name": "action_ship_with_date",
+            "action_checkbox_name": admin.helpers.ACTION_CHECKBOX_NAME,
         }
         return TemplateResponse(request, "admin/as_app/outbound_date_select.html", context)
 
@@ -3120,6 +3133,8 @@ class StatusRegistrationAdmin(CompositeDisplayMixin, StatusBadgeMixin, CustomTit
             "selected_pks": list(queryset.values_list("pk", flat=True)),
             "today": timezone.localdate().isoformat(),
             "opts": self.model._meta,
+            "action_name": "action_ship_unrepaired_with_date",
+            "action_checkbox_name": admin.helpers.ACTION_CHECKBOX_NAME,
         }
         return TemplateResponse(request, "admin/as_app/outbound_date_select.html", context)
 

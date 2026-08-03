@@ -127,7 +127,7 @@
 </style>
 
 <div class="date-pick-container">
-    <div class="date-pick-title">📅 출고 날짜 선택</div>
+    <div class="date-pick-title">📅 {{ title }}</div>
     <div class="date-pick-desc">
         선택한 항목들의 출고일을 지정하고 출고 처리합니다.
     </div>
@@ -136,12 +136,14 @@
         선택된 항목: <strong>{{ ticket_count }}건</strong>
     </div>
 
-    <form method="post">
+    <form method="post" action="{% url 'admin:as_app_statusregistration_changelist' %}">
         {% csrf_token %}
+        {# 선택된 PK를 Django admin ACTION_CHECKBOX_NAME으로 전달 #}
         {% for pk in selected_pks %}
-            <input type="hidden" name="_selected_action" value="{{ pk }}">
+            <input type="hidden" name="{{ action_checkbox_name }}" value="{{ pk }}">
         {% endfor %}
-        <input type="hidden" name="action" value="mark_as_shipped_with_date">
+        {# 실제 Django admin action 이름 전달 (action_ship_with_date 또는 action_ship_unrepaired_with_date) #}
+        <input type="hidden" name="action" value="{{ action_name }}">
         <input type="hidden" name="confirm" value="yes">
 
         <label class="date-pick-label" for="outbound_date">출고 날짜</label>
@@ -150,7 +152,7 @@
                value="{{ today }}">
 
         <div class="date-pick-actions">
-            <a href="{% url 'admin:as_app_outboundticket_changelist' %}"
+            <a href="{% url 'admin:as_app_statusregistration_changelist' %}"
                class="date-pick-btn date-pick-btn-cancel">취소</a>
             <button type="submit" class="date-pick-btn date-pick-btn-submit">
                 출고 처리

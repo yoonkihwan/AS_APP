@@ -1,0 +1,131 @@
+{% comment %}
+    Multi-Select Filter Bar Include Template
+    
+    사용법: change_list.html에서 {% include "admin/as_app/includes/filter_bar.html" %}
+    
+    필요한 context:
+        - multi_filters: 필터 설정 리스트 (MultiSelectFilterMixin에서 생성)
+        - filter_pills: 활성 필터 Pill 리스트
+        - has_active_filters: 활성 필터 존재 여부
+        - search_query_preserved: 보존할 검색어
+{% endcomment %}
+
+{% if multi_filters %}
+<div id="multi-filter-bar" class="filter-bar">
+    <form id="filter-bar-form" method="GET" action="" style="display:contents;">
+        {% comment %} 검색어 보존 {% endcomment %}
+        {% if search_query_preserved %}
+        <input type="hidden" name="q" value="{{ search_query_preserved }}">
+        {% endif %}
+
+        {% for filter in multi_filters %}
+            {% if filter.type == "choices" or filter.type == "fk" %}
+            {# ── 다중 선택 드롭다운 ── #}
+            <div class="filter-bar__item">
+                <span class="filter-bar__label">{{ filter.label }}</span>
+                <div class="filter-dropdown">
+                    <button type="button" class="filter-dropdown__trigger{% if filter.selected_values %} filter-dropdown__trigger--active{% endif %}" data-placeholder="전체">
+                        <span class="filter-dropdown__trigger-text">
+                            {% if filter.selected_values|length == 0 %}
+                                전체
+                            {% elif filter.selected_values|length == 1 %}
+                                {% for opt in filter.options %}{% if opt.selected %}{{ opt.label }}{% endif %}{% endfor %}
+                            {% else %}
+                                {{ filter.selected_values|length }}개 선택
+                            {% endif %}
+                        </span>
+                        <span class="filter-dropdown__arrow">▼</span>
+                    </button>
+                    <div class="filter-dropdown__panel">
+                        {% if filter.searchable %}
+                        <div class="filter-dropdown__search">
+                            <input type="text" placeholder="검색..." autocomplete="off">
+                        </div>
+                        {% endif %}
+                        {% for option in filter.options %}
+                        <label class="filter-dropdown__option{% if option.selected %} filter-dropdown__option--selected{% endif %}">
+                            <input type="checkbox" name="mf_{{ filter.key }}" value="{{ option.value }}" {% if option.selected %}checked{% endif %} style="display:none;">
+                            <span class="filter-dropdown__checkbox"></span>
+                            <span class="filter-dropdown__option-text">{{ option.label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% elif filter.type == "date_range" %}
+            {# ── 날짜 범위 선택기 ── #}
+            <div class="filter-bar__item filter-bar__item--date">
+                <span class="filter-bar__label">{{ filter.label }}</span>
+                <div class="filter-date-range">
+                    <input type="date" name="mf_{{ filter.key }}_from" value="{{ filter.date_from }}" placeholder="시작일">
+                    <span class="filter-date-range__separator">~</span>
+                    <input type="date" name="mf_{{ filter.key }}_to" value="{{ filter.date_to }}" placeholder="종료일">
+                </div>
+                <div class="filter-date-range__presets">
+                    <button type="button" class="filter-date-range__preset-btn" data-range="1w">1주</button>
+                    <button type="button" class="filter-date-range__preset-btn" data-range="1m">1개월</button>
+                    <button type="button" class="filter-date-range__preset-btn" data-range="3m">3개월</button>
+                    <button type="button" class="filter-date-range__preset-btn" data-range="6m">6개월</button>
+                    <button type="button" class="filter-date-range__preset-btn" data-range="1y">1년</button>
+                </div>
+            </div>
+
+            {% elif filter.type == "boolean" %}
+            {# ── 불린 선택 드롭다운 ── #}
+            <div class="filter-bar__item">
+                <span class="filter-bar__label">{{ filter.label }}</span>
+                <div class="filter-dropdown">
+                    <button type="button" class="filter-dropdown__trigger{% if filter.selected_values %} filter-dropdown__trigger--active{% endif %}" data-placeholder="전체">
+                        <span class="filter-dropdown__trigger-text">
+                            {% if filter.selected_values|length == 0 %}
+                                전체
+                            {% elif filter.selected_values|length == 1 %}
+                                {% for opt in filter.options %}{% if opt.selected %}{{ opt.label }}{% endif %}{% endfor %}
+                            {% else %}
+                                {{ filter.selected_values|length }}개 선택
+                            {% endif %}
+                        </span>
+                        <span class="filter-dropdown__arrow">▼</span>
+                    </button>
+                    <div class="filter-dropdown__panel">
+                        {% for option in filter.options %}
+                        <label class="filter-dropdown__option{% if option.selected %} filter-dropdown__option--selected{% endif %}">
+                            <input type="checkbox" name="mf_{{ filter.key }}" value="{{ option.value }}" {% if option.selected %}checked{% endif %} style="display:none;">
+                            <span class="filter-dropdown__checkbox"></span>
+                            <span class="filter-dropdown__option-text">{{ option.label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+
+        {# ── 적용/초기화 버튼 ── #}
+        <div class="filter-bar__actions">
+            <button type="submit" class="filter-bar__btn filter-bar__btn--apply">
+                🔍 적용
+            </button>
+            {% if has_active_filters %}
+            <button type="button" class="filter-bar__btn filter-bar__btn--reset">
+                ↻ 초기화
+            </button>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+{# ── 활성 필터 Pill 태그 ── #}
+{% if filter_pills %}
+<div class="filter-pills">
+    {% for pill in filter_pills %}
+    <span class="filter-pill">
+        {{ pill.label }}
+        <button type="button" class="filter-pill__remove" data-key="{{ pill.key }}" data-value="{{ pill.value }}" title="이 필터 제거">✕</button>
+    </span>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endif %}

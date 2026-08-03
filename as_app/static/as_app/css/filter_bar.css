@@ -1,0 +1,538 @@
+/* ──────────────────────────────────────────────
+   Multi-Select Filter Bar — AS 관리 복합 필터
+   Unfold Admin 다크/라이트 테마 호환 스타일링
+   ────────────────────────────────────────────── */
+
+/* ── 필터 바 컨테이너 ── */
+.search-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+}
+
+.search-layout__search {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    max-width: 420px;
+    min-width: 0;
+}
+
+.search-layout__label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+[data-theme="dark"] .search-layout__label,
+.dark .search-layout__label {
+    color: #94a3b8;
+}
+
+.search-layout__search #toolbar,
+.search-layout__search #changelist-search {
+    width: 100%;
+    min-width: 0;
+}
+
+.search-layout__search #changelist-search > div {
+    width: 100% !important;
+    min-height: 44px;
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.search-layout__search #searchbar {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.search-layout__filters {
+    width: 100%;
+    min-width: 0;
+}
+
+.search-layout__filters .filter-bar {
+    margin-bottom: 0;
+}
+
+.search-layout__filters .filter-pills {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    background: var(--color-bg-light, #f8fafc);
+    border: 1px solid var(--color-border-light, #e2e8f0);
+    transition: all 0.2s ease;
+}
+
+/* 다크모드 대응 */
+[data-theme="dark"] .filter-bar,
+.dark .filter-bar {
+    background: rgba(30, 41, 59, 0.6);
+    border-color: rgba(71, 85, 105, 0.5);
+}
+
+/* ── 개별 필터 래퍼 ── */
+.filter-bar__item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 160px;
+    flex: 1 1 160px;
+    max-width: 260px;
+    position: relative;
+}
+
+.filter-bar__item--date {
+    min-width: 280px;
+    max-width: 340px;
+    flex: 1 1 280px;
+}
+
+.filter-bar__label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+[data-theme="dark"] .filter-bar__label,
+.dark .filter-bar__label {
+    color: #94a3b8;
+}
+
+/* ── 커스텀 드롭다운 Trigger ── */
+.filter-dropdown {
+    position: relative;
+}
+
+.filter-dropdown__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 7px 12px;
+    font-size: 0.82rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #374151;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+}
+
+.filter-dropdown__trigger:hover {
+    border-color: #a78bfa;
+}
+
+.filter-dropdown__trigger:focus {
+    outline: none;
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+}
+
+.filter-dropdown__trigger--active {
+    border-color: #7c3aed;
+    background: rgba(124, 58, 237, 0.06);
+    font-weight: 600;
+}
+
+[data-theme="dark"] .filter-dropdown__trigger,
+.dark .filter-dropdown__trigger {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: #475569;
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .filter-dropdown__trigger:hover,
+.dark .filter-dropdown__trigger:hover {
+    border-color: #a78bfa;
+}
+
+.filter-dropdown__arrow {
+    font-size: 0.65rem;
+    color: #9ca3af;
+    margin-left: 8px;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.filter-dropdown--open .filter-dropdown__arrow {
+    transform: rotate(180deg);
+}
+
+/* ── 드롭다운 패널 ── */
+.filter-dropdown__panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 999;
+    min-width: 100%;
+    max-width: 320px;
+    max-height: 280px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -4px rgba(0, 0, 0, 0.06);
+    display: none;
+    animation: filterDropFadeIn 0.15s ease;
+}
+
+@keyframes filterDropFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.filter-dropdown--open .filter-dropdown__panel {
+    display: block;
+}
+
+[data-theme="dark"] .filter-dropdown__panel,
+.dark .filter-dropdown__panel {
+    background: #1e293b;
+    border-color: #475569;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);
+}
+
+/* ── 검색 입력 (매출처 등 Searchable) ── */
+.filter-dropdown__search {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 8px;
+    background: inherit;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.filter-dropdown__search input {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    background: #f8fafc;
+    color: #374151;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.filter-dropdown__search input:focus {
+    border-color: #7c3aed;
+}
+
+[data-theme="dark"] .filter-dropdown__search,
+.dark .filter-dropdown__search {
+    border-bottom-color: #475569;
+}
+
+[data-theme="dark"] .filter-dropdown__search input,
+.dark .filter-dropdown__search input {
+    background: rgba(30, 41, 59, 0.7);
+    border-color: #475569;
+    color: #e2e8f0;
+}
+
+/* ── 옵션 항목 ── */
+.filter-dropdown__option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    font-size: 0.82rem;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.filter-dropdown__option:hover {
+    background: rgba(124, 58, 237, 0.06);
+}
+
+.filter-dropdown__option--selected {
+    background: rgba(124, 58, 237, 0.08);
+    font-weight: 600;
+}
+
+[data-theme="dark"] .filter-dropdown__option,
+.dark .filter-dropdown__option {
+    color: #cbd5e1;
+}
+
+[data-theme="dark"] .filter-dropdown__option:hover,
+.dark .filter-dropdown__option:hover {
+    background: rgba(124, 58, 237, 0.15);
+}
+
+.filter-dropdown__checkbox {
+    width: 15px;
+    height: 15px;
+    border-radius: 3px;
+    border: 1.5px solid #9ca3af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.filter-dropdown__option--selected .filter-dropdown__checkbox {
+    background: #7c3aed;
+    border-color: #7c3aed;
+}
+
+.filter-dropdown__option--selected .filter-dropdown__checkbox::after {
+    content: "✓";
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.filter-dropdown__option-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── 옵션 숨김 (검색 필터) ── */
+.filter-dropdown__option--hidden {
+    display: none !important;
+}
+
+/* ── 날짜 범위 필터 ── */
+.filter-date-range {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-date-range input[type="date"] {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 0.82rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+    color: #374151;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.filter-date-range input[type="date"]:focus {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+}
+
+[data-theme="dark"] .filter-date-range input[type="date"],
+.dark .filter-date-range input[type="date"] {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: #475569;
+    color: #e2e8f0;
+}
+
+.filter-date-range__separator {
+    color: #9ca3af;
+    font-size: 0.82rem;
+    flex-shrink: 0;
+}
+
+/* 빠른 날짜 선택 (최근 1주/1개월 등) */
+.filter-date-range__presets {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.filter-date-range__preset-btn {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.filter-date-range__preset-btn:hover {
+    border-color: #7c3aed;
+    color: #7c3aed;
+    background: rgba(124, 58, 237, 0.04);
+}
+
+.filter-date-range__preset-btn--active {
+    border-color: #7c3aed;
+    background: rgba(124, 58, 237, 0.1);
+    color: #7c3aed;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .filter-date-range__preset-btn,
+.dark .filter-date-range__preset-btn {
+    border-color: #475569;
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .filter-date-range__preset-btn:hover,
+.dark .filter-date-range__preset-btn:hover {
+    border-color: #a78bfa;
+    color: #a78bfa;
+}
+
+/* ── 버튼 영역 ── */
+.filter-bar__actions {
+    display: flex;
+    gap: 8px;
+    align-self: flex-end;
+    flex-shrink: 0;
+    padding-bottom: 1px;
+}
+
+.filter-bar__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 18px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.filter-bar__btn--apply {
+    background: #7c3aed;
+    color: #fff;
+}
+
+.filter-bar__btn--apply:hover {
+    background: #6d28d9;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+.filter-bar__btn--reset {
+    background: transparent;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+}
+
+.filter-bar__btn--reset:hover {
+    background: #f1f5f9;
+    color: #374151;
+    border-color: #9ca3af;
+}
+
+[data-theme="dark"] .filter-bar__btn--reset,
+.dark .filter-bar__btn--reset {
+    border-color: #475569;
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .filter-bar__btn--reset:hover,
+.dark .filter-bar__btn--reset:hover {
+    background: rgba(71, 85, 105, 0.3);
+    color: #e2e8f0;
+}
+
+/* ── 활성 필터 Pill(태그) 영역 ── */
+.filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 20px;
+    margin-bottom: 12px;
+}
+
+.filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: rgba(124, 58, 237, 0.1);
+    color: #7c3aed;
+    border-radius: 999px;
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    transition: all 0.15s ease;
+}
+
+[data-theme="dark"] .filter-pill,
+.dark .filter-pill {
+    background: rgba(124, 58, 237, 0.15);
+    color: #a78bfa;
+    border-color: rgba(124, 58, 237, 0.3);
+}
+
+.filter-pill__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(124, 58, 237, 0.15);
+    color: #7c3aed;
+    font-size: 0.65rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+    padding: 0;
+    line-height: 1;
+}
+
+.filter-pill__remove:hover {
+    background: #7c3aed;
+    color: #fff;
+}
+
+/* ── Unfold 사이드바 필터 숨김 (다중 필터 바로 대체) ── */
+.filter-bar-active #changelist-filter,
+.filter-bar-active .changelist-filter-wrapper {
+    display: none !important;
+}
+
+/* ── 반응형 (모바일) ── */
+@media screen and (max-width: 768px) {
+    .search-layout__search {
+        max-width: 100%;
+    }
+
+    .filter-bar {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .filter-bar__item,
+    .filter-bar__item--date {
+        max-width: 100%;
+        min-width: 100%;
+    }
+
+    .filter-bar__actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}

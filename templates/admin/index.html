@@ -30,9 +30,16 @@
         grid-template-columns: 1fr;
     }
 
+    .dash-grid-3 {
+        grid-template-columns: 1fr;
+    }
+
     @media (min-width: 1024px) {
         .dash-grid-2 {
             grid-template-columns: 1fr 1fr;
+        }
+        .dash-grid-3 {
+            grid-template-columns: repeat(3, 1fr);
         }
     }
 
@@ -389,10 +396,54 @@
 {% endif %}
 
 
-<!-- ── ③④ 수리 대기 + 최근 출고 ── -->
-<div class="dash-grid dash-grid-2">
+<!-- ── 하단 목록 패널 3개 (장기미처리, 수리대기, 최근출고) ── -->
+<div class="dash-grid dash-grid-3">
 
-    <!-- ③ 수리 대기 목록 -->
+    <!-- 장기 미처리 목록 -->
+    <div class="dash-panel">
+        <div class="dash-panel-header">
+            <span class="dash-panel-title">
+                <span class="material-icons-outlined" style="color: #ef4444;">warning</span>
+                장기 미처리 목록
+                {% if long_pending_tickets_list %}
+                <span class="dash-panel-badge" style="background: #ef4444;">{{ long_pending_tickets_list|length }}</span>
+                {% endif %}
+            </span>
+            <a href="{% url 'admin:as_app_ashistory_changelist' %}" class="dash-panel-link">전체 보기 →</a>
+        </div>
+        {% if long_pending_tickets_list %}
+        <table class="dash-table">
+            <thead>
+                <tr>
+                    <th>입고일</th>
+                    <th>매출처</th>
+                    <th>장비</th>
+                    <th>시리얼</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in long_pending_tickets_list %}
+                <tr>
+                    <td>{{ ticket.inbound_date|date:"m/d" }}</td>
+                    <td>{{ ticket.company.name }}</td>
+                    <td>
+                        <span class="text-muted">{{ ticket.tool.brand.name }}</span>
+                        {{ ticket.tool.model_name }}
+                    </td>
+                    <td><strong>{{ ticket.serial_number }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="dash-empty">
+            <span class="material-icons-outlined">sentiment_satisfied</span>
+            장기 미처리 건이 없습니다
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 수리 대기 목록 -->
     <div class="dash-panel">
         <div class="dash-panel-header">
             <span class="dash-panel-title">

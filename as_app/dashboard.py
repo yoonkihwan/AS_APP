@@ -23,7 +23,13 @@ def dashboard_callback(request, context):
     # 1. 장기 미처리 (30일 이상 경과)
     long_pending_count = ASTicket.objects.filter(
         inbound_date__lte=thirty_days_ago,
-        status=ASTicket.Status.INBOUND,
+        status__in=[
+            ASTicket.Status.INBOUND,
+            ASTicket.Status.ESTIMATE_DONE,
+            ASTicket.Status.OUTSOURCED,
+            ASTicket.Status.HOLD,
+            ASTicket.Status.REPAIRED,
+        ]
     ).count()
 
     # 2. 수리 대기 (입고 상태이거나 수리대기 상태)
@@ -57,7 +63,7 @@ def dashboard_callback(request, context):
 
     # ── KPI 카드 링크 생성 ──
     history_url = reverse("admin:as_app_ashistory_changelist")
-    long_pending_url = f"{history_url}?status__exact=inbound&inbound_date__lte={thirty_days_ago.isoformat()}"
+    long_pending_url = f"{history_url}?inbound_date__lte={thirty_days_ago.isoformat()}"
     waiting_url = f"{history_url}?status__exact=inbound"
     outsourced_url = f"{history_url}?status__exact=outsourced"
     repaired_url = f"{history_url}?status__exact=repaired"
@@ -82,20 +88,20 @@ def dashboard_callback(request, context):
             "link": waiting_url,
         },
         {
+            "title": "견적완료",
+            "metric": estimate_done_count,
+            "footer": "고객 결정 대기 중",
+            "icon": "receipt_long",
+            "color": "#22c55e",  # green
+            "link": estimate_done_url,
+        },
+        {
             "title": "수리의뢰 중",
             "metric": outsourced_count,
             "footer": "현재 외주 의뢰 중인 건수",
             "icon": "send",
             "color": "#eab308",  # yellow
             "link": outsourced_url,
-        },
-        {
-            "title": "수리 완료 (미출고)",
-            "metric": repaired_count,
-            "footer": "출고 대기 중인 건수",
-            "icon": "check_circle",
-            "color": "#10b981",  # emerald
-            "link": repaired_url,
         },
         {
             "title": "수리보류",
@@ -106,12 +112,12 @@ def dashboard_callback(request, context):
             "link": hold_url,
         },
         {
-            "title": "견적완료",
-            "metric": estimate_done_count,
-            "footer": "고객 결정 대기 중",
-            "icon": "receipt_long",
-            "color": "#22c55e",  # green
-            "link": estimate_done_url,
+            "title": "수리 완료 (미출고)",
+            "metric": repaired_count,
+            "footer": "출고 대기 중인 건수",
+            "icon": "check_circle",
+            "color": "#10b981",  # emerald
+            "link": repaired_url,
         },
     ]
 
@@ -130,23 +136,40 @@ def dashboard_callback(request, context):
         {"title": "이번 년도 수리매출", "amount": f"{year_rev:,}", "icon": "event_note", "color": "#6366f1"},     # indigo
     ]
 
-    # ── ③ 수리 대기 목록 (최근 10건) ──
+    # ── ③ 장기 미처리 대기 목록 (최근 5건) ──
+    long_pending_tickets_list = (
+        ASTicket.objects.filter(
+            inbound_date__lte=thirty_days_ago,
+            status__in=[
+                ASTicket.Status.INBOUND,
+                ASTicket.Status.ESTIMATE_DONE,
+                ASTicket.Status.OUTSOURCED,
+                ASTicket.Status.HOLD,
+                ASTicket.Status.REPAIRED,
+            ]
+        )
+        .select_related("company", "tool", "tool__brand")
+        .order_by("inbound_date", "created_at")[:5]
+    )
+
+    # ── ④ 수리 대기 목록 (최근 5건) ──
     pending_tickets = (
         ASTicket.objects.filter(status=ASTicket.Status.INBOUND)
         .select_related("company", "tool", "tool__brand")
-        .order_by("inbound_date", "created_at")[:10]
+        .order_by("inbound_date", "created_at")[:5]
     )
 
-    # ── ④ 최근 출고 목록 (최근 10건) ──
+    # ── ⑤ 최근 출고 목록 (최근 5건) ──
     recent_shipped = (
         ASTicket.objects.filter(status=ASTicket.Status.SHIPPED)
         .select_related("company", "tool", "tool__brand")
-        .order_by("-outbound_date", "-updated_at")[:10]
+        .order_by("-outbound_date", "-updated_at")[:5]
     )
 
     context.update({
         "kpi": kpi,
         "revenue_data": revenue_data,
+        "long_pending_tickets_list": long_pending_tickets_list,
         "pending_tickets": pending_tickets,
         "recent_shipped": recent_shipped,
     })

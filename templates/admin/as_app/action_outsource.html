@@ -136,12 +136,14 @@
         선택된 장비: <strong>{{ queryset.count }}건</strong>
     </div>
 
-    <form method="post">
+    <form method="post" action="{% url 'admin:as_app_statusregistration_changelist' %}">
         {% csrf_token %}
+        {# 선택된 PK를 Django admin ACTION_CHECKBOX_NAME으로 전달 #}
         {% for obj in queryset %}
             <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}">
         {% endfor %}
-        <input type="hidden" name="action" value="mark_as_outsourced">
+        {# 실제 Django admin action 이름 전달 #}
+        <input type="hidden" name="action" value="action_outsource">
         <input type="hidden" name="confirm" value="yes">
 
         <label class="date-pick-label" for="outsource_company">의뢰업체</label>
@@ -158,7 +160,7 @@
                value="{{ default_date }}">
 
         <div class="date-pick-actions">
-            <a href="{% url 'admin:as_app_outsourcedticket_changelist' %}"
+            <a href="{% url 'admin:as_app_statusregistration_changelist' %}"
                class="date-pick-btn date-pick-btn-cancel">취소</a>
             <button type="submit" class="date-pick-btn date-pick-btn-submit">
                 수리의뢰 처리
