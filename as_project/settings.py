@@ -74,6 +74,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8001",
     "https://*.trycloudflare.com",
     "https://*.loca.lt",
+    "https://cheng-1.com",
+    "https://*.cheng-1.com",
 ]
 
 TEMPLATES = [
@@ -99,7 +101,7 @@ WSGI_APPLICATION = "as_project.wsgi.application"
 
 DATABASES = {
     "default": dj_database_url.config(
-        default="postgres://postgres:123456@localhost:5433/as_project_db",
+        default="postgres://postgres:123456@localhost:5432/as_project_db",
         conn_max_age=600,
     )
 }
