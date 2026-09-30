@@ -7,7 +7,7 @@ from unfold.sites import UnfoldAdminSite
 from unfold.decorators import action as unfold_action, display
 from django.utils import timezone
 from django.utils.html import format_html
-from .models import Inventory, InventoryBatch, InboundInventory, OutboundInventory
+from .models import Inventory, InventoryBatch, InboundInventory, OutboundInventory, LegacyInventory
 from .forms import InventoryForm
 from master_data.models import OutsourceCompany, Company, Tool, Brand
 
@@ -852,12 +852,35 @@ class InventoryBatchAdmin(ModelAdmin):
                 expanded.append(instance)
 
         saved_count = 0
+        duplicate_serials = []
         for instance in expanded:
             instance.date = batch.inbound_date
             instance.supplier = batch.supplier
+            instance.is_legacy = False  # 신규 입고 데이터는 항상 is_legacy=False
+
+            # 중복 시리얼 소프트 검증 (재고 상태 동일 시리얼이 이미 있는 경우 건너뜀)
+            if instance.serial and instance.tool_id:
+                already_exists = Inventory.all_objects.filter(
+                    tool=instance.tool,
+                    serial=instance.serial,
+                    status='재고',
+                    is_legacy=False,
+                ).exclude(pk=instance.pk).exists()
+                if already_exists:
+                    duplicate_serials.append(instance.serial)
+                    continue  # 중복 시리얼은 저장하지 않고 건너뜀
+
             instance.save()
             saved_count += 1
         formset.save_m2m()
+
+        if duplicate_serials:
+            from django.contrib import messages
+            messages.warning(
+                request,
+                f"⚠️ 이미 '재고' 상태로 등록된 시리얼 번호는 제외하였습니다: "
+                f"{', '.join(duplicate_serials)}"
+            )
         
         original_count = len(instances)
         if saved_count > original_count:
@@ -901,21 +924,22 @@ class OutboundBatchAdmin(ModelAdmin):
         if formset.model == OutboundTicket:
             for inline_form in formset.forms:
                 instance = inline_form.instance
-                
+
                 # 삭제 대상이거나 빈 폼(cleaned_data가 없는 경우)은 건너뜀
                 if instance in formset.deleted_objects or not getattr(inline_form, 'cleaned_data', None):
                     continue
-                
+
                 selected_inventories = list(instance.inventories.all())
-                
+
                 # 시리얼 번호가 골라지지 않았을 때는 선입선출 자동 배정
                 if not selected_inventories:
                     qty = instance.quantity or 1
                     auto_inventories = Inventory.objects.filter(
-                        tool=instance.tool, 
-                        status='재고'
+                        tool=instance.tool,
+                        status='재고',
+                        is_legacy=False,  # 신규 데이터에서만 선입선출
                     ).order_by('date')[:qty]
-                    
+
                     for inv in auto_inventories:
                         inv.release_date = instance.batch.release_date
                         inv.release_company = instance.batch.release_company
@@ -924,14 +948,26 @@ class OutboundBatchAdmin(ModelAdmin):
                         inv.save()
                         instance.inventories.add(inv)
                 else:
-                    # 유저가 직접 다중 선택한 경우
+                    # 유저가 직접 다중 선택한 경우 — 이미 출고된 재고는 건너뜀
+                    already_released = []
                     for inv in selected_inventories:
+                        if inv.status == '출고':
+                            already_released.append(str(inv))
+                            continue  # 이미 출고된 재고는 다시 출고하지 않음
                         inv.release_date = instance.batch.release_date
                         inv.release_company = instance.batch.release_company
                         inv.status = '출고'
                         inv.usage_process = instance.usage_process
                         inv.save()
-                        
+
+                    if already_released:
+                        from django.contrib import messages
+                        messages.warning(
+                            request,
+                            f"⚠️ 이미 출고 처리된 재고는 중복 출고에서 제외되었습니다: "
+                            f"{', '.join(already_released)}"
+                        )
+
                 instance.quantity = instance.inventories.count()
                 instance.save()
 
@@ -975,7 +1011,56 @@ class OutboundInventoryAdmin(ModelAdmin):
         # "추가" 버튼 클릭 시 OutboundBatch 생성 화면으로 리다이렉트
         return HttpResponseRedirect(reverse("tool_admin:tool_inventory_outboundbatch_add"))
 
-from .models import ToolStockSummary
+from .models import ToolStockSummary, LegacyInventory as _LegacyInventoryModel
+
+# ── 레거시(구) 데이터 전용 Admin ── (읽기 전용)
+@admin.register(LegacyInventory, site=tool_admin_site)
+class LegacyInventoryAdmin(ModelAdmin):
+    """기존(레거시) 입출고 이력 — 읽기 전용 조회"""
+    list_display = (
+        'display_status', 'date', 'supplier_text', 'release_date', 'release_company',
+        'tool_text', 'serial', 'usage_process',
+    )
+    list_display_links = None
+    list_filter = ('status', 'supplier', 'release_company')
+    search_fields = ('tool__model_name', 'tool__brand__name', 'serial', 'supplier__name', 'release_company__name')
+    list_per_page = 50
+    date_hierarchy = 'date'
+
+    class Media:
+        css = {"all": ("as_app/css/row_colors.css",)}
+
+    def get_queryset(self, request):
+        # 레거시 전용 매니저를 직접 사용
+        return Inventory.legacy_objects.all()
+
+    # ── 완전 읽기 전용 설정 ──
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @display(description="입고처")
+    def supplier_text(self, obj):
+        return str(obj.supplier) if obj.supplier else "-"
+
+    @display(description="품목명")
+    def tool_text(self, obj):
+        return str(obj.tool) if obj.tool else "-"
+
+    @display(description="상태")
+    def display_status(self, obj):
+        if obj.status == "재고":
+            return obj.get_status_display()
+        return format_html(
+            '<span class="status-marker" data-status="repaired">{}</span>',
+            obj.get_status_display(),
+        )
+
 
 @admin.register(ToolStockSummary, site=tool_admin_site)
 class ToolStockSummaryAdmin(ModelAdmin):

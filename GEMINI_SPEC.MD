@@ -203,9 +203,9 @@
 - **ImprovementRequest:** 개선사항 요청 게시판 (제목, 내용, 작성자, 상태, 관리자 답변)
 
 ### 5.3. Tool Inventory 모델 (`tool_inventory` 앱)
-- **InventoryBatch:** 장비 입고 헤더 (입고일, 입고처=OutsourceCompany FK)
-- **Inventory:** 통합 입출고 이력 / 개별 단품(시리얼 등) 재고 상태 내역 (재고/출고). `usage_process`를 통한 현장 적용 공정 기록 포함. UUID 기반 PK.
-- **OutboundBatch:** 장비 출고 헤더 (출고일, 출고처=Company FK)
+- **InventoryBatch:** 장비 입고 헤더 (입고일, 입고처=OutsourceCompany FK). `is_legacy` 필드로 구/신 데이터 분리.
+- **Inventory:** 통합 입출고 이력 / 개별 단품(시리얼 등) 재고 상태 내역 (재고/출고). `usage_process`를 통한 현장 적용 공정 기록 포함. UUID 기반 PK. **`is_legacy` 필드**: `True`이면 구 데이터(이전에 존재하던 데이터), `False`이면 신규 데이터. 기본 매니저(`objects`)는 `is_legacy=False`인 신규 데이터만 반환.
+- **OutboundBatch:** 장비 출고 헤더 (출고일, 출고처=Company FK). `is_legacy` 필드로 구/신 데이터 분리.
 - **OutboundTicket:** 출고할 대상 품목 목록 (Tool FK, 수량, Inventory M2M, `usage_process`)
 - **TodoItem:** 대시보드 투두리스트 항목
 
@@ -228,6 +228,7 @@
 | `InboundInventory` | `tool_inventory`| 개별 입고 내역     | Tool Inventory 전용           | 유지       |
 | `OutboundInventory` | `tool_inventory`| 출고 등록 전용    | Tool Inventory 전용           | 유지       |
 | `ToolStockSummary` | `tool_inventory`| 재고 현황 요약    | Tool Inventory 전용, 읽기/PDF | 유지       |
+| **`LegacyInventory`** | `tool_inventory`| **구 데이터 읽기 전용 조회** | `is_legacy=True`인 기존 데이터, 완전 읽기 전용 | **신규** |
 
 ---
 
@@ -276,7 +277,7 @@
 - **기준정보 관리 (`/master/`):**
     - 매출처 · 의뢰업체 · 단가 그룹 · 브랜드&툴 관리
 - **장비/툴 관리 (`/inventory/`):**
-    - 대시보드 · 통합 입출고 이력 · 입고 등록 · 출고 등록 · 재고 · 기준 정보 연결
+    - 대시보드 · 통합 입출고 이력 · 입고 등록 · 출고 등록 · 재고 · **툴 입출고 관리(구)** · 기준 정보 연결
 - **시스템 관리 (`/sysadmin/`):**
     - 사용자(회원) 관리 · 전체 활동 기록
 - **근무/근태 관리 (`/hr/`):**

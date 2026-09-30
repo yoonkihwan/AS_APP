@@ -235,6 +235,17 @@ def sidebar_callback(request):
                 ],
             },
             {
+                "title": "툴 입출고 관리(구)",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "통합 입출고 이력(구)",
+                        "icon": "history_toggle_off",
+                        "link": reverse_lazy("tool_admin:tool_inventory_legacyinventory_changelist"),
+                    },
+                ],
+            },
+            {
                 "title": "기준 정보",
                 "separator": True,
                 "items": [
