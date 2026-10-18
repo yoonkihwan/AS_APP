@@ -374,6 +374,7 @@ class InventoryAdmin(ModelAdmin):
     search_fields = ('tool__model_name', 'tool__brand__name', 'serial', 'supplier__name', 'release_company__name', 'usage_process')
     list_per_page = 50
     autocomplete_fields = ('tool', 'supplier', 'release_company')
+    exclude = ('is_legacy',)
 
     def get_ordering(self, request):
         """필터 컨텍스트에 따른 동적 정렬:
@@ -762,6 +763,7 @@ class InventoryInline(TabularInline):
 
 @admin.register(InventoryBatch, site=tool_admin_site)
 class InventoryBatchAdmin(ModelAdmin):
+    fields = ["inbound_date", "supplier"]
     list_display = ["inbound_date", "supplier", "created_at"]
     list_filter = ["inbound_date", "supplier"]
     search_fields = ["supplier__name"]
@@ -902,6 +904,7 @@ class OutboundTicketInline(TabularInline):
 
 @admin.register(OutboundBatch, site=tool_admin_site)
 class OutboundBatchAdmin(ModelAdmin):
+    fields = ["release_date", "release_company"]
     list_display = ["release_date", "release_company", "created_at"]
     list_filter = ["release_date", "release_company"]
     search_fields = ["release_company__name"]
