@@ -24,19 +24,19 @@ def run():
     total_inv = Inventory.all_objects.filter(is_legacy=False).count()
     print(f"\n[1] Inventory 레코드: {total_inv}건을 is_legacy=True로 변경합니다...")
     updated_inv = Inventory.all_objects.filter(is_legacy=False).update(is_legacy=True)
-    print(f"    ✅ {updated_inv}건 완료")
+    print(f"    [OK] {updated_inv}건 완료")
 
     # --- InventoryBatch 전체를 is_legacy=True로 설정 ---
     total_batch = InventoryBatch.objects.filter(is_legacy=False).count()
     print(f"\n[2] InventoryBatch 레코드: {total_batch}건을 is_legacy=True로 변경합니다...")
     updated_batch = InventoryBatch.objects.filter(is_legacy=False).update(is_legacy=True)
-    print(f"    ✅ {updated_batch}건 완료")
+    print(f"    [OK] {updated_batch}건 완료")
 
     # --- OutboundBatch 전체를 is_legacy=True로 설정 ---
     total_obatch = OutboundBatch.objects.filter(is_legacy=False).count()
     print(f"\n[3] OutboundBatch 레코드: {total_obatch}건을 is_legacy=True로 변경합니다...")
     updated_obatch = OutboundBatch.objects.filter(is_legacy=False).update(is_legacy=True)
-    print(f"    ✅ {updated_obatch}건 완료")
+    print(f"    [OK] {updated_obatch}건 완료")
 
     # --- 결과 확인 ---
     print("\n" + "=" * 60)

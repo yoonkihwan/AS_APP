@@ -99,9 +99,10 @@ WSGI_APPLICATION = "as_project.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+_default_db_port = "5433" if os.name == "nt" else "5432"
 DATABASES = {
     "default": dj_database_url.config(
-        default="postgres://postgres:123456@localhost:5432/as_project_db",
+        default=f"postgres://postgres:123456@localhost:{_default_db_port}/as_project_db",
         conn_max_age=600,
     )
 }
