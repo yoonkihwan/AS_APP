@@ -232,3 +232,9 @@ elease_date 등 폼 필드로의 텍스트 침투 원천 차단.
          - 불필요한 가상환경/백업 DB(`.runenv/`, `db.sqlite3.*`, `staticfiles/`, `scripts/scripts/`) `.gitignore` 제외 및 Git 인덱스 정리 완료.
          - 운영 서버(Linux/Raspberry Pi) 배포 시 PostgreSQL(`localhost:5432/as_project_db`) 자동 연결 및 로컬(Windows) SQLite 분기 안전장치 적용.
          - `origin/main` 최신 커밋 동기화 및 Push 완료.
+
+---
+
+      20. **다른 PC 배포용 단일 실행 파일(`barcode_agent.exe`) 패키징 완비 (2026-11-01) ✅:**
+         - `scripts/barcode_agent.py`: PyInstaller(`sys.frozen`) 환경에서도 실행 파일 옆의 `agent_config.ini`를 정확히 읽도록 `BASE_DIR` 경로 판별 보강, 기본 `SERVER_URL`을 운영 도메인(`https://cheng-1.com`)으로 설정.
+         - `dist/barcode_agent_pack/`: 파이썬 미설치 PC에서도 즉시 작동하는 `barcode_agent.exe` + `agent_config.ini` 배포 패키지 생성 완료.

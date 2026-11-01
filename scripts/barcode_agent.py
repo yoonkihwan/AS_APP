@@ -33,13 +33,14 @@ except Exception:
 
 # ── 1. 기본 설정 (config.ini가 있으면 불러오고, 없으면 기본값 사용) ──
 DEFAULT_CONFIG = {
-    "SERVER_URL": "http://127.0.0.1:8001",
-    "MAX_KEY_INTERVAL_SEC": "0.040",   # 40ms 이하를 바코드 입력으로 판정
+    "SERVER_URL": "https://cheng-1.com",
+    "MAX_KEY_INTERVAL_SEC": "0.065",   # 65ms 이하를 바코드 입력으로 판정
     "MIN_SERIAL_LENGTH": "4",          # 최소 4자리 이상
     "BEEP_ON_SCAN": "True",            # 스캔 성공 시 삡! 비프음
 }
 
-CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agent_config.ini")
+BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASE_DIR, "agent_config.ini")
 
 def load_or_create_config():
     config = configparser.ConfigParser()

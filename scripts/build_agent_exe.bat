@@ -1,30 +1,39 @@
 @echo off
 chcp 65001 > nul
+cd /d "%~dp0.."
+
 echo =======================================================
-echo  🚀 바코드 에이전트 단일 EXE 빌드 스크립트 (PyInstaller)
+echo  [AS-APP] 바코드 에이전트 다른 PC 배포용 EXE 빌드
 echo =======================================================
 echo.
 
-REM 가상환경 파이썬 확인
-where python >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [X] 파이썬이 시스템에 설치되어 있지 않습니다.
-    pause
-    exit /b 1
+set PYTHON_EXE=venv\Scripts\python.exe
+if not exist "%PYTHON_EXE%" (
+    set PYTHON_EXE=python
 )
 
 echo [*] PyInstaller 설치 확인 중...
-pip install pyinstaller --quiet
+"%PYTHON_EXE%" -m pip install pyinstaller --quiet
 
-echo [*] barcode_agent.exe 빌드 시작 (단일 파일, 아이콘 및 의존성 압축)...
-pyinstaller --noconfirm --onedir --windowed --name "barcode_agent" --clean "scripts\barcode_agent.py"
+echo [*] barcode_agent.exe 단일 파일 빌드 중...
+"%PYTHON_EXE%" -m PyInstaller --noconfirm --onefile --name "barcode_agent" --clean "scripts\barcode_agent.py"
 
 if %errorlevel% equ 0 (
+    if not exist "dist\barcode_agent_pack" mkdir "dist\barcode_agent_pack"
+    copy /y "dist\barcode_agent.exe" "dist\barcode_agent_pack\barcode_agent.exe" > nul
+    (
+        echo [SETTINGS]
+        echo server_url = https://cheng-1.com
+        echo max_key_interval_sec = 0.065
+        echo min_serial_length = 4
+        echo beep_on_scan = True
+    ) > "dist\barcode_agent_pack\agent_config.ini"
+
     echo.
     echo =======================================================
-    echo  ✅ 빌드 완료!
-    echo  위치: dist\barcode_agent\barcode_agent.exe
-    echo  현장 PC에는 dist\barcode_agent 폴더 전체를 복사해서 쓰시면 됩니다!
+    echo  빌드 완료!
+    echo  배포 폴더: dist\barcode_agent_pack
+    echo  안의 파일(barcode_agent.exe, agent_config.ini)을 다른 PC에 복사하십시오.
     echo =======================================================
 ) else (
     echo.
