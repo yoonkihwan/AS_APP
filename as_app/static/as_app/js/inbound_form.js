@@ -1,21 +1,17 @@
 document.addEventListener("DOMContentLoaded", function () {
   /**
-   * ===========================================================================
-   * 사내 AS & 툴 입출고 관리 시스템: 고속 입고 연동 스크립트 (Inbound Fast Form)
-   * ===========================================================================
-   * [엄격한 스파르타 검증 완료]
-   * 1. 툴 마스터 바코드(TOOL-1-9, TOOL:1:9, 새ㅐㅣ-1-9 등) 입력 시:
-   *    - input 이벤트 중도 가로채기 절대 금지! (글자 타이핑 중 성급한 오작동 원천 차단)
-   *    - Enter 키 도달 시에만 원자적(Atomic) 완전 감지 및 즉각 브랜드/품목 세팅!
-   *    - 시리얼란에 잔여 텍스트(:9, :16 등) 잔류 100% 원천 차단.
-   * 2. 한글(IME) 100% 영문 QWERTY 자동 치환:
-   *    - 스캐너/키보드가 한글 상태여도 입력란에는 0.001초 만에 100% 대문자 영문으로 강제 변환.
-   * 3. 연속 시리얼 스캔:
-   *    - 장비 시리얼 바코드 스캔 시 쉼표(,) 자동 누적 및 연속 스캔 보장.
-   * ===========================================================================
+   * 사내 AS & 툴 입출고 관리 시스템: 입고 등록 스크립트 (Inbound Fast Form)
+   * 1. 품목 바코드(TOOL-1-20 등) 연속 스캔 시:
+   *    - 포커스 이동을 비동기 콜백이 아닌 0ms 동기식으로 처리하여 타건 갈라짐(L-1-20 잔류) 원천 차단
+   *    - 시리얼이 비어 있는 행이 있으면 100% 일관되게 해당 행의 품목을 변경하고,
+   *      시리얼이 입력된 행만 있을 때는 100% 일관되게 새 티켓(행)을 추가
+   * 2. 박스 품목명(모델명) 바코드 오스캔 방어:
+   *    - 시리얼 번호 근처의 품목명 바코드(예: 18ESE17Q, MPRO300GCD 등)가 찍히면
+   *      시리얼 번호에서 즉시 제외하고 품목 자동 선택 또는 안내 토스트 표시
+   * 3. 한글(IME) 100% 영문 QWERTY 자동 치환 및 연속 시리얼 쉼표(,) 분리 누적
    */
 
-  // ── 1. 한글(2벌식) -> 영문 QWERTY 100% 완벽 역변환 테이블 ──
+  // ── 1. 한글(2벌식) -> 영문 QWERTY 역변환 ──
   const CHO = ['r', 'R', 's', 'e', 'E', 'f', 'a', 'q', 'Q', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g'];
   const JUNG = ['k', 'o', 'i', 'O', 'j', 'p', 'u', 'P', 'h', 'hk', 'ho', 'hl', 'y', 'n', 'nj', 'np', 'nl', 'b', 'm', 'ml', 'l'];
   const JONG = ['', 'r', 'R', 'rt', 's', 'sw', 'sg', 'e', 'f', 'fr', 'fa', 'fq', 'ft', 'fx', 'fv', 'fg', 'a', 'q', 'qt', 't', 'T', 'd', 'w', 'c', 'z', 'x', 'v', 'g'];
@@ -38,10 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const code = str.charCodeAt(i);
       if (code >= 0xAC00 && code <= 0xD7A3) {
         const offset = code - 0xAC00;
-        const choIdx = Math.floor(offset / 588);
-        const jungIdx = Math.floor((offset % 588) / 28);
-        const jongIdx = offset % 28;
-        result += CHO[choIdx] + JUNG[jungIdx] + JONG[jongIdx];
+        result += CHO[Math.floor(offset / 588)] + JUNG[Math.floor((offset % 588) / 28)] + JONG[offset % 28];
       } else if (JAMO_TO_ENG[str[i]]) {
         result += JAMO_TO_ENG[str[i]];
       } else {
@@ -51,38 +44,51 @@ document.addEventListener("DOMContentLoaded", function () {
     return result;
   }
 
-  // ── 2. 툴 마스터 바코드 완전 분석기 ──
-  // 규격 1: TOOL-<brand_id>-<tool_id> 또는 TOOL:<brand_id>:<tool_id>
-  // 규격 2: TOOL-<tool_id> 또는 TOOL:<tool_id>
-  // (스캐너 시작글자 누락 OOL-..., 세미콜론 tool;... 한글 새ㅐㅣ-... 모두 지원)
+  // ── 2. 품목 마스터 바코드(TOOL-1-20 등) 완전 분석 및 찌꺼기 제거기 ──
   function parseToolMasterBarcode(rawStr) {
     if (!rawStr) return { found: false };
     let s = convertHangulToEnglish(rawStr).toUpperCase().trim();
     s = s.replace(/[;_\-]/g, ':');
 
-    // 1순위: 브랜드ID와 툴ID가 모두 포함된 완전 규격 (TOOL:1:9)
-    const matchFull = s.match(/(?:TOOL|OOL):(\d+):(\d+)/);
-    if (matchFull) {
+    // 쉼표로 구분된 토큰들 중 가장 마지막에 찍힌 마스터 바코드 탐색 (앞글자 T, TO, TOO 누락까지 모두 포착)
+    const regexFull = /(?:T?O?O?L):(\d+):(\d+)/g;
+    let match;
+    let lastMatch = null;
+    while ((match = regexFull.exec(s)) !== null) {
+      lastMatch = match;
+    }
+    if (lastMatch) {
       return {
         found: true,
-        brandId: matchFull[1],
-        toolId: matchFull[2],
-        matchedText: matchFull[0]
+        brandId: lastMatch[1],
+        toolId: lastMatch[2],
       };
     }
 
-    // 2순위: 툴ID만 단독으로 있는 규격 (TOOL:9) - 뒤에 콜론이 더 붙지 않아야 함
     const matchToolOnly = s.match(/(?:TOOL|OOL):(\d+)(?!:)/);
     if (matchToolOnly) {
       return {
         found: true,
         brandId: null,
         toolId: matchToolOnly[1],
-        matchedText: matchToolOnly[0]
       };
     }
 
     return { found: false };
+  }
+
+  function stripMasterBarcodeTokens(rawStr) {
+    if (!rawStr) return '';
+    const converted = convertHangulToEnglish(rawStr).toUpperCase();
+    const tokens = converted.split(',').map(t => t.trim()).filter(Boolean);
+    const cleanTokens = tokens.filter(tok => {
+      const norm = tok.replace(/[;_\-]/g, ':');
+      if (/^(?:T?O?O?L)?:?\d+:\d+$/.test(norm)) return false;
+      if (/^(?:T?O?O?L):\d+$/.test(norm)) return false;
+      if (/(?:T?O?O?L):\d+:\d+/.test(norm)) return false;
+      return true;
+    });
+    return cleanTokens.join(', ');
   }
 
   // ── 3. 사운드 및 토스트 알림 ──
@@ -103,14 +109,15 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (_) {}
   }
 
-  function showToastNotification(msg) {
+  function showToastNotification(msg, isWarning = false) {
     let toast = document.getElementById("barcode-toast");
     if (!toast) {
       toast = document.createElement("div");
       toast.id = "barcode-toast";
-      toast.style.cssText = "position:fixed; top:24px; right:24px; z-index:999999; background:#059669; color:#fff; font-weight:700; font-size:14px; padding:12px 20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); transition:opacity 0.25s ease; pointer-events:none;";
+      toast.style.cssText = "position:fixed; top:24px; right:24px; z-index:999999; color:#fff; font-weight:700; font-size:14px; padding:12px 20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); transition:opacity 0.25s ease; pointer-events:none;";
       document.body.appendChild(toast);
     }
+    toast.style.background = isWarning ? "#dc2626" : "#059669";
     toast.textContent = msg;
     toast.style.opacity = "1";
     clearTimeout(toast._timeout);
@@ -162,36 +169,55 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   }
 
-  // ── 5. 툴 마스터 바코드 자동 선택 처리 핸들러 ──
-  function handleToolMasterBarcode(brandId, toolId, originRow = null, originRemaining = "") {
+  function getActiveInboundRows() {
+    return Array.from(
+      document.querySelectorAll("tr.form-row:not(.empty-form), tr.has_original:not(.empty-form), tr.dynamic-inventories:not(.empty-form)")
+    );
+  }
+
+  function scrubAllSerialInputs() {
+    document.querySelectorAll("input[name$='-serial'], input[name$='-serial_number']").forEach(inp => {
+      const cleaned = stripMasterBarcodeTokens(inp.value);
+      if (cleaned !== inp.value.replace(/^[, ]+|[, ]+$/g, '').trim()) {
+        inp.value = cleaned ? cleaned + ', ' : '';
+      }
+    });
+  }
+
+  // ── 5. 품목 마스터 바코드 자동 선택 핸들러 (100% 일관된 행 선택 보장) ──
+  function handleToolMasterBarcode(brandId, toolId) {
     if (!toolId) return;
 
+    // 모든 시리얼 입력창에서 마스터 바코드 찌꺼기(TOOL-1-20 등) 즉시 청소
+    scrubAllSerialInputs();
+
     let targetRow = null;
-    const allRows = Array.from(document.querySelectorAll("tr.form-row:not(.empty-form), tr.has_original:not(.empty-form), tr.dynamic-inventories:not(.empty-form)"));
+    const allRows = getActiveInboundRows();
 
-    // 1) 호출된 행이 있고, 해당 행의 시리얼란이 완전히 비어있다면 바로 그 행을 타깃으로 사용
-    if (originRow && !originRemaining) {
-      targetRow = originRow;
-    }
+    // 1순위: 이미 동일한 품목(toolId)이 선택된 행이 있다면 그 행으로 포커스
+    targetRow = allRows.find(r => {
+      const tSel = r.querySelector("select[name$='-tool']");
+      return (tSel && String(tSel.value) === String(toolId)) || r.dataset.pendingToolId === String(toolId);
+    });
 
-    // 2) 그렇지 않다면(기존 행에 이미 시리얼이 차 있거나 originRow가 null인 경우), 비어있는 첫 행 탐색
+    // 2순위: 시리얼 번호가 아직 비어있고 '시리얼번호 없음'도 체크되지 않은 행이 있다면 무조건 그 행의 품목을 변경!
+    // (시리얼을 안 찍고 품목 바코드만 연속으로 찍을 때 빈 행이 증식하거나 랜덤하게 동작하는 현상 100% 해결)
     if (!targetRow) {
-      for (const r of allRows) {
+      targetRow = allRows.find(r => {
         const sInp = r.querySelector("input[name$='-serial'], input[name$='-serial_number']");
-        const tSel = r.querySelector("select[name$='-tool']");
-        if (sInp && !sInp.value.trim() && (!tSel || !tSel.value)) {
-          targetRow = r;
-          break;
-        }
-      }
+        const noSerialCb = r.querySelector("input[name$='-no_serial_number'], input[name$='-no_serial']");
+        const hasNoSerialChecked = noSerialCb && noSerialCb.checked;
+        const cleanVal = sInp ? stripMasterBarcodeTokens(sInp.value) : '';
+        return !hasNoSerialChecked && !cleanVal;
+      });
     }
 
-    // 3) 비어있는 행이 하나도 없다면 '행 추가' 버튼을 눌러 새 행 자동 생성!
+    // 3순위: 모든 기존 행에 이미 시리얼이 입력되어 있거나 '시리얼번호 없음'이 체크되어 있다면 -> 새 티켓(행) 추가!
     if (!targetRow) {
       const addRowBtn = document.querySelector(".add-row a, tr.add-row a, .inline-related .add-row a");
       if (addRowBtn) {
         addRowBtn.click();
-        const updatedRows = Array.from(document.querySelectorAll("tr.form-row:not(.empty-form), tr.has_original:not(.empty-form), tr.dynamic-inventories:not(.empty-form)"));
+        const updatedRows = getActiveInboundRows();
         targetRow = updatedRows[updatedRows.length - 1];
       } else if (allRows.length > 0) {
         targetRow = allRows[allRows.length - 1];
@@ -200,13 +226,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!targetRow) return;
 
+    targetRow.dataset.pendingToolId = String(toolId);
     const brandSelect = targetRow.querySelector("select[name$='-brand']");
     const toolSelect = targetRow.querySelector("select[name$='-tool']");
     const serialInput = targetRow.querySelector("input[name$='-serial'], input[name$='-serial_number']");
 
-    // 타깃 행의 시리얼란은 확실하게 비워둠 (박스 시리얼 스캔 대기)
-    if (serialInput && !originRemaining) {
-      serialInput.value = "";
+    // 포커스를 비동기 fetch 완료 후가 아니라 지금 즉시(0ms 동기식) 이동시켜 다음 스캔 시 타건이 쪼개지지 않게 방어!
+    if (serialInput) {
+      const cleanVal = stripMasterBarcodeTokens(serialInput.value);
+      serialInput.value = cleanVal ? cleanVal + ', ' : '';
+      serialInput.focus();
     }
 
     function applySelection(bId, tId) {
@@ -215,11 +244,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (bId) {
         updateToolOptions(brandSelect, tId, function () {
-          if (serialInput) {
-            serialInput.focus();
-          }
+          delete targetRow.dataset.pendingToolId;
           playBeep(2000, 0.08);
-          setTimeout(() => playBeep(2400, 0.1), 80);
 
           const bText = brandSelect ? (brandSelect.options[brandSelect.selectedIndex]?.text || '') : '';
           const tText = toolSelect ? (toolSelect.options[toolSelect.selectedIndex]?.text || '') : '';
@@ -231,15 +257,19 @@ document.addEventListener("DOMContentLoaded", function () {
     if (brandId) {
       applySelection(brandId, toolId);
     } else {
-      // brandId가 바코드에 없는 경우 백엔드 API에서 브랜드 역추적
       fetch(`/inventory/barcode-api/tool-info/?tool_id=${toolId}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.success && data.brand_id) {
             applySelection(data.brand_id, toolId);
+          } else {
+            delete targetRow.dataset.pendingToolId;
           }
         })
-        .catch((err) => console.error("Error fetching tool info:", err));
+        .catch((err) => {
+          delete targetRow.dataset.pendingToolId;
+          console.error("Error fetching tool info:", err);
+        });
     }
   }
 
@@ -250,7 +280,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const inputs = document.querySelectorAll("input[name$='-serial'], input[name$='-serial_number']");
     for (const inp of inputs) {
       if (inp === currentField) continue;
-      const tokens = convertHangulToEnglish(inp.value).toUpperCase().split(',').map(t => t.trim()).filter(Boolean);
+      const tokens = stripMasterBarcodeTokens(inp.value).split(',').map(t => t.trim()).filter(Boolean);
       if (tokens.includes(s)) {
         return true;
       }
@@ -258,81 +288,86 @@ document.addEventListener("DOMContentLoaded", function () {
     return false;
   }
 
-  // ── 6. 시리얼 필드 헬퍼 (재고 상태 검증 후 출고 직행 또는 스마트 연결) ──
-  function appendSerialToField(field, serial) {
-    serial = convertHangulToEnglish(serial.trim().toUpperCase());
-    if (!serial) return;
+  // ── 6. 시리얼 검증 및 필드 누적 헬퍼 ──
+  function validateAndAppendSerial(field, targetSerial, existingTokens) {
+    const row = field.closest("tr");
 
-    // 만약 툴 마스터 바코드가 전달된 경우 즉시 분기 처리
-    const parsed = parseToolMasterBarcode(serial);
+    // 1) 마스터 바코드 조각인지 한 번 더 검증
+    const parsed = parseToolMasterBarcode(targetSerial);
     if (parsed.found) {
-      const currentRow = field.closest("tr.form-row, tr.has_original, tr.dynamic-inventories");
-      handleToolMasterBarcode(parsed.brandId, parsed.toolId, currentRow, "");
+      field.value = existingTokens.length > 0 ? existingTokens.join(', ') + ', ' : '';
+      handleToolMasterBarcode(parsed.brandId, parsed.toolId);
       return;
     }
 
-    // 1) 페이지 전체 중복 검사: 이미 다른 행에 입력된 시리얼인 경우 차단
-    if (isSerialAlreadyEnteredOnPage(serial, field)) {
-      showToastNotification(`중복 시리얼: [${serial}]은 이미 다른 행에 입력되어 있습니다.`);
+    // 2) 현재 입력란 내부 중복 검사
+    if (existingTokens.includes(targetSerial)) {
+      field.value = existingTokens.length > 0 ? existingTokens.join(', ') + ', ' : '';
+      showToastNotification(`중복 시리얼: [${targetSerial}]은 이미 입력되어 있습니다.`, true);
       playBeep(400, 0.25);
       return;
     }
 
-    // 2) 현재 필드 내부 중복 검사
-    let curVal = convertHangulToEnglish(field.value.trim().toUpperCase());
-    // 혹시라도 필드 안에 툴 바코드 텍스트가 묻어있다면 청소
-    const curParsed = parseToolMasterBarcode(curVal);
-    if (curParsed.found) {
-      curVal = curVal.replace(new RegExp(curParsed.matchedText.replace(/:/g, '[-:_]'), 'gi'), '');
-      curVal = curVal.replace(/^[, ]+|[, ]+$/g, '').trim();
-    }
-
-    const currentTokens = curVal.split(',').map(t => t.trim()).filter(Boolean);
-    if (currentTokens.includes(serial)) {
-      showToastNotification(`중복 시리얼: [${serial}]은 이미 입력되어 있습니다.`);
+    // 3) 페이지 전체 다른 행 중복 검사
+    if (isSerialAlreadyEnteredOnPage(targetSerial, field)) {
+      field.value = existingTokens.length > 0 ? existingTokens.join(', ') + ', ' : '';
+      showToastNotification(`중복 시리얼: [${targetSerial}]은 다른 행에 이미 입력되어 있습니다.`, true);
       playBeep(400, 0.25);
       return;
     }
 
-    // 3) 실시간 재고 확인: 만약 이미 재고 상태라면 입고란에 넣지 않고 출고 등록으로 직행!
-    fetch(`/inventory/barcode-api/lookup/?serial=${encodeURIComponent(serial)}`)
+    // 4) 백엔드 조회: 품목명(모델명) 바코드 오스캔 여부 및 기존 재고 여부 검증
+    fetch(`/inventory/barcode-api/lookup/?serial=${encodeURIComponent(targetSerial)}`)
       .then(res => res.json())
       .then(data => {
+        // [핵심] 박스에 적힌 품목명(모델명) 바코드가 찍힌 경우 시리얼란에서 즉시 제거!
+        if (data.is_tool_model) {
+          field.value = existingTokens.length > 0 ? existingTokens.join(', ') + ', ' : '';
+          const toolSelect = row ? row.querySelector("select[name$='-tool']") : null;
+          if (toolSelect && !toolSelect.value && data.brand_id && data.tool_id) {
+            // 아직 품목이 선택되지 않은 행이었다면 해당 품목을 자동 선택해 줌
+            handleToolMasterBarcode(data.brand_id, data.tool_id);
+          } else {
+            playBeep(400, 0.25);
+            showToastNotification(`품목명 바코드 제외: [${data.tool_name}]은 품목명이므로 시리얼에서 제외되었습니다.`, true);
+          }
+          return;
+        }
+
         if (data.found && data.is_stock) {
-          showToastNotification(`재고 확인: [${serial}] 출고 등록 화면으로 이동합니다.`);
+          field.value = existingTokens.length > 0 ? existingTokens.join(', ') + ', ' : '';
+          showToastNotification(`재고 확인: [${targetSerial}] 출고 등록 화면으로 이동합니다.`, true);
           playBeep(1000, 0.15);
           setTimeout(() => {
-            window.location.href = `/inventory/tool_inventory/outboundbatch/add/?serial=${encodeURIComponent(serial)}`;
+            window.location.href = `/inventory/tool_inventory/outboundbatch/add/?serial=${encodeURIComponent(targetSerial)}`;
           }, 600);
           return;
         }
 
-        // 정상 신규 장비 누적: 연속 스캔을 위해 항상 쉼표와 공백(, )으로 대기
-        if (currentTokens.length === 0) {
-          field.value = serial + ', ';
-        } else {
-          field.value = currentTokens.join(', ') + ', ' + serial + ', ';
-        }
+        // 정상 신규 시리얼 누적
+        const updated = [...existingTokens, targetSerial];
+        const finalVal = updated.join(', ') + ', ';
+        field.value = finalVal;
         field.focus();
-        field.setSelectionRange(field.value.length, field.value.length);
-        playBeep(1600, 0.09);
+        field.setSelectionRange(finalVal.length, finalVal.length);
+        playBeep(1400, 0.08);
       })
       .catch(() => {
-        if (currentTokens.length === 0) {
-          field.value = serial + ', ';
-        } else {
-          field.value = currentTokens.join(', ') + ', ' + serial + ', ';
-        }
-        field.focus();
-        playBeep(1600, 0.09);
+        const updated = [...existingTokens, targetSerial];
+        const finalVal = updated.join(', ') + ', ';
+        field.value = finalVal;
+        playBeep(1400, 0.08);
       });
   }
 
-  // ── 7. 시리얼 필드 이벤트 핸들링: input에서는 한글 -> 영문 변환만 수행하고, 툴 마스터 바코드 실행은 오직 Enter에서만! ──
+  // ── 7. 글로벌 & 시리얼 인풋 통합 스캔 버퍼 ──
+  let scanBuffer = [];
+  let lastKeyTime = 0;
+  const SCAN_INTERVAL = 70;
+
   document.body.addEventListener("input", function (e) {
     if (e.target.matches("input[name$='-serial'], input[name$='-serial_number']")) {
       const raw = e.target.value;
-      // 한글 상태 오입력 방지: 실시간 100% 영문 대문자 변환
       const converted = convertHangulToEnglish(raw).toUpperCase();
       if (raw !== converted) {
         const start = e.target.selectionStart;
@@ -354,88 +389,50 @@ document.addEventListener("DOMContentLoaded", function () {
   document.body.addEventListener("keydown", function (e) {
     if (e.target.matches("input[name$='-serial'], input[name$='-serial_number']")) {
       if (e.key === "Enter") {
-        e.preventDefault(); // 폼 자동 전송 원천 차단!
+        e.preventDefault();
         e.stopPropagation();
 
-        const raw = e.target.value.trim();
+        // 만약 포커스 이동 직전 window scanBuffer에 앞글자가 찍혔다면 복원 결합
+        const now = performance.now();
+        let prefix = "";
+        if (scanBuffer.length > 0 && (now - lastKeyTime) < 150) {
+          prefix = scanBuffer.join("");
+        }
+        scanBuffer = [];
+
+        const raw = (prefix + e.target.value).trim();
         const converted = convertHangulToEnglish(raw).toUpperCase();
 
-        // 1) 툴 마스터 바코드 감지
+        // 1) 품목 마스터 바코드(TOOL-1-20 등) 감지
         const parsed = parseToolMasterBarcode(converted);
         if (parsed.found) {
-          let remaining = converted.replace(new RegExp(parsed.matchedText.replace(/:/g, '[-:_]'), 'gi'), '');
-          remaining = remaining.replace(/^[, ]+|[, ]+$/g, '').trim();
-          e.target.value = remaining ? remaining + ', ' : '';
-
-          const currentRow = e.target.closest("tr.form-row, tr.has_original, tr.dynamic-inventories");
-          handleToolMasterBarcode(parsed.brandId, parsed.toolId, currentRow, remaining);
+          const cleaned = stripMasterBarcodeTokens(converted);
+          e.target.value = cleaned ? cleaned + ', ' : '';
+          handleToolMasterBarcode(parsed.brandId, parsed.toolId);
           return;
         }
 
-        // 2) 일반 장비 시리얼 번호인 경우: 재고 상태 실시간 검증 및 중복 방어
+        // 2) 일반 시리얼 번호 처리
         if (converted) {
-          const serialTokens = converted.split(',').map(s => s.trim()).filter(Boolean);
-          const targetSerial = serialTokens[serialTokens.length - 1];
-
-          if (targetSerial) {
-            // 현재 입력란 내 앞선 토큰 중복 체크
-            if (serialTokens.slice(0, -1).includes(targetSerial)) {
-              serialTokens.pop();
-              e.target.value = serialTokens.length > 0 ? serialTokens.join(', ') + ', ' : '';
-              showToastNotification(`⚠️ [${targetSerial}]은 이미 입력란에 존재합니다! (중복 티켓 추가 방지)`);
-              playBeep(400, 0.25);
-              return;
-            }
-
-            // 페이지 내 다른 행 중복 체크
-            if (isSerialAlreadyEnteredOnPage(targetSerial, e.target)) {
-              serialTokens.pop();
-              e.target.value = serialTokens.length > 0 ? serialTokens.join(', ') + ', ' : '';
-              showToastNotification(`⚠️ [${targetSerial}]은 다른 행에 이미 등록되어 있습니다!`);
-              playBeep(400, 0.25);
-              return;
-            }
-
-            fetch(`/inventory/barcode-api/lookup/?serial=${encodeURIComponent(targetSerial)}`)
-              .then(res => res.json())
-              .then(data => {
-                if (data.found && data.is_stock) {
-                  // 이미 입고 완료된 재고 장비 -> 입고 등록에 누적 차단 및 출고 등록으로 직행!
-                  serialTokens.pop();
-                  e.target.value = serialTokens.length > 0 ? serialTokens.join(', ') + ', ' : '';
-                  showToastNotification(`⚠️ [${targetSerial}]은 이미 입고된 재고 장비입니다! [출고 등록] 화면으로 이동합니다.`);
-                  playBeep(1000, 0.15);
-                  setTimeout(() => {
-                    window.location.href = `/inventory/tool_inventory/outboundbatch/add/?serial=${encodeURIComponent(targetSerial)}`;
-                  }, 600);
-                } else {
-                  // 신규 미등록 장비 -> 다음 바코드 연속 스캔을 위해 반드시 끝 쉼표와 공백(, )으로 자동 분리 대기!
-                  const finalVal = serialTokens.join(', ') + ', ';
-                  e.target.value = finalVal;
-                  e.target.setSelectionRange(finalVal.length, finalVal.length);
-                  playBeep(1400, 0.08);
-                }
-              })
-              .catch(() => {
-                const finalVal = serialTokens.join(', ') + ', ';
-                e.target.value = finalVal;
-                playBeep(1400, 0.08);
-              });
+          const cleanStr = stripMasterBarcodeTokens(converted);
+          const serialTokens = cleanStr.split(',').map(s => s.trim()).filter(Boolean);
+          if (serialTokens.length === 0) {
+            e.target.value = '';
+            return;
           }
+          const targetSerial = serialTokens[serialTokens.length - 1];
+          const existingTokens = serialTokens.slice(0, -1);
+          validateAndAppendSerial(e.target, targetSerial, existingTokens);
         }
       }
     }
   });
 
-  // ── 8. 글로벌 바코드 인터셉터 (포커스가 인풋에 없을 때 스캐너 입력 감지) ──
-  let scanBuffer = [];
-  let lastKeyTime = 0;
-  const SCAN_INTERVAL = 50; // 50ms 이하를 스캐너 연속 입력으로 판정
-
+  // ── 8. 글로벌 바코드 인터셉터 (포커스가 시리얼 인풋에 없을 때) ──
   window.addEventListener("keydown", function (e) {
     const activeEl = document.activeElement;
     if (activeEl && activeEl.matches && activeEl.matches("input[name$='-serial'], input[name$='-serial_number']")) {
-      return; // 시리얼 인풋에 포커스가 있을 때는 위의 input/keydown 리스너가 전담
+      return;
     }
     if (activeEl && ['TEXTAREA'].includes(activeEl.tagName)) {
       return;
@@ -459,10 +456,14 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
 
-        // 일반 시리얼 번호인 경우 유효한 시리얼 인풋에 누적
-        const targetInput = document.querySelector("tr:not(.empty-form) input[name$='-serial']:not([disabled]), tr:not(.empty-form) input[name$='-serial_number']:not([disabled])");
+        // 현재 포커스 가능한 시리얼 인풋 탐색
+        const allInputs = Array.from(
+          document.querySelectorAll("tr:not(.empty-form) input[name$='-serial']:not([disabled]), tr:not(.empty-form) input[name$='-serial_number']:not([disabled])")
+        );
+        const targetInput = allInputs[allInputs.length - 1];
         if (targetInput) {
-          appendSerialToField(targetInput, converted);
+          const existingTokens = stripMasterBarcodeTokens(targetInput.value).split(',').map(s => s.trim()).filter(Boolean);
+          validateAndAppendSerial(targetInput, converted, existingTokens);
         }
       } else {
         scanBuffer = [];
@@ -550,7 +551,9 @@ document.addEventListener("DOMContentLoaded", function () {
   if (initialSerial) {
     const firstSerialInput = document.querySelector("input[name$='-serial'], input[name$='-serial_number']");
     if (firstSerialInput) {
-      appendSerialToField(firstSerialInput, initialSerial);
+      setTimeout(() => {
+        validateAndAppendSerial(firstSerialInput, convertHangulToEnglish(initialSerial).trim().toUpperCase(), []);
+      }, 150);
     }
   }
 });

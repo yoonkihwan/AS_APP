@@ -383,6 +383,18 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
             return JsonResponse({'success': False, 'message': '시리얼 번호가 비어있습니다.'}, status=400)
 
         # 1순위: 현재 '재고' 레코드 (출고 대상) / 2순위: 가장 최근 이력
+        matched_tool = Inventory.find_tool_by_model_barcode(serial)
+        if matched_tool is not None:
+            return JsonResponse({
+                'success': True,
+                'found': False,
+                'is_tool_model': True,
+                'tool_id': matched_tool.id,
+                'tool_name': matched_tool.model_name,
+                'brand_id': matched_tool.brand_id,
+                'brand_name': matched_tool.brand.name if matched_tool.brand else '',
+                'serial': serial,
+            })
         inv = Inventory.find_in_stock(serial)
         if inv is None:
             inv = (
@@ -493,6 +505,18 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
         except Company.DoesNotExist:
             return JsonResponse({'success': False, 'message': '유효하지 않은 출고처입니다.'}, status=400)
 
+        matched_tool = Inventory.find_tool_by_model_barcode(serial)
+        if matched_tool is not None:
+            return JsonResponse({
+                'success': True,
+                'found': False,
+                'is_tool_model': True,
+                'tool_id': matched_tool.id,
+                'tool_name': matched_tool.model_name,
+                'brand_id': matched_tool.brand_id,
+                'brand_name': matched_tool.brand.name if matched_tool.brand else '',
+                'serial': serial,
+            })
         inv = Inventory.find_in_stock(serial)
         if not inv:
             return JsonResponse({'success': False, 'message': f'시리얼 [{serial}]에 해당하는 재고 장비를 찾을 수 없습니다.'}, status=404)
@@ -1169,7 +1193,11 @@ class OutboundBatchAdmin(ModelAdmin):
 
     class Media:
         css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css", "as_app/css/outbound_form.css")}
-        js = ("as_app/js/outbound_form.js",)
+    def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
+        context["show_save_and_add_another"] = False
+        context["show_save_and_continue"] = False
+        context["cache_bust"] = str(int(timezone.now().timestamp()))
+        return super().render_change_form(request, context, add, change, form_url, obj)
 
     def get_model_perms(self, request):
         return {}

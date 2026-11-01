@@ -238,3 +238,25 @@ elease_date 등 폼 필드로의 텍스트 침투 원천 차단.
       20. **다른 PC 배포용 단일 실행 파일(`barcode_agent.exe`) 패키징 완비 (2026-11-01) ✅:**
          - `scripts/barcode_agent.py`: PyInstaller(`sys.frozen`) 환경에서도 실행 파일 옆의 `agent_config.ini`를 정확히 읽도록 `BASE_DIR` 경로 판별 보강, 기본 `SERVER_URL`을 운영 도메인(`https://cheng-1.com`)으로 설정.
          - `dist/barcode_agent_pack/`: 파이썬 미설치 PC에서도 즉시 작동하는 `barcode_agent.exe` + `agent_config.ini` 배포 패키지 생성 완료.
+
+
+---
+
+      21. **현장 실전 테스트 2차 피드백 5대 결함 완결 조치 (2026-11-01) ✅:**
+          1) **[출고 등록] 타 품목 연속 스캔 시 기존 행 덮어쓰기 방지 및 자동 행 추가 (`outbound_form.js`):**
+             - 기존에는 빈 행이 없을 때 마지막 행(`rows[rows.length - 1]`)을 강제로 덮어써서 이전에 찍었던 출고 품목과 시리얼이 증발하는 치명적 결함 존재.
+             - 스캔한 시리얼의 품목(`tool_id`)이 이미 열려 있는 행이 있으면 해당 행에 시리얼 체크박스를 누적 체크하고(`_pendingSerials` 보존), 없으면 빈 행을 찾으며, 빈 행도 없으면 `.add-row a`(**출고등록 티켓 추가**)를 자동 클릭하여 새 인라인 행을 생성한 뒤 브랜드·품목·시리얼을 자동 세팅하도록 전면 개편.
+          2) **[품목명(모델명) 바코드 오스캔 방어] (`models.py`, `forms.py`, `admin.py`, `inbound_form.js`, `outbound_form.js`):**
+             - 장비 박스에서 시리얼 바코드 바로 옆에 인쇄된 제조사 품목명(모델명) 바코드가 찍힐 경우 시리얼 번호로 오인식되는 문제 해결.
+             - `Inventory.find_tool_by_model_barcode(raw)`를 신설하여 DB 등록된 `Tool.model_name`(괄호 앞 모델코드 및 하이픈/공백 제거 정규화 포함)과 대조.
+             - 입고 폼에서 품목명 바코드가 스캔되면 시리얼 입력란에서 즉시 제거하고, 해당 행에 품목이 미선택된 상태라면 해당 브랜드/품목을 자동 선택하며, 이미 선택된 상태라면 경고 토스트 출력. 서버(`InventoryForm.clean`)에서도 품목명이 시리얼로 저장되는 것을 2중 차단.
+          3) **[입고 등록] 품목 마스터 바코드(`TOOL-1-20`) 연속 스캔 시 행 추가 불규칙 및 시리얼란 잔류 원천 차단 (`inbound_form.js`, `models.py`):**
+             - 기존에는 마스터 바코드 스캔 시 `fetch` 비동기 응답 후에야 `serialInput.focus()`를 호출하여, 연속 스캔 도중 포커스가 뒤늦게 이동하면서 `TOOL-1-20`이나 `L-1-20` 조각이 시리얼 입력란에 찍히고 그 찌꺼기 때문에 다음 스캔 시 새 티켓 행이 불규칙하게 추가되던 현상 발생.
+             - 마스터 바코드 감지 즉시(0ms 동기) 시리얼란을 비우고 포커스를 선(先)이동시키며, `stripMasterBarcodeTokens` 및 `scrubAllSerialInputs`로 `TOOL-x-y` 및 잘린 조각(`L-x-y`)을 시리얼란과 백엔드(`split_serials`) 양쪽에서 100% 소거.
+             - 시리얼이 비어 있는 행에서는 마스터 바코드를 몇 번 연속으로 찍든 **새 티켓을 추가하지 않고 현재 빈 행의 품목만 교체**하도록 결정론적(Deterministic) 행 선택 로직 확립.
+          4) **[타 PC (Windows 10) 시작프로그램 자동 등록 내장] (`scripts/barcode_agent.py`):**
+             - 인코딩/버전 차이로 Windows 10에서 실패하던 외부 `.bat` 파일을 완전 폐기.
+             - `barcode_agent.exe` 실행 시 파이썬 내장 `winreg` 모듈을 통해 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 레지스트리에 자기 자신을 직접 자동 등록하도록 내장화.
+          5) **[바코드 에이전트 무창(`--noconsole`) 백그라운드 상주 및 재실행 제어] (`scripts/barcode_agent.py`, `scripts/build_agent_exe.bat`):**
+             - PyInstaller `--noconsole` 옵션으로 빌드하여 작업표시줄에 검은 콘솔 창이 전혀 뜨지 않고 100% 백그라운드에서 투명하게 작동.
+             - 최초 실행 시 안내 메시지박스를 띄우며, 이미 실행 중일 때 `barcode_agent.exe`를 다시 더블클릭하면 **"백그라운드에서 정상 작동 중입니다. 종료하시겠습니까? [예/아니오]"** 제어 창이 떠서 언제든 상태 확인 및 종료 가능.

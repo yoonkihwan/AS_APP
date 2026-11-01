@@ -203,7 +203,43 @@ class Inventory(models.Model):
             sn = cls.normalize_serial(token)
             if sn and sn not in result:
                 result.append(sn)
-        return result
+        return [s for s in result if not cls.is_master_barcode_text(s)]
+
+    @staticmethod
+    def is_master_barcode_text(raw: str | None) -> bool:
+        """툴 마스터 바코드(TOOL-1-20 등) 또는 잔여 문자열인지 판별"""
+        if not raw:
+            return False
+        import re
+        s = raw.strip().upper()
+        return bool(re.match(r"^(?:T?O?O?L)?[;:\-_]\d+(?:[;:\-_]\d+)?$", s) or re.match(r"^(?:TOOL|OOL)[;:\-_]?\d+", s))
+
+    @classmethod
+    def find_tool_by_model_barcode(cls, raw: str | None):
+        """박스에 인쇄된 품목명(모델명) 바코드가 찍혔을 때 등록된 Tool 객체 반환"""
+        sn = cls.normalize_serial(raw)
+        if not sn:
+            return None
+        import re
+        from master_data.models import Tool
+        sn_clean = re.sub(r"^(?:P/?N|MODEL|ITEM)[;:\-\s]+", "", sn, flags=re.IGNORECASE).strip()
+        sn_alnum = re.sub(r"[\s\-_]", "", sn_clean)
+        if len(sn_alnum) < 3:
+            return None
+        for t in Tool.objects.select_related("brand").all():
+            m_full = t.model_name.strip().upper()
+            m_no_paren = m_full.split("(")[0].strip()
+            m_first_tok = m_full.split(" ")[0].strip()
+            candidates = {m_full, re.sub(r"[\s\-_]", "", m_full)}
+            if len(m_no_paren) >= 3:
+                candidates.add(m_no_paren)
+                candidates.add(re.sub(r"[\s\-_]", "", m_no_paren))
+            if len(m_first_tok) >= 4:
+                candidates.add(m_first_tok)
+                candidates.add(re.sub(r"[\s\-_]", "", m_first_tok))
+            if sn_clean in candidates or sn_alnum in candidates:
+                return t
+        return None
 
     @classmethod
     def find_in_stock(cls, serial: str | None):

@@ -91,6 +91,10 @@ class InventoryForm(forms.ModelForm):
 
         in_stock = []
         for sn in serials:
+            matched_tool = Inventory.find_tool_by_model_barcode(sn)
+            if matched_tool:
+                self.add_error("serial", f"[{sn}]은 시리얼 번호가 아니라 품목명({matched_tool.model_name})입니다.")
+                return cleaned_data
             dup = Inventory.find_in_stock(sn)
             if dup and dup.pk != self.instance.pk:
                 in_stock.append(f"{sn}({dup.tool.model_name})")

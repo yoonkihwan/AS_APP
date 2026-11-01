@@ -1,10 +1,53 @@
 document.addEventListener("DOMContentLoaded", function () {
   /**
-   * 인라인 폼셋에서 "브랜드 선택 -> 툴 목록 갱신" 
-   * "툴 선택 -> 재고(시리얼) 목록 & 현재 재고(수량) 갱신"
-   * "바코드 스캔 -> 시리얼 체크박스 자동 선택 & 수량 자동 카운트"
+   * 출고 등록 인라인 폼셋 스크립트 (Outbound Fast Form)
+   * 1. 브랜드 선택 -> 품목 목록 갱신 -> 재고(시리얼) 목록 및 현재 재고량 갱신
+   * 2. 바코드 스캔 시:
+   *    - 동일 품목 행이 이미 있으면 해당 행에 시리얼 체크 추가
+   *    - 빈 행이 있으면 빈 행에 품목/시리얼 세팅
+   *    - 다른 품목이 이미 선택되어 빈 행이 없으면 자동으로 새 티켓(행)을 추가하여 동시 출고 지원
+   * 3. 박스에 인쇄된 품목명 바코드나 마스터 바코드(TOOL-...) 오스캔 시 시리얼로 오인식하지 않고 자동 차단
    */
 
+  // ── 1. 한글(2벌식) -> 영문 QWERTY 역변환 ──
+  const CHO = ['r', 'R', 's', 'e', 'E', 'f', 'a', 'q', 'Q', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g'];
+  const JUNG = ['k', 'o', 'i', 'O', 'j', 'p', 'u', 'P', 'h', 'hk', 'ho', 'hl', 'y', 'n', 'nj', 'np', 'nl', 'b', 'm', 'ml', 'l'];
+  const JONG = ['', 'r', 'R', 'rt', 's', 'sw', 'sg', 'e', 'f', 'fr', 'fa', 'fq', 'ft', 'fx', 'fv', 'fg', 'a', 'q', 'qt', 't', 'T', 'd', 'w', 'c', 'z', 'x', 'v', 'g'];
+  const JAMO_TO_ENG = {
+    'ㄱ': 'r', 'ㄲ': 'R', 'ㄴ': 's', 'ㄷ': 'e', 'ㄸ': 'E', 'ㄹ': 'f',
+    'ㅁ': 'a', 'ㅂ': 'q', 'ㅃ': 'Q', 'ㅅ': 't', 'ㅆ': 'T', 'ㅇ': 'd',
+    'ㅈ': 'w', 'ㅉ': 'W', 'ㅊ': 'c', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅍ': 'v', 'ㅎ': 'g',
+    'ㅏ': 'k', 'ㅐ': 'o', 'ㅑ': 'i', 'ㅒ': 'O', 'ㅓ': 'j', 'ㅔ': 'p',
+    'ㅕ': 'u', 'ㅖ': 'P', 'ㅗ': 'h', 'ㅘ': 'hk', 'ㅙ': 'ho', 'ㅚ': 'hl',
+    'ㅛ': 'y', 'ㅜ': 'n', 'ㅝ': 'nj', 'ㅞ': 'np', 'ㅟ': 'nl', 'ㅠ': 'b',
+    'ㅡ': 'm', 'ㅢ': 'ml', 'ㅣ': 'l',
+    'ㄳ': 'rt', 'ㄵ': 'sw', 'ㄶ': 'sg', 'ㄺ': 'fr', 'ㄻ': 'fa',
+    'ㄼ': 'fq', 'ㄽ': 'ft', 'ㄾ': 'fx', 'ㄿ': 'fv', 'ㅀ': 'fg', 'ㅄ': 'qt'
+  };
+
+  function convertHangulToEnglish(str) {
+    if (!str) return '';
+    let result = '';
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      if (code >= 0xAC00 && code <= 0xD7A3) {
+        const offset = code - 0xAC00;
+        result += CHO[Math.floor(offset / 588)] + JUNG[Math.floor((offset % 588) / 28)] + JONG[offset % 28];
+      } else if (JAMO_TO_ENG[str[i]]) {
+        result += JAMO_TO_ENG[str[i]];
+      } else {
+        result += str[i];
+      }
+    }
+    return result;
+  }
+
+  function isMasterBarcode(str) {
+    const norm = str.replace(/[;_\-]/g, ':').toUpperCase();
+    return /^(?:T?O?O?L)?:?\d+:\d+$/.test(norm) || norm.startsWith("TOOL:") || norm.startsWith("OOL:");
+  }
+
+  // ── 2. 사운드 및 토스트 알림 ──
   let audioCtx = null;
   function playBeep(freq = 1500, duration = 0.08) {
     try {
@@ -22,12 +65,31 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (e) {}
   }
 
+  function showToast(msg, isWarning = false) {
+    let toast = document.getElementById("outbound-barcode-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "outbound-barcode-toast";
+      toast.style.cssText = "position:fixed; top:24px; right:24px; z-index:999999; color:#fff; font-weight:700; font-size:14px; padding:12px 20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); transition:opacity 0.25s ease; pointer-events:none;";
+      document.body.appendChild(toast);
+    }
+    toast.style.background = isWarning ? "#dc2626" : "#4f46e5";
+    toast.textContent = msg;
+    toast.style.opacity = "1";
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => {
+      toast.style.opacity = "0";
+    }, 3000);
+  }
+
+  // ── 3. 브랜드 -> 툴 -> 시리얼 목록 로드 ──
   function updateToolOptions(row, brandId, targetToolId = null, onComplete = null) {
     const toolSelect = row.querySelector("select[name$='-tool']");
     if (!toolSelect) return;
 
     if (!brandId) {
       toolSelect.innerHTML = '<option value="">---------</option>';
+      if (onComplete) onComplete();
       return;
     }
 
@@ -48,12 +110,15 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         if (targetToolId) {
-          toolSelect.value = targetToolId;
+          toolSelect.value = String(targetToolId);
         }
 
         if (onComplete) onComplete();
       })
-      .catch((err) => console.error("Error fetching tools:", err));
+      .catch((err) => {
+        console.error("Error fetching tools:", err);
+        if (onComplete) onComplete();
+      });
   }
 
   function updateInventoryOptions(row, toolId, targetSerial = null) {
@@ -61,10 +126,11 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!inventoryTd) return;
 
     const currentStockInput = row.querySelector("input[name$='-current_stock']");
+    const rowPrefix = row.id || "";
 
-    let rowPrefix = "";
-    if (row.id) {
-      rowPrefix = row.id;
+    if (targetSerial) {
+      if (!row._pendingSerials) row._pendingSerials = new Set();
+      row._pendingSerials.add(targetSerial.trim().toUpperCase());
     }
 
     if (!toolId) {
@@ -80,8 +146,20 @@ document.addEventListener("DOMContentLoaded", function () {
     fetch(`/api/inventory-by-tool/?tool_id=${toolId}`)
       .then((response) => response.json())
       .then((data) => {
+        delete row.dataset.pendingToolId;
+
         const existingCheckboxes = Array.from(inventoryTd.querySelectorAll('input[type="checkbox"]'));
-        const checkedValues = existingCheckboxes.filter(cb => cb.checked).map(cb => cb.value);
+        const checkedValues = existingCheckboxes.filter(cb => cb.checked).map(cb => String(cb.value));
+        const checkedSerials = existingCheckboxes
+          .filter(cb => cb.checked && cb.getAttribute('data-serial'))
+          .map(cb => cb.getAttribute('data-serial').trim().toUpperCase());
+
+        if (row._pendingSerials) {
+          row._pendingSerials.forEach(s => {
+            if (!checkedSerials.includes(s)) checkedSerials.push(s);
+          });
+          row._pendingSerials.clear();
+        }
 
         existingCheckboxes.forEach(cb => {
           const wrapperDiv = cb.closest('div');
@@ -117,18 +195,20 @@ document.addEventListener("DOMContentLoaded", function () {
           cb.name = rowPrefix + "-inventories";
           cb.value = inv.id;
           cb.id = rowPrefix + "-inventories_" + index;
-          cb.setAttribute('data-serial', (inv.serial || '').trim());
+          const invSerial = (inv.serial || '').trim();
+          cb.setAttribute('data-serial', invSerial);
 
-          // 기존 체크 상태 복원 또는 타겟 시리얼 자동 체크
-          if (checkedValues.includes(String(inv.id)) || (targetSerial && inv.serial && inv.serial.trim() === targetSerial.trim())) {
+          if (
+            checkedValues.includes(String(inv.id)) ||
+            (invSerial && checkedSerials.includes(invSerial.toUpperCase()))
+          ) {
             cb.checked = true;
             wrapper.style.backgroundColor = "rgba(16, 185, 129, 0.2)";
           }
 
           const lbl = document.createElement("label");
           lbl.htmlFor = cb.id;
-          // [피드백 반영] 품목명은 이미 선택되어 있으므로 시리얼 번호만 깔끔하게 노출
-          lbl.textContent = inv.serial ? ` ${inv.serial}` : ` S/N: 없음 (${inv.id.substring(0, 8)}...)`;
+          lbl.textContent = invSerial ? ` ${invSerial}` : ` S/N: 없음 (${inv.id.substring(0, 8)}...)`;
           lbl.style.marginLeft = "8px";
           lbl.style.fontSize = "0.875rem";
           lbl.style.cursor = "pointer";
@@ -144,7 +224,10 @@ document.addEventListener("DOMContentLoaded", function () {
           playBeep(1800, 0.12);
         }
       })
-      .catch((err) => console.error("Error fetching inventory:", err));
+      .catch((err) => {
+        delete row.dataset.pendingToolId;
+        console.error("Error fetching inventory:", err);
+      });
   }
 
   function updateQuantityLogic(row) {
@@ -197,21 +280,35 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  // ── 🚀 바코드 스캔 처리 핵심 함수 ──
-  function handleScannedSerial(serial) {
-    serial = serial.trim();
+  function getActiveTicketRows() {
+    return Array.from(
+      document.querySelectorAll("tr.form-row:not(.empty-form), tr.dynamic-tickets:not(.empty-form)")
+    );
+  }
+
+  // ── 4. 바코드 스캔 처리 핵심 함수 (다중 품목 자동 행 추가 지원) ──
+  function handleScannedSerial(rawSerial) {
+    const serial = convertHangulToEnglish(rawSerial).trim().toUpperCase();
     if (!serial) return;
+
+    // 0. 마스터 바코드(TOOL-1-20 등)가 출고 화면에서 찍힌 경우 무시
+    if (isMasterBarcode(serial)) {
+      playBeep(400, 0.2);
+      showToast("품목 바코드입니다. 출고할 장비의 시리얼 번호 바코드를 스캔하십시오.", true);
+      return;
+    }
 
     // 1. 현재 화면에 이미 렌더링된 체크박스 중 시리얼 일치 항목 검색
     const allCbs = Array.from(document.querySelectorAll("input[type='checkbox'][name$='-inventories']"));
     const matchedCb = allCbs.find(cb => {
-      const s = cb.getAttribute('data-serial');
-      if (s && s.toLowerCase() === serial.toLowerCase()) return true;
+      const s = (cb.getAttribute('data-serial') || '').trim().toUpperCase();
+      if (s && s === serial) return true;
       const lbl = document.querySelector(`label[for='${cb.id}']`);
-      return lbl && lbl.textContent.trim().toLowerCase() === serial.toLowerCase();
+      return lbl && lbl.textContent.trim().toUpperCase() === serial;
     });
 
     if (matchedCb) {
+      const wasChecked = matchedCb.checked;
       matchedCb.checked = true;
       const row = matchedCb.closest("tr");
       if (row) updateQuantityLogic(row);
@@ -222,48 +319,80 @@ document.addEventListener("DOMContentLoaded", function () {
         wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       playBeep(1800, 0.1);
+      showToast(wasChecked ? `이미 선택된 시리얼입니다: ${serial}` : `출고 선택 완료: ${serial}`);
       return;
     }
 
-    // 2. 화면에 없다면 -> API로 품목 정보 조회 후 인라인 자동 세팅
+    // 2. 화면에 없다면 -> API로 품목 정보 조회 후 행 탐색 또는 새 티켓(행) 추가
     fetch(`/inventory/barcode-api/lookup/?serial=${encodeURIComponent(serial)}`)
       .then(res => res.json())
       .then(data => {
+        // 박스의 품목명(모델명) 바코드가 찍힌 경우 시리얼로 오인식하지 않고 즉시 차단!
+        if (data.is_tool_model) {
+          playBeep(400, 0.25);
+          showToast(`품목명 바코드 제외: [${data.tool_name}]은 품목명입니다. 시리얼 바코드를 스캔하십시오.`, true);
+          return;
+        }
+
         if (!data.success || !data.found) {
           playBeep(300, 0.25);
-          if (confirm(`시리얼 [${serial}]은 미등록 장비입니다.\n[입고 등록] 화면으로 이동하여 신규 입고하시겠습니까?`)) {
-            window.location.href = `/inventory/tool_inventory/inventorybatch/add/?serial=${encodeURIComponent(serial)}`;
-          }
+          showToast(`미등록 시리얼: [${serial}]은 재고에 등록되지 않은 번호입니다.`, true);
           return;
         }
 
         if (!data.is_stock) {
           playBeep(300, 0.25);
-          alert(`시리얼 [${serial}]은 이미 '${data.status}' 처리된 장비입니다.`);
+          showToast(`출고 불가: [${serial}]은 이미 '${data.status}' 처리된 장비입니다.`, true);
           return;
         }
 
-        // 비어있는 행 찾기
-        const rows = Array.from(document.querySelectorAll("tr.form-row:not(.empty-form)"));
+        const targetToolId = String(data.tool_id);
+        let rows = getActiveTicketRows();
+
+        // (A) 이미 동일한 품목(tool_id)이 선택되어 있거나 로딩 중인 행이 있는지 확인
         let targetRow = rows.find(r => {
           const toolSel = r.querySelector("select[name$='-tool']");
-          return toolSel && !toolSel.value;
+          return (toolSel && String(toolSel.value) === targetToolId) || r.dataset.pendingToolId === targetToolId;
         });
 
-        if (!targetRow && rows.length > 0) {
-          targetRow = rows[rows.length - 1];
+        if (targetRow) {
+          updateInventoryOptions(targetRow, data.tool_id, data.serial);
+          showToast(`출고 추가: [${data.tool_name}] S/N: ${data.serial}`);
+          return;
+        }
+
+        // (B) 아직 브랜드/품목이 선택되지 않은 완전히 비어있는 행 찾기
+        targetRow = rows.find(r => {
+          const brandSel = r.querySelector("select[name$='-brand']");
+          const toolSel = r.querySelector("select[name$='-tool']");
+          return toolSel && !toolSel.value && (!brandSel || !brandSel.value) && !r.dataset.pendingToolId;
+        });
+
+        // (C) 비어있는 행이 없다면(이전 품목이 이미 들어있다면) -> 절대 덮어쓰지 않고 '새 티켓(행) 추가' 클릭!
+        if (!targetRow) {
+          const addRowBtn = document.querySelector(".add-row a, tr.add-row a, .inline-related .add-row a");
+          if (addRowBtn) {
+            addRowBtn.click();
+            rows = getActiveTicketRows();
+            targetRow = rows[rows.length - 1];
+          }
         }
 
         if (targetRow) {
+          targetRow.dataset.pendingToolId = targetToolId;
+          if (!targetRow._pendingSerials) targetRow._pendingSerials = new Set();
+          targetRow._pendingSerials.add(data.serial.trim().toUpperCase());
+
           const brandSelect = targetRow.querySelector("select[name$='-brand']");
           if (brandSelect && data.brand_id) {
-            brandSelect.value = data.brand_id;
+            brandSelect.value = String(data.brand_id);
             updateToolOptions(targetRow, data.brand_id, data.tool_id, () => {
-              updateInventoryOptions(targetRow, data.tool_id, serial);
+              updateInventoryOptions(targetRow, data.tool_id, data.serial);
             });
           } else {
-            updateInventoryOptions(targetRow, data.tool_id, serial);
+            updateInventoryOptions(targetRow, data.tool_id, data.serial);
           }
+          showToast(`티켓 추가: [${data.tool_name}] S/N: ${data.serial}`);
         }
       })
       .catch(err => console.error("Error looking up scanned serial:", err));
@@ -275,37 +404,37 @@ document.addEventListener("DOMContentLoaded", function () {
   if (initialSerial) {
     setTimeout(() => {
       handleScannedSerial(initialSerial);
-    }, 400);
+    }, 300);
   }
 
-  // ── [출고날짜 오염 방어] 페이지 진입 시 release_date 자동 포커스 해제 ──
+  // ── 5. 출고날짜 오염 방어 ──
   const releaseDateInput = document.querySelector("input[name='release_date']");
   if (releaseDateInput && document.activeElement === releaseDateInput) {
     releaseDateInput.blur();
   }
   let initialReleaseDate = releaseDateInput ? releaseDateInput.value : "";
 
-  // 글로벌 바코드 스캐너 리스너 (40ms 이하 스캔)
+  // ── 6. 글로벌 바코드 스캐너 리스너 (70ms 이하 스캔) ──
   let scanBuffer = [];
   let lastKeyTime = 0;
-  const SCAN_INTERVAL = 40;
+  const SCAN_INTERVAL = 70;
 
   window.addEventListener("keydown", function(e) {
     const activeEl = document.activeElement;
     if (activeEl && ['TEXTAREA'].includes(activeEl.tagName)) return;
+    if (activeEl && activeEl.matches && activeEl.matches("input[name$='-usage_process']")) return;
 
     const now = performance.now();
     const gap = now - lastKeyTime;
     lastKeyTime = now;
 
     if (e.key === "Enter") {
-      if (scanBuffer.length >= 4) {
+      if (scanBuffer.length >= 3) {
         const scanned = scanBuffer.join("").trim();
         scanBuffer = [];
         e.preventDefault();
         e.stopPropagation();
 
-        // 출고날짜(release_date) 필드에 바코드 찌꺼기가 들어갔다면 즉시 복원
         if (releaseDateInput && releaseDateInput.value !== initialReleaseDate) {
           releaseDateInput.value = initialReleaseDate;
         }
@@ -316,19 +445,17 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     } else if (e.key.length === 1) {
       if (gap <= SCAN_INTERVAL) {
-        // 스캐너 고속 스트림 중: 포커스된 인풋(특히 release_date)에 문자가 찍히는 것을 원천 차단!
         if (activeEl && activeEl.matches && activeEl.matches("input[name='release_date'], input[type='text'], input[type='search']")) {
           e.preventDefault();
         }
         scanBuffer.push(e.key);
       } else {
-        // 새로운 입력 시작
         scanBuffer = [e.key];
       }
     }
   });
 
-  // 이벤트 위임
+  // ── 7. 수동 드롭다운 및 수량 변경 이벤트 위임 ──
   document.body.addEventListener("change", function (e) {
     if (e.target.matches("select[name$='-brand']")) {
       const row = e.target.closest("tr");

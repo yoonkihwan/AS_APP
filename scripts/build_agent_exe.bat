@@ -15,11 +15,12 @@ if not exist "%PYTHON_EXE%" (
 echo [*] PyInstaller 설치 확인 중...
 "%PYTHON_EXE%" -m pip install pyinstaller --quiet
 
-echo [*] barcode_agent.exe 단일 파일 빌드 중...
-"%PYTHON_EXE%" -m PyInstaller --noconfirm --onefile --name "barcode_agent" --clean "scripts\barcode_agent.py"
+echo [*] barcode_agent.exe 단일 파일(무창 백그라운드) 빌드 중...
+"%PYTHON_EXE%" -m PyInstaller --noconfirm --onefile --noconsole --name "barcode_agent" --clean "scripts\barcode_agent.py"
 
 if %errorlevel% equ 0 (
     if not exist "dist\barcode_agent_pack" mkdir "dist\barcode_agent_pack"
+    if exist "dist\barcode_agent_pack\시작프로그램_자동등록.bat" del /f /q "dist\barcode_agent_pack\시작프로그램_자동등록.bat"
     copy /y "dist\barcode_agent.exe" "dist\barcode_agent_pack\barcode_agent.exe" > nul
     (
         echo [SETTINGS]
@@ -33,7 +34,7 @@ if %errorlevel% equ 0 (
     echo =======================================================
     echo  빌드 완료!
     echo  배포 폴더: dist\barcode_agent_pack
-    echo  안의 파일(barcode_agent.exe, agent_config.ini)을 다른 PC에 복사하십시오.
+    echo  안의 파일들을 다른 PC에 복사하십시오.
     echo =======================================================
 ) else (
     echo.

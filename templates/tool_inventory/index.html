@@ -783,7 +783,9 @@
                     fetch(`/inventory/barcode-api/lookup/?serial=${encodeURIComponent(code)}`)
                         .then(r => r.json())
                         .then(data => {
-                            if (data.found && data.is_stock) {
+                            if (data.is_tool_model && data.brand_id && data.tool_id) {
+                                window.location.href = `/inventory/tool_inventory/inventorybatch/add/?initial_master=TOOL-${data.brand_id}-${data.tool_id}`;
+                            } else if (data.found && data.is_stock) {
                                 // 현재 재고 상태 -> 바로 [출고 등록]으로 이동!
                                 window.location.href = `/inventory/tool_inventory/outboundbatch/add/?serial=${encodeURIComponent(code)}`;
                             } else {
