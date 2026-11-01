@@ -1,0 +1,1108 @@
+{% extends 'admin/base.html' %}
+
+{% load i18n %}
+
+{% block title %}바코드 입출고 | {{ site_title }}{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+    /* ── Django Unfold Clean & Minimal 스타일 규격 준수 ── */
+    :root {
+        --bc-bg: #ffffff;
+        --bc-border: #e2e8f0;
+        --bc-header-bg: #f8fafc;
+        --bc-text-main: #0f172a;
+        --bc-text-sub: #64748b;
+        --bc-input-bg: #ffffff;
+        --bc-input-border: #cbd5e1;
+    }
+
+    .dark {
+        --bc-bg: #1e293b;
+        --bc-border: #334155;
+        --bc-header-bg: #0f172a;
+        --bc-text-main: #f8fafc;
+        --bc-text-sub: #94a3b8;
+        --bc-input-bg: #0f172a;
+        --bc-input-border: #475569;
+    }
+
+    .bc-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding-bottom: 2rem;
+    }
+
+    /* ── 1. 상단 정갈한 Unfold 스타일 스캔 패널 (Clean & Minimal) ── */
+    .bc-header-panel {
+        background: var(--bc-bg);
+        border: 1px solid var(--bc-border);
+        border-radius: 0.5rem;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+    }
+
+    .bc-header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.85rem;
+        gap: 1rem;
+    }
+
+    .bc-header-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        color: var(--bc-text-main);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .bc-header-desc {
+        font-size: 0.8125rem;
+        color: var(--bc-text-sub);
+        margin-top: 0.2rem;
+    }
+
+    .bc-sound-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.65rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: var(--bc-header-bg);
+        border: 1px solid var(--bc-border);
+        border-radius: 0.375rem;
+        color: var(--bc-text-sub);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .bc-sound-btn:hover {
+        background: var(--bc-border);
+        color: var(--bc-text-main);
+    }
+
+    /* ── Unfold 검색 인풋 스타일 스캔바 ── */
+    .bc-search-wrap {
+        display: flex;
+        align-items: center;
+        background: var(--bc-header-bg);
+        border: 1px solid var(--bc-input-border);
+        border-radius: 0.375rem;
+        padding: 0.35rem 0.75rem;
+        transition: all 0.15s ease;
+        gap: 0.65rem;
+    }
+    .bc-search-wrap:focus-within {
+        background: var(--bc-input-bg);
+        border-color: #6366f1;
+        box-shadow: 0 0 0 1px #6366f1;
+    }
+
+    .bc-scan-icon {
+        color: var(--bc-text-sub);
+        font-size: 1.35rem;
+    }
+
+    .bc-scan-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--bc-text-main);
+        font-family: inherit;
+        letter-spacing: 0.025em;
+    }
+    .bc-scan-input::placeholder {
+        color: #94a3b8;
+        font-weight: 400;
+        font-size: 0.875rem;
+    }
+
+    .bc-search-btn {
+        background: #6366f1;
+        color: #ffffff;
+        border: none;
+        border-radius: 0.25rem;
+        padding: 0.45rem 1rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .bc-search-btn:hover {
+        background: #4f46e5;
+    }
+
+    /* ── 2단 메인 작업 영역 ── */
+    .bc-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    @media (min-width: 1024px) {
+        .bc-grid {
+            grid-template-columns: 1.25fr 0.75fr;
+        }
+    }
+
+    .bc-card {
+        background: var(--bc-bg);
+        border: 1px solid var(--bc-border);
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+        overflow: hidden;
+    }
+
+    .bc-card-header {
+        background: var(--bc-header-bg);
+        border-bottom: 1px solid var(--bc-border);
+        padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--bc-text-main);
+    }
+
+    .bc-card-body {
+        padding: 1.25rem;
+    }
+
+    /* ── 미니 컬러 배지 (GEMINI_SPEC Pill Badge 규격) ── */
+    .bc-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.15rem 0.55rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .bc-badge-stock {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    .dark .bc-badge-stock {
+        background: rgba(16, 185, 129, 0.2);
+        color: #6ee7b7;
+    }
+
+    .bc-badge-new {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .dark .bc-badge-new {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+    }
+
+    .bc-badge-released {
+        background: #e0e7ff;
+        color: #3730a3;
+    }
+    .dark .bc-badge-released {
+        background: rgba(99, 102, 241, 0.2);
+        color: #a5b4fc;
+    }
+
+    /* ── 정보 요약 그리드 ── */
+    .bc-info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        background: var(--bc-header-bg);
+        border: 1px solid var(--bc-border);
+        border-radius: 0.375rem;
+        padding: 0.85rem;
+        margin-bottom: 1rem;
+    }
+    .bc-info-item-label {
+        font-size: 0.725rem;
+        color: var(--bc-text-sub);
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .bc-info-item-val {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--bc-text-main);
+        margin-top: 0.15rem;
+    }
+
+    /* ── 폼 스타일 (Unfold 규격) ── */
+    .bc-form-group {
+        margin-bottom: 0.85rem;
+    }
+    .bc-form-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--bc-text-sub);
+        margin-bottom: 0.25rem;
+    }
+    .bc-form-control {
+        width: 100%;
+        padding: 0.45rem 0.65rem;
+        font-size: 0.85rem;
+        border-radius: 0.375rem;
+        border: 1px solid var(--bc-input-border);
+        background: var(--bc-input-bg);
+        color: var(--bc-text-main);
+        outline: none;
+        transition: all 0.15s ease;
+    }
+    .bc-form-control:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 1px #6366f1;
+    }
+
+    /* ── 버튼 (플랫 Unfold 스타일) ── */
+    .bc-btn {
+        width: 100%;
+        padding: 0.55rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        transition: background 0.15s ease;
+    }
+    .bc-btn-outbound {
+        background: #4f46e5;
+        color: #ffffff;
+    }
+    .bc-btn-outbound:hover {
+        background: #4338ca;
+    }
+
+    .bc-btn-inbound {
+        background: #059669;
+        color: #ffffff;
+    }
+    .bc-btn-inbound:hover {
+        background: #047857;
+    }
+
+    /* ── 빈 상태 안내 ── */
+    .bc-empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--bc-text-sub);
+    }
+    .bc-empty-icon {
+        font-size: 2.75rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.4;
+    }
+
+    /* ── 단정하고 정갈한 테이블 ── */
+    .bc-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8125rem;
+    }
+    .bc-table th {
+        background: var(--bc-header-bg);
+        color: var(--bc-text-sub);
+        font-weight: 600;
+        padding: 0.55rem 0.85rem;
+        text-align: left;
+        border-bottom: 1px solid var(--bc-border);
+        font-size: 0.725rem;
+    }
+    .bc-table td {
+        padding: 0.55rem 0.85rem;
+        border-bottom: 1px solid var(--bc-border);
+        color: var(--bc-text-main);
+    }
+    .bc-table tr:hover td {
+        background: rgba(0, 0, 0, 0.02);
+    }
+    .dark .bc-table tr:hover td {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* ── 알림 피드백 배너 ── */
+    .bc-alert {
+        padding: 0.65rem 1rem;
+        border-radius: 0.375rem;
+        margin-bottom: 1rem;
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .bc-alert-success {
+        background: #ecfdf5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+    .dark .bc-alert-success {
+        background: rgba(16, 185, 129, 0.15);
+        color: #6ee7b7;
+        border-color: rgba(16, 185, 129, 0.3);
+    }
+    .bc-alert-error {
+        background: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+    .dark .bc-alert-error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bc-container">
+
+    <!-- 1. 상단 단정하고 정갈한 Unfold 스타일 스캔 패널 -->
+    <div class="bc-header-panel">
+        <div class="bc-header-top">
+            <div>
+                <div class="bc-header-title">
+                    <span class="material-icons-outlined text-primary-600 dark:text-primary-400">qr_code_scanner</span>
+                    <span>바코드 입출고 관리</span>
+                </div>
+                <div class="bc-header-desc">
+                    MQ160W 바코드 스캐너로 바코드를 스캔하십시오. 재고 유무를 자동 판별하여 출고 또는 신규 입고로 분기합니다.
+                </div>
+            </div>
+            <button type="button" class="bc-sound-btn" id="btn-sound" onclick="toggleSound()">
+                <span class="material-icons-outlined" id="sound-icon" style="font-size:1rem;">volume_up</span>
+                <span id="sound-text">효과음 켜짐</span>
+            </button>
+        </div>
+
+        <!-- Unfold 검색창 스타일의 정갈한 바코드 입력창 -->
+        <div class="bc-search-wrap">
+            <span class="material-icons-outlined bc-scan-icon">barcode_scanner</span>
+            <input type="text"
+                   id="main-barcode-input"
+                   class="bc-scan-input"
+                   placeholder="스캐너로 바코드를 찍거나 시리얼 번호를 입력 후 Enter..."
+                   value="{{ initial_serial }}"
+                   autocomplete="off"
+                   autofocus>
+            <button type="button"
+                    class="bc-search-btn"
+                    onclick="handleManualSearch()">
+                조회
+            </button>
+        </div>
+    </div>
+
+    <!-- 처리 결과 피드백 배너 -->
+    <div id="alert-banner" class="bc-alert"></div>
+
+    <!-- 2. 중앙 메인 작업 영역 -->
+    <div class="bc-grid">
+
+        <!-- 좌측: 실시간 판별 및 즉시 처리 카드 -->
+        <div class="bc-card" id="action-card">
+            <div class="bc-card-header">
+                <span style="display:flex; align-items:center; gap:0.5rem;">
+                    <span class="material-icons-outlined" style="color:#6366f1;">tune</span>
+                    <span id="action-card-title">스캔 결과 및 입출고 처리</span>
+                </span>
+                <span id="action-badge-container"></span>
+            </div>
+            <div class="bc-card-body">
+
+                <!-- [상태 1: 대기 상태] -->
+                <div id="state-waiting" class="bc-empty-state">
+                    <span class="material-icons-outlined bc-empty-icon">barcode_reader</span>
+                    <div style="font-size:1rem; font-weight:700; color:var(--bc-text-main); margin-bottom:0.25rem;">스캐너 대기 중</div>
+                    <div style="font-size:0.8125rem;">공구의 시리얼 바코드를 스캔하면 여기에 맞춤형 처리 화면이 표시됩니다.</div>
+                </div>
+
+                <!-- [상태 2: 재고 장비 -> 출고 처리 폼] -->
+                <div id="state-outbound" style="display:none;">
+                    <div class="bc-info-grid">
+                        <div>
+                            <div class="bc-info-item-label">품목명 (Model)</div>
+                            <div class="bc-info-item-val" id="out-tool-name">-</div>
+                        </div>
+                        <div>
+                            <div class="bc-info-item-label">시리얼 번호 (S/N)</div>
+                            <div class="bc-info-item-val" id="out-serial" style="color:#6366f1;">-</div>
+                        </div>
+                        <div>
+                            <div class="bc-info-item-label">브랜드</div>
+                            <div class="bc-info-item-val" id="out-brand">-</div>
+                        </div>
+                        <div>
+                            <div class="bc-info-item-label">입고일자 / 입고처</div>
+                            <div class="bc-info-item-val" id="out-inbound-info" style="font-size:0.875rem;">-</div>
+                        </div>
+                    </div>
+
+                    <form id="form-outbound" onsubmit="submitOutbound(event)">
+                        <input type="hidden" id="out-hidden-serial">
+                        <div class="bc-form-group">
+                            <label class="bc-form-label">출고일자 *</label>
+                            <input type="date" id="out-release-date" class="bc-form-control" value="{{ today }}" required>
+                        </div>
+                        <div class="bc-form-group">
+                            <label class="bc-form-label">출고처 (매출처) *</label>
+                            <select id="out-company" class="bc-form-control" required>
+                                <option value="">출고처를 선택하십시오</option>
+                                {% for c in companies %}
+                                <option value="{{ c.id }}">{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="bc-form-group">
+                            <label class="bc-form-label">적용공정 / 용도 (선택)</label>
+                            <input type="text" id="out-usage" class="bc-form-control" placeholder="예: 조립라인 3공정, 예비용 등">
+                        </div>
+                        <button type="submit" class="bc-btn bc-btn-outbound">
+                            <span class="material-icons-outlined">local_shipping</span>
+                            출고 확정 (Enter)
+                        </button>
+                    </form>
+                </div>
+
+                <!-- [상태 3: 미등록 장비 -> 신규 입고 등록 폼] -->
+                <div id="state-inbound" style="display:none;">
+                    <div style="background:var(--bc-header-bg); border:1px solid var(--bc-border); border-radius:0.375rem; padding:0.75rem 1rem; margin-bottom:1rem;">
+                        <div style="display:flex; align-items:center; gap:0.4rem; color:#d97706; font-weight:700; font-size:0.875rem;">
+                            <span class="material-icons-outlined">warning_amber</span>
+                            현재 재고 목록에 없는 시리얼입니다.
+                        </div>
+                        <div style="font-size:0.8rem; color:var(--bc-text-sub); margin-top:0.2rem;">
+                            품목 정보를 선택하시면 시스템에 즉시 신규 입고 등록됩니다.
+                        </div>
+                    </div>
+
+                    <form id="form-inbound" onsubmit="submitInbound(event)">
+                        <div class="bc-form-group">
+                            <label class="bc-form-label">시리얼 번호 (S/N) *</label>
+                            <input type="text" id="in-serial" class="bc-form-control" style="font-weight:700; color:#6366f1;" readonly required>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                            <div class="bc-form-group">
+                                <label class="bc-form-label">브랜드 *</label>
+                                <select id="in-brand" class="bc-form-control" onchange="filterToolsByBrand()" required>
+                                    <option value="">브랜드 선택</option>
+                                    {% for b in brands %}
+                                    <option value="{{ b.id }}">{{ b.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="bc-form-group">
+                                <label class="bc-form-label">품목명 (Model) *</label>
+                                <select id="in-tool" class="bc-form-control" required>
+                                    <option value="">품목을 선택하십시오</option>
+                                    {% for t in tools %}
+                                    <option value="{{ t.id }}" data-brand="{{ t.brand_id }}">{{ t.model_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                            <div class="bc-form-group">
+                                <label class="bc-form-label">입고일자 *</label>
+                                <input type="date" id="in-date" class="bc-form-control" value="{{ today }}" required>
+                            </div>
+                            <div class="bc-form-group">
+                                <label class="bc-form-label">입고처 (공급사) *</label>
+                                <select id="in-supplier" class="bc-form-control" required>
+                                    <option value="">입고처 선택</option>
+                                    {% for s in suppliers %}
+                                    <option value="{{ s.id }}">{{ s.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="bc-btn bc-btn-inbound">
+                            <span class="material-icons-outlined">inbox</span>
+                            신규 입고 등록 (Enter)
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 우측: 빠른 일괄 출고 큐 (연속 출고 대기열) -->
+        <div class="bc-card">
+            <div class="bc-card-header">
+                <span style="display:flex; align-items:center; gap:0.5rem;">
+                    <span class="material-icons-outlined text-primary-600">playlist_add_check</span>
+                    <span>연속 출고 대기열 (Queue)</span>
+                </span>
+                <span id="queue-count-badge" class="bc-badge bc-badge-released">0대</span>
+            </div>
+            <div class="bc-card-body" style="padding:1rem;">
+                <div style="font-size:0.8125rem; color:var(--bc-text-sub); margin-bottom:0.75rem;">
+                    여러 대를 연속으로 스캔하여 한 번에 출고하려면 아래 대기열을 활용하십시오.
+                </div>
+
+                <div style="max-height: 250px; overflow-y: auto; margin-bottom:1rem; border: 1px solid var(--bc-border); border-radius:0.375rem;">
+                    <table class="bc-table" id="queue-table">
+                        <thead>
+                            <tr>
+                                <th>품목</th>
+                                <th>시리얼</th>
+                                <th style="text-align:right;">제거</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queue-tbody">
+                            <tr id="queue-empty-row">
+                                <td colspan="3" style="text-align:center; padding:1.5rem; color:var(--bc-text-sub);">
+                                    대기 중인 장비가 없습니다.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 일괄 출고 폼 -->
+                <div style="background:var(--bc-header-bg); border-radius:0.375rem; padding:0.85rem; border:1px solid var(--bc-border);">
+                    <div style="font-size:0.8125rem; font-weight:700; margin-bottom:0.4rem; color:var(--bc-text-main);">일괄 출고 정보</div>
+                    <div style="margin-bottom:0.5rem;">
+                        <select id="batch-company" class="bc-form-control" style="font-size:0.8125rem;">
+                            <option value="">출고처 선택 (필수)</option>
+                            {% for c in companies %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="button"
+                            class="bc-btn bc-btn-outbound"
+                            style="padding:0.5rem 1rem; font-size:0.85rem;"
+                            onclick="submitBatchOutbound()">
+                        대기 장비 일괄 출고
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 3. 하단 최근 처리 내역 실시간 로그 -->
+    <div class="bc-card">
+        <div class="bc-card-header">
+            <span style="display:flex; align-items:center; gap:0.5rem;">
+                <span class="material-icons-outlined" style="color:#0ea5e9;">history</span>
+                <span>최근 입/출고 완료 내역</span>
+            </span>
+            <span style="font-size:0.75rem; font-weight:400; color:var(--bc-text-sub);">(실시간 갱신)</span>
+        </div>
+        <div class="bc-card-body" style="padding:0;">
+            <table class="bc-table">
+                <thead>
+                    <tr>
+                        <th>구분</th>
+                        <th>처리일자</th>
+                        <th>품목명 (Model)</th>
+                        <th>시리얼 번호 (S/N)</th>
+                        <th>거래처</th>
+                        <th>비고/용도</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-actions-tbody">
+                    {% for inv in recent_inventories %}
+                    <tr>
+                        <td>
+                            {% if inv.status == '재고' %}
+                            <span class="bc-badge bc-badge-stock">입고(재고)</span>
+                            {% else %}
+                            <span class="bc-badge bc-badge-released">출고완료</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ inv.date|date:"Y-m-d" }}</td>
+                        <td style="font-weight:600;">{{ inv.tool.model_name }}</td>
+                        <td style="font-family:monospace; font-weight:600; color:#6366f1;">{{ inv.serial|default:"-" }}</td>
+                        <td>
+                            {% if inv.status == '출고' %}
+                                {{ inv.release_company.name|default:"-" }}
+                            {% else %}
+                                {{ inv.supplier.name|default:"-" }}
+                            {% endif %}
+                        </td>
+                        <td>{{ inv.usage_process|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align:center; padding:2rem; color:var(--bc-text-sub);">최근 처리 내역이 없습니다.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- 4. 자바스크립트 로직 (바코드 인터셉터 & AJAX) -->
+<script>
+    // ── 사운드 효과 (Web Audio API) ──
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    function playBeep(freq = 1200, duration = 0.12, type = 'sine') {
+        if (!soundEnabled) return;
+        try {
+            initAudio();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        } catch (e) {
+            console.warn("Sound play error:", e);
+        }
+    }
+
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        const icon = document.getElementById('sound-icon');
+        const text = document.getElementById('sound-text');
+        if (soundEnabled) {
+            icon.textContent = 'volume_up';
+            text.textContent = '효과음 켜짐';
+            playBeep(1500, 0.1);
+        } else {
+            icon.textContent = 'volume_off';
+            text.textContent = '효과음 꺼짐';
+        }
+    }
+
+    // ── 글로벌 바코드 스캐너 인터셉터 ──
+    const mainInput = document.getElementById('main-barcode-input');
+    let scanBuffer = [];
+    let lastKeyTime = 0;
+    const SCAN_INTERVAL_THRESHOLD = 40; // 40ms 이하를 스캐너로 판정
+
+    window.addEventListener('keydown', function(e) {
+        // 입력창에 포커스가 없을 때도 스캐너 입력 감지
+        if (document.activeElement !== mainInput && !['TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+            const now = performance.now();
+            const gap = now - lastKeyTime;
+            lastKeyTime = now;
+
+            if (e.key === 'Enter') {
+                if (scanBuffer.length >= 4) {
+                    const scanned = scanBuffer.join('');
+                    scanBuffer = [];
+                    mainInput.value = scanned;
+                    lookupSerial(scanned);
+                    e.preventDefault();
+                } else {
+                    scanBuffer = [];
+                }
+            } else if (e.key.length === 1) {
+                if (gap <= SCAN_INTERVAL_THRESHOLD || scanBuffer.length === 0) {
+                    scanBuffer.push(e.key);
+                } else {
+                    scanBuffer = [e.key];
+                }
+            }
+        }
+    });
+
+    // 메인 인풋 엔터키 처리
+    mainInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = this.value.trim();
+            if (val) {
+                lookupSerial(val);
+            }
+        }
+    });
+
+    function handleManualSearch() {
+        const val = mainInput.value.trim();
+        if (val) {
+            lookupSerial(val);
+        }
+    }
+
+    // ── 시리얼 실시간 비동기 조회 ──
+    function lookupSerial(serial) {
+        serial = serial.trim();
+        if (!serial) return;
+
+        showAlert(`시리얼 [${serial}] 조회 중...`, 'info');
+
+        fetch(`{% url 'tool_admin:barcode_api_lookup' %}?serial=${encodeURIComponent(serial)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    playBeep(300, 0.3, 'sawtooth');
+                    showAlert(data.message || '조회 실패', 'error');
+                    return;
+                }
+
+                playBeep(1400, 0.1);
+
+                if (data.found && data.is_stock) {
+                    // 1. 현재 재고 상태 -> 출고 폼 활성화
+                    showOutboundForm(data);
+                    addToQueue(data); // 우측 대기열에도 자동 누적 후보 제공
+                    showAlert(`재고 확인: [${data.tool_name}] (S/N: ${data.serial}) - 출고 가능`, 'success');
+                } else if (data.found && !data.is_stock) {
+                    // 2. 이미 출고된 장비 -> 신규/재입고 폼 활성화
+                    showInboundForm(data.serial, data.tool_id, data.brand_id);
+                    showAlert(`기존 출고 장비입니다. 재입고 등록을 진행하십시오.`, 'warning');
+                } else {
+                    // 3. 미등록 신규 장비 -> 신규 입고 폼 활성화
+                    showInboundForm(serial);
+                    showAlert(`신규 시리얼 [${serial}] 감지 - 입고 등록을 진행하십시오.`, 'warning');
+                }
+            })
+            .catch(err => {
+                playBeep(300, 0.3, 'sawtooth');
+                showAlert('서버 통신 중 오류가 발생했습니다.', 'error');
+                console.error(err);
+            });
+    }
+
+    // ── 출고 폼 노출 ──
+    function showOutboundForm(data) {
+        document.getElementById('state-waiting').style.display = 'none';
+        document.getElementById('state-inbound').style.display = 'none';
+        document.getElementById('state-outbound').style.display = 'block';
+
+        document.getElementById('action-card-title').textContent = '출고 처리';
+        document.getElementById('action-badge-container').innerHTML = `
+            <span class="bc-badge bc-badge-stock">🟢 재고 (출고 대기)</span>
+        `;
+
+        document.getElementById('out-tool-name').textContent = data.tool_name;
+        document.getElementById('out-serial').textContent = data.serial;
+        document.getElementById('out-hidden-serial').value = data.serial;
+        document.getElementById('out-brand').textContent = data.brand_name || '-';
+        document.getElementById('out-inbound-info').textContent = `${data.date} (${data.supplier_name || '공급사 미지정'})`;
+
+        // 출고처 드롭다운으로 포커스
+        setTimeout(() => {
+            document.getElementById('out-company').focus();
+        }, 100);
+    }
+
+    // ── 입고 폼 노출 ──
+    function showInboundForm(serial, toolId = null, brandId = null) {
+        document.getElementById('state-waiting').style.display = 'none';
+        document.getElementById('state-outbound').style.display = 'none';
+        document.getElementById('state-inbound').style.display = 'block';
+
+        document.getElementById('action-card-title').textContent = '신규 입고 등록';
+        document.getElementById('action-badge-container').innerHTML = `
+            <span class="bc-badge bc-badge-new">🟡 미등록 (신규 입고)</span>
+        `;
+
+        document.getElementById('in-serial').value = serial;
+
+        if (brandId) {
+            document.getElementById('in-brand').value = brandId;
+            filterToolsByBrand();
+        }
+        if (toolId) {
+            document.getElementById('in-tool').value = toolId;
+        }
+
+        setTimeout(() => {
+            document.getElementById('in-tool').focus();
+        }, 100);
+    }
+
+    // ── 브랜드별 툴 필터링 ──
+    function filterToolsByBrand() {
+        const brandId = document.getElementById('in-brand').value;
+        const toolSelect = document.getElementById('in-tool');
+        const options = toolSelect.querySelectorAll('option');
+
+        options.forEach(opt => {
+            if (!opt.value) return; // 첫 번째 안내문
+            if (!brandId || opt.getAttribute('data-brand') === brandId) {
+                opt.style.display = '';
+            } else {
+                opt.style.display = 'none';
+            }
+        });
+        toolSelect.value = '';
+    }
+
+    // ── 출고 확정 제출 ──
+    function submitOutbound(e) {
+        e.preventDefault();
+        const serial = document.getElementById('out-hidden-serial').value;
+        const companyId = document.getElementById('out-company').value;
+        const releaseDate = document.getElementById('out-release-date').value;
+        const usage = document.getElementById('out-usage').value;
+
+        if (!companyId) {
+            showAlert('출고처를 선택하십시오.', 'error');
+            return;
+        }
+
+        fetch(`{% url 'tool_admin:barcode_api_outbound' %}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                serial: serial,
+                company_id: companyId,
+                release_date: releaseDate,
+                usage_process: usage
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                playBeep(1800, 0.2);
+                showAlert(data.message, 'success');
+                appendRecentAction('출고완료', data.release_date, data.tool_name, data.serial, data.release_company, data.usage_process);
+                removeFromQueue(data.serial);
+                resetActionCard();
+            } else {
+                playBeep(300, 0.3, 'sawtooth');
+                showAlert(data.message, 'error');
+            }
+        })
+        .catch(err => {
+            playBeep(300, 0.3, 'sawtooth');
+            showAlert('출고 처리 중 에러가 발생했습니다.', 'error');
+        });
+    }
+
+    // ── 입고 등록 제출 ──
+    function submitInbound(e) {
+        e.preventDefault();
+        const serial = document.getElementById('in-serial').value;
+        const toolId = document.getElementById('in-tool').value;
+        const supplierId = document.getElementById('in-supplier').value;
+        const inboundDate = document.getElementById('in-date').value;
+
+        if (!toolId || !supplierId) {
+            showAlert('품목명과 입고처를 모두 선택하십시오.', 'error');
+            return;
+        }
+
+        fetch(`{% url 'tool_admin:barcode_api_inbound' %}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                serial: serial,
+                tool_id: toolId,
+                supplier_id: supplierId,
+                inbound_date: inboundDate
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                playBeep(1800, 0.2);
+                showAlert(data.message, 'success');
+                appendRecentAction('입고(재고)', data.inbound_date, data.tool_name, data.serial, data.supplier, '');
+                resetActionCard();
+            } else {
+                playBeep(300, 0.3, 'sawtooth');
+                showAlert(data.message, 'error');
+            }
+        })
+        .catch(err => {
+            playBeep(300, 0.3, 'sawtooth');
+            showAlert('입고 등록 중 에러가 발생했습니다.', 'error');
+        });
+    }
+
+    function resetActionCard() {
+        document.getElementById('state-outbound').style.display = 'none';
+        document.getElementById('state-inbound').style.display = 'none';
+        document.getElementById('state-waiting').style.display = 'block';
+        document.getElementById('action-card-title').textContent = '스캔 결과 및 입출고 처리';
+        document.getElementById('action-badge-container').innerHTML = '';
+        mainInput.value = '';
+        mainInput.focus();
+    }
+
+    // ── 연속 출고 대기열(Queue) 관리 ──
+    const scanQueue = [];
+
+    function addToQueue(data) {
+        // 이미 큐에 있으면 중복 추가 방지
+        if (scanQueue.some(item => item.serial === data.serial)) return;
+
+        scanQueue.push(data);
+        renderQueue();
+    }
+
+    function removeFromQueue(serial) {
+        const idx = scanQueue.findIndex(item => item.serial === serial);
+        if (idx !== -1) {
+            scanQueue.splice(idx, 1);
+            renderQueue();
+        }
+    }
+
+    function renderQueue() {
+        const tbody = document.getElementById('queue-tbody');
+        const countBadge = document.getElementById('queue-count-badge');
+        countBadge.textContent = `${scanQueue.length}대`;
+
+        if (scanQueue.length === 0) {
+            tbody.innerHTML = `
+                <tr id="queue-empty-row">
+                    <td colspan="3" style="text-align:center; padding:1.5rem; color:var(--bc-text-sub);">
+                        대기 중인 장비가 없습니다.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = scanQueue.map(item => `
+            <tr>
+                <td style="font-weight:600;">${item.tool_name}</td>
+                <td style="font-family:monospace; color:#6366f1;">${item.serial}</td>
+                <td style="text-align:right;">
+                    <button type="button"
+                            onclick="removeFromQueue('${item.serial}')"
+                            style="border:none; background:transparent; color:#ef4444; cursor:pointer; font-size:1.1rem;">
+                        &times;
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function submitBatchOutbound() {
+        if (scanQueue.length === 0) {
+            showAlert('대기열에 장비가 없습니다.', 'error');
+            return;
+        }
+        const companyId = document.getElementById('batch-company').value;
+        if (!companyId) {
+            showAlert('일괄 출고할 출고처를 선택해 주십시오.', 'error');
+            return;
+        }
+
+        const serials = scanQueue.map(item => item.serial);
+
+        // 일괄 처리
+        Promise.all(serials.map(s => {
+            return fetch(`{% url 'tool_admin:barcode_api_outbound' %}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    serial: s,
+                    company_id: companyId,
+                    release_date: '{{ today }}',
+                    usage_process: '일괄 출고'
+                })
+            }).then(r => r.json());
+        })).then(results => {
+            const successItems = results.filter(r => r.success);
+            playBeep(2000, 0.3);
+            showAlert(`총 ${successItems.length}대의 장비가 일괄 출고되었습니다!`, 'success');
+            scanQueue.length = 0;
+            renderQueue();
+            resetActionCard();
+            setTimeout(() => {
+                location.reload();
+            }, 800);
+        }).catch(err => {
+            showAlert('일괄 처리 중 오류가 발생했습니다.', 'error');
+        });
+    }
+
+    // ── 최근 이력 테이블 맨 위에 한 줄 추가 ──
+    function appendRecentAction(type, date, toolName, serial, company, usage) {
+        const tbody = document.getElementById('recent-actions-tbody');
+        const badgeClass = (type === '출고완료') ? 'bc-badge-released' : 'bc-badge-stock';
+        const newRow = `
+            <tr>
+                <td><span class="bc-badge ${badgeClass}">${type}</span></td>
+                <td>${date}</td>
+                <td style="font-weight:600;">${toolName}</td>
+                <td style="font-family:monospace; font-weight:600; color:#6366f1;">${serial}</td>
+                <td>${company || '-'}</td>
+                <td>${usage || '-'}</td>
+            </tr>
+        `;
+        tbody.insertAdjacentHTML('afterbegin', newRow);
+    }
+
+    // ── 알림 배너 ──
+    function showAlert(msg, type = 'info') {
+        const banner = document.getElementById('alert-banner');
+        banner.textContent = msg;
+        banner.className = `bc-alert bc-alert-${type === 'error' ? 'error' : 'success'}`;
+        banner.style.display = 'flex';
+        setTimeout(() => {
+            banner.style.display = 'none';
+        }, 3500);
+    }
+
+    // ── CSRF 유틸 ──
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // ── 초기 URL 파라미터 자동 조회 ──
+    window.addEventListener('DOMContentLoaded', () => {
+        const initialVal = mainInput.value.trim();
+        if (initialVal) {
+            lookupSerial(initialVal);
+        }
+    });
+</script>
+{% endblock %}

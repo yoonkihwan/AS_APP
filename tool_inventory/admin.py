@@ -25,6 +25,12 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
         custom_urls = [
             path('dashboard/stock-pdf/', self.admin_view(self.dashboard_stock_pdf), name='dashboard_stock_pdf'),
             path('dashboard/history-pdf/', self.admin_view(self.dashboard_history_pdf), name='dashboard_history_pdf'),
+            path('barcode-manage/', self.admin_view(self.barcode_manage_view), name='barcode_manage'),
+            path('barcode-sheet/', self.admin_view(self.barcode_sheet_view), name='barcode_sheet'),
+            path('barcode-api/lookup/', self.barcode_api_lookup, name='barcode_api_lookup'),
+            path('barcode-api/tool-info/', self.barcode_api_tool_info, name='barcode_api_tool_info'),
+            path('barcode-api/inbound/', self.admin_view(self.barcode_api_inbound), name='barcode_api_inbound'),
+            path('barcode-api/outbound/', self.admin_view(self.barcode_api_outbound), name='barcode_api_outbound'),
         ]
         return custom_urls + super().get_urls()
 
@@ -326,6 +332,257 @@ class ToolInventoryAdminSite(UnfoldAdminSite):
         buffer.seek(0)
         filename = f"기간별_입출고이력_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}_{timezone.now().strftime('%H%M')}.pdf"
         return FileResponse(buffer, as_attachment=True, filename=filename)
+
+    def barcode_manage_view(self, request):
+        """바코드 입출고 관리 전용 뷰 (MQ160W 연동)"""
+        from django.shortcuts import render
+        import json
+        from master_data.models import Company, OutsourceCompany, Brand, Tool
+        from .models import Inventory
+
+        companies = Company.objects.all().order_by('name')
+        suppliers = OutsourceCompany.objects.all().order_by('name')
+        brands = Brand.objects.all().order_by('name')
+        tools = Tool.objects.select_related('brand').all().order_by('brand__name', 'model_name')
+        
+        tools_data = [
+            {
+                'id': t.id,
+                'name': t.model_name,
+                'brand_id': t.brand_id,
+                'brand_name': t.brand.name if t.brand else ''
+            }
+            for t in tools
+        ]
+
+        # 최근 처리된 입/출고 이력 10건
+        recent_inventories = Inventory.all_objects.select_related('tool', 'tool__brand', 'supplier', 'release_company').order_by('-date')[:10]
+
+        context = {
+            **self.each_context(request),
+            'title': '바코드 입출고',
+            'subtitle': 'MQ160W 바코드 스캐너 고속 연동 관리 화면',
+            'companies': companies,
+            'suppliers': suppliers,
+            'brands': brands,
+            'tools': tools,
+            'tools_json': json.dumps(tools_data, ensure_ascii=False),
+            'today': timezone.now().date().strftime('%Y-%m-%d'),
+            'initial_serial': request.GET.get('serial', '').strip(),
+            'recent_inventories': recent_inventories,
+        }
+        return render(request, 'tool_inventory/barcode_manage.html', context)
+
+    def barcode_api_lookup(self, request):
+        """시리얼 번호로 재고 상태 실시간 조회 API"""
+        from django.http import JsonResponse
+        from .models import Inventory
+
+        serial = Inventory.normalize_serial(request.GET.get('serial', ''))
+        if not serial:
+            return JsonResponse({'success': False, 'message': '시리얼 번호가 비어있습니다.'}, status=400)
+
+        # 1순위: 현재 '재고' 레코드 (출고 대상) / 2순위: 가장 최근 이력
+        inv = Inventory.find_in_stock(serial)
+        if inv is None:
+            inv = (
+                Inventory.all_objects.filter(serial__iexact=serial)
+                .select_related('tool', 'tool__brand', 'supplier', 'release_company')
+                .order_by('-date')
+                .first()
+            )
+        if inv is not None:
+            is_stock = (inv.status == '재고')
+            return JsonResponse({
+                'success': True,
+                'found': True,
+                'is_stock': is_stock,
+                'status': inv.status,
+                'id': str(inv.id),
+                'serial': inv.serial,
+                'tool_id': inv.tool_id,
+                'tool_name': inv.tool.model_name,
+                'brand_id': inv.tool.brand_id if inv.tool.brand else None,
+                'brand_name': inv.tool.brand.name if inv.tool.brand else '',
+                'date': inv.date.strftime('%Y-%m-%d') if inv.date else '',
+                'supplier_id': inv.supplier_id,
+                'supplier_name': inv.supplier.name if inv.supplier else '',
+                'release_date': inv.release_date.strftime('%Y-%m-%d') if inv.release_date else '',
+                'release_company_name': inv.release_company.name if inv.release_company else '',
+                'usage_process': inv.usage_process or '',
+            })
+        else:
+            return JsonResponse({
+                'success': True,
+                'found': False,
+                'serial': serial,
+            })
+
+    def barcode_sheet_view(self, request):
+        """작업대 비치용 툴 마스터 바코드 시트 A4 인쇄 화면"""
+        from django.shortcuts import render
+        from master_data.models import Brand, Tool
+
+        brands = Brand.objects.prefetch_related('tools').all().order_by('name')
+        brand_tools = []
+        for b in brands:
+            tools = b.tools.all().order_by('model_name')
+            if tools.exists():
+                brand_tools.append({
+                    'brand': b,
+                    'tools': tools,
+                    'count': tools.count()
+                })
+
+        context = {
+            **self.each_context(request),
+            'title': '품목 바코드 출력',
+            'brand_tools': brand_tools,
+            'total_tools': Tool.objects.count(),
+            'total_brands': len(brand_tools),
+        }
+        return render(request, 'tool_inventory/barcode_sheet.html', context)
+
+    def barcode_api_tool_info(self, request):
+        """툴 ID 기반 브랜드 및 모델 정보 반환 API"""
+        from django.http import JsonResponse
+        from master_data.models import Tool
+
+        tool_id = request.GET.get('tool_id')
+        if not tool_id:
+            return JsonResponse({'success': False, 'message': '툴 ID가 누락되었습니다.'}, status=400)
+        try:
+            tool = Tool.objects.select_related('brand').get(pk=tool_id)
+            return JsonResponse({
+                'success': True,
+                'tool_id': tool.id,
+                'model_name': tool.model_name,
+                'brand_id': tool.brand_id,
+                'brand_name': tool.brand.name if tool.brand else '',
+            })
+        except Tool.DoesNotExist:
+            return JsonResponse({'success': False, 'message': '존재하지 않는 툴입니다.'}, status=404)
+
+    def barcode_api_outbound(self, request):
+        """바코드 시리얼 기반 즉시 출고 처리 API"""
+        from django.http import JsonResponse
+        import json
+        from master_data.models import Company
+        from .models import Inventory, OutboundBatch, OutboundTicket
+
+        if request.method != 'POST':
+            return JsonResponse({'success': False, 'message': 'POST 요청만 지원합니다.'}, status=405)
+
+        try:
+            data = json.loads(request.body) if request.body else request.POST
+        except Exception:
+            data = request.POST
+
+        serial = data.get('serial', '').strip()
+        company_id = data.get('company_id')
+        release_date = data.get('release_date') or timezone.now().date()
+        usage_process = data.get('usage_process', '').strip()
+
+        if not serial:
+            return JsonResponse({'success': False, 'message': '시리얼 번호가 없습니다.'}, status=400)
+        if not company_id:
+            return JsonResponse({'success': False, 'message': '출고처를 선택해 주십시오.'}, status=400)
+
+        try:
+            company = Company.objects.get(pk=company_id)
+        except Company.DoesNotExist:
+            return JsonResponse({'success': False, 'message': '유효하지 않은 출고처입니다.'}, status=400)
+
+        inv = Inventory.find_in_stock(serial)
+        if not inv:
+            return JsonResponse({'success': False, 'message': f'시리얼 [{serial}]에 해당하는 재고 장비를 찾을 수 없습니다.'}, status=404)
+
+        batch = OutboundBatch.objects.create(
+            release_date=release_date,
+            release_company=company,
+        )
+        ticket = OutboundTicket.objects.create(
+            batch=batch,
+            tool=inv.tool,
+            quantity=1,
+            usage_process=usage_process,
+        )
+        ticket.inventories.add(inv)
+
+        inv.status = '출고'
+        inv.release_date = release_date
+        inv.release_company = company
+        inv.usage_process = usage_process
+        inv.save()
+
+        return JsonResponse({
+            'success': True,
+            'message': f'[{inv.tool.model_name}] (S/N: {inv.serial}) 출고 처리가 완료되었습니다.',
+            'serial': inv.serial,
+            'tool_name': inv.tool.model_name,
+            'release_company': company.name,
+            'release_date': str(release_date),
+            'usage_process': usage_process,
+        })
+
+    def barcode_api_inbound(self, request):
+        """바코드 시리얼 기반 즉시 입고 등록 API"""
+        from django.http import JsonResponse
+        import json
+        from master_data.models import OutsourceCompany, Tool
+        from .models import Inventory, InventoryBatch
+
+        if request.method != 'POST':
+            return JsonResponse({'success': False, 'message': 'POST 요청만 지원합니다.'}, status=405)
+
+        try:
+            data = json.loads(request.body) if request.body else request.POST
+        except Exception:
+            data = request.POST
+
+        serial = data.get('serial', '').strip()
+        tool_id = data.get('tool_id')
+        supplier_id = data.get('supplier_id')
+        inbound_date = data.get('inbound_date') or timezone.now().date()
+
+        if not serial:
+            return JsonResponse({'success': False, 'message': '시리얼 번호가 누락되었습니다.'}, status=400)
+        if not tool_id:
+            return JsonResponse({'success': False, 'message': '품목(Tool)을 선택해 주십시오.'}, status=400)
+        if not supplier_id:
+            return JsonResponse({'success': False, 'message': '입고처(공급사)를 선택해 주십시오.'}, status=400)
+
+        if Inventory.all_objects.filter(tool_id=tool_id, serial=serial, status='재고').exists():
+            return JsonResponse({'success': False, 'message': f'해당 시리얼 [{serial}]은 이미 재고 상태로 등록되어 있습니다.'}, status=400)
+
+        try:
+            tool = Tool.objects.select_related('brand').get(pk=tool_id)
+            supplier = OutsourceCompany.objects.get(pk=supplier_id)
+        except (Tool.DoesNotExist, OutsourceCompany.DoesNotExist):
+            return JsonResponse({'success': False, 'message': '선택한 품목 또는 공급사가 존재하지 않습니다.'}, status=400)
+
+        batch = InventoryBatch.objects.create(
+            inbound_date=inbound_date,
+            supplier=supplier,
+        )
+
+        inv = Inventory.objects.create(
+            batch=batch,
+            supplier=supplier,
+            date=inbound_date,
+            tool=tool,
+            serial=serial,
+            status='재고',
+        )
+
+        return JsonResponse({
+            'success': True,
+            'message': f'[{tool.model_name}] (S/N: {serial}) 신규 입고 등록이 완료되었습니다.',
+            'serial': inv.serial,
+            'tool_name': tool.model_name,
+            'supplier': supplier.name,
+            'inbound_date': str(inbound_date),
+        })
 
 tool_admin_site = ToolInventoryAdminSite(name='tool_admin')
 
@@ -774,7 +1031,6 @@ class InventoryBatchAdmin(ModelAdmin):
 
     class Media:
         css = {"all": ("as_app/css/inline_fix.css", "as_app/css/hide_fab.css")}
-        js = ("as_app/js/inbound_form.js",)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
@@ -789,6 +1045,7 @@ class InventoryBatchAdmin(ModelAdmin):
     def render_change_form(self, request, context, add=False, change=False, form_url="", obj=None):
         context["show_save_and_add_another"] = False
         context["show_save_and_continue"] = False
+        context["cache_bust"] = str(int(timezone.now().timestamp()))
         return super().render_change_form(request, context, add, change, form_url, obj)
 
     def response_add(self, request, obj, post_url_continue=None):
@@ -837,57 +1094,55 @@ class InventoryBatchAdmin(ModelAdmin):
                         )
                         expanded.append(new_inv)
             elif instance.tool_id and instance.serial:
-                serials = [s.strip() for s in instance.serial.split(",") if s.strip()]
-                if len(serials) > 1:
-                    instance.serial = serials[0]
-                    expanded.append(instance)
-                    for sn in serials[1:]:
-                        new_inv = Inventory(
-                            batch=batch,
-                            tool=instance.tool,
-                            serial=sn,
-                        )
-                        expanded.append(new_inv)
-                else:
-                    expanded.append(instance)
+                serials = Inventory.split_serials(instance.serial)
+                if not serials:
+                    continue
+                # 단건이든 다건이든 반드시 정규화된 값으로 교체 (끝 쉼표 저장 버그 차단)
+                instance.serial = serials[0]
+                expanded.append(instance)
+                for sn in serials[1:]:
+                    expanded.append(Inventory(batch=batch, tool=instance.tool, serial=sn))
             elif instance.tool_id:
                 expanded.append(instance)
 
-        saved_count = 0
+        # 1단계: 사전 검증 — 중복 시리얼이나 에러가 1건이라도 있으면 전체 입고 취소!
         duplicate_serials = []
+        seen_serials = set()
+        for instance in expanded:
+            if instance.serial:
+                sn = instance.serial.strip().upper()
+                if sn in seen_serials:
+                    duplicate_serials.append(f"{sn}(배치 내 중복)")
+                seen_serials.add(sn)
+
+                dup = Inventory.find_in_stock(instance.serial)
+                if dup and dup.pk != instance.pk:
+                    duplicate_serials.append(f"{instance.serial}({dup.tool.model_name})")
+
+        if duplicate_serials:
+            from django.contrib import messages
+            messages.error(
+                request,
+                f"❌ 입고 등록 실패 (저장 취소): 이미 '재고' 상태이거나 중복된 시리얼 번호가 포함되어 있어 저장을 취소하였습니다 — "
+                f"{', '.join(duplicate_serials)}"
+            )
+            request._formset_validation_failed = True
+            return
+
+        # 2단계: 모든 검증 통과 시에만 일괄 안전 저장!
+        saved_count = 0
         for instance in expanded:
             instance.date = batch.inbound_date
             instance.supplier = batch.supplier
             instance.is_legacy = False  # 신규 입고 데이터는 항상 is_legacy=False
-
-            # 중복 시리얼 소프트 검증 (재고 상태 동일 시리얼이 이미 있는 경우 건너뜀)
-            if instance.serial and instance.tool_id:
-                already_exists = Inventory.all_objects.filter(
-                    tool=instance.tool,
-                    serial=instance.serial,
-                    status='재고',
-                    is_legacy=False,
-                ).exclude(pk=instance.pk).exists()
-                if already_exists:
-                    duplicate_serials.append(instance.serial)
-                    continue  # 중복 시리얼은 저장하지 않고 건너뜀
-
             instance.save()
             saved_count += 1
         formset.save_m2m()
 
-        if duplicate_serials:
-            from django.contrib import messages
-            messages.warning(
-                request,
-                f"⚠️ 이미 '재고' 상태로 등록된 시리얼 번호는 제외하였습니다: "
-                f"{', '.join(duplicate_serials)}"
-            )
-        
         original_count = len(instances)
         if saved_count > original_count:
             from django.contrib import messages
-            messages.info(request, f"시리얼번호 분리로 총 {saved_count}건의 툴장비가 등록되었습니다.")
+            messages.info(request, f"시리얼번호 분리로 총 {saved_count}건의 툴장비가 정상 등록되었습니다.")
 
 from .models import Inventory, InventoryBatch, InboundInventory, OutboundInventory, OutboundBatch, OutboundTicket
 from .forms import InventoryForm, OutboundTicketForm

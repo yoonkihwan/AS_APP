@@ -1,0 +1,8 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+{# 강제 캐시 버스팅: 타임스탬프 쿼리스트링을 통해 브라우저 디스크 캐시를 무력화하고 항상 최신 스크립트 실행 보장 #}
+<script src="{% static 'as_app/js/inbound_form.js' %}?v={{ cache_bust }}"></script>
+{% endblock %}

@@ -75,6 +75,35 @@ class InventoryForm(forms.ModelForm):
                  except (ValueError, TypeError):
                      pass
 
+    def clean(self):
+        cleaned_data = super().clean()
+        tool = cleaned_data.get("tool")
+        no_serial = cleaned_data.get("no_serial")
+        raw_serial = cleaned_data.get("serial")
+
+        if not tool or no_serial or cleaned_data.get("DELETE"):
+            return cleaned_data
+
+        serials = Inventory.split_serials(raw_serial)
+        if not serials:
+            self.add_error("serial", "시리얼 번호를 입력하거나 '시리얼번호 없음'을 체크하십시오.")
+            return cleaned_data
+
+        in_stock = []
+        for sn in serials:
+            dup = Inventory.find_in_stock(sn)
+            if dup and dup.pk != self.instance.pk:
+                in_stock.append(f"{sn}({dup.tool.model_name})")
+        if in_stock and len(serials) > 1:
+            self.add_error(
+                "serial",
+                f"이미 '재고' 상태인 시리얼입니다 — 출고 등록 대상: {', '.join(in_stock)}",
+            )
+
+        # 정규화된 값으로 교체 (끝 쉼표/공백 제거)
+        cleaned_data["serial"] = ", ".join(serials)
+        return cleaned_data
+
 class OutboundTicketForm(forms.ModelForm):
     """OutboundTicket Inline용 커스텀 폼 - 브랜드/장비별 재고(시리얼) 동적 필터링"""
     
@@ -112,6 +141,8 @@ class OutboundTicketForm(forms.ModelForm):
         self.fields["tool"].queryset = Tool.objects.none()
         self.fields["inventories"].queryset = Inventory.objects.none()
         self.fields["inventories"].required = False
+        # [UX 개선] 품목명은 이미 선택되어 있으므로 시리얼만 깔끔하게 노출
+        self.fields["inventories"].label_from_instance = lambda obj: obj.serial if obj.serial else "S/N: 없음"
 
         # 수정 모드 혹은 에러 복구 시
         if self.instance.pk and getattr(self.instance, 'tool_id', None):

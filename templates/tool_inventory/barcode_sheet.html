@@ -1,0 +1,376 @@
+{% extends 'admin/base.html' %}
+{% load i18n %}
+
+{% block title %}품목 바코드 출력 | {{ site_title }}{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<style>
+    /* ── 기존 프로그램(Django Unfold 대시보드/목록) 공통 스타일 ── */
+    .dash-panel {
+        background: var(--color-bg, #fff);
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.75rem;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        margin-bottom: 1.25rem;
+    }
+
+    .dash-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.875rem 1.25rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+        background: var(--color-bg-secondary, #f9fafb);
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .dash-panel-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-color, #111827);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .text-muted {
+        color: var(--text-muted, #6b7280);
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    /* ── 상단 컨트롤 영역 ── */
+    .control-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .search-input {
+        padding: 0.45rem 0.75rem;
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.5rem;
+        font-size: 0.82rem;
+        background: var(--color-bg, #fff);
+        color: var(--text-color, #374151);
+        outline: none;
+        width: 200px;
+    }
+
+    .search-input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+    }
+
+    .btn-primary {
+        padding: 0.45rem 0.9rem;
+        border-radius: 0.5rem;
+        border: none;
+        background: #6366f1;
+        color: #fff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .btn-primary:hover {
+        background: #4f46e5;
+    }
+
+    /* ── 브랜드 필터 ── */
+    .brand-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        padding: 0.875rem 1.25rem;
+    }
+
+    .filter-btn {
+        padding: 0.35rem 0.75rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: 0.375rem;
+        border: 1px solid var(--border-color, #e5e7eb);
+        background: var(--color-bg, #fff);
+        color: var(--text-color, #374151);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .filter-btn:hover {
+        background: var(--color-bg-secondary, #f9fafb);
+        border-color: #cbd5e1;
+    }
+
+    .filter-btn.active {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: #ffffff;
+    }
+
+    /* ── 품목 바코드 그리드 ── */
+    .barcode-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+    }
+
+    .tool-item {
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        background: var(--color-bg, #fff);
+        page-break-inside: avoid;
+    }
+
+    .tool-name {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--text-color, #111827);
+        margin-bottom: 0.35rem;
+        word-break: break-all;
+    }
+
+    .barcode-box {
+        background: #ffffff;
+        border-radius: 0.25rem;
+        padding: 0.2rem 0.4rem;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    .tool-barcode-svg {
+        max-width: 100%;
+        height: auto;
+    }
+
+    .tool-code {
+        font-size: 0.7rem;
+        font-family: monospace;
+        color: var(--text-muted, #6b7280);
+        margin-top: 0.2rem;
+    }
+
+    /* ── 다크 모드 지원 (index.html과 동일 규격) ── */
+    .dark .dash-panel {
+        background: #1e293b;
+        border-color: #334155;
+    }
+
+    .dark .dash-panel-header {
+        background: #1a2332;
+        border-color: #334155;
+    }
+
+    .dark .dash-panel-title,
+    .dark .tool-name {
+        color: #f1f5f9;
+    }
+
+    .dark .text-muted,
+    .dark .tool-code {
+        color: #94a3b8;
+    }
+
+    .dark .search-input,
+    .dark .filter-btn,
+    .dark .tool-item {
+        background: #1a2332;
+        border-color: #334155;
+        color: #cbd5e1;
+    }
+
+    .dark .filter-btn.active {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: #ffffff;
+    }
+
+    /* ── 인쇄 전용 (A4 출력) ── */
+    @media print {
+        body {
+            background: #ffffff !important;
+            color: #000000 !important;
+        }
+        nav, header, footer, #control-panel, .breadcrumbs {
+            display: none !important;
+        }
+        .dash-panel {
+            border: none !important;
+            box-shadow: none !important;
+            margin-bottom: 1rem !important;
+            page-break-inside: avoid;
+        }
+        .dash-panel-header {
+            background: #f8fafc !important;
+            border: 1pt solid #cbd5e1 !important;
+            padding: 0.4rem 0.75rem !important;
+        }
+        .dash-panel-title {
+            color: #000000 !important;
+            font-size: 10pt !important;
+        }
+        .barcode-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 0.4rem !important;
+            padding: 0.5rem 0 !important;
+        }
+        .tool-item {
+            border: 0.75pt solid #cbd5e1 !important;
+            padding: 0.4rem !important;
+            background: #ffffff !important;
+            page-break-inside: avoid !important;
+        }
+        .tool-name {
+            color: #000000 !important;
+            font-size: 8.5pt !important;
+        }
+        .tool-barcode-svg {
+            height: 36px !important;
+        }
+        .tool-code {
+            color: #475569 !important;
+            font-size: 6.5pt !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 상단 필터 및 인쇄 제어 패널 -->
+<div class="dash-panel" id="control-panel">
+    <div class="dash-panel-header">
+        <div class="dash-panel-title">
+            <span>품목 바코드 목록</span>
+            <span class="text-muted">(브랜드 {{ total_brands }}개 · 품목 {{ total_tools }}개)</span>
+        </div>
+        <div class="control-actions">
+            <input type="text"
+                   id="tool-search-input"
+                   class="search-input"
+                   placeholder="품목명 검색..."
+                   autocomplete="off"
+                   oninput="filterBySearch(this.value)">
+            <button type="button" class="btn-primary" onclick="window.print()">
+                <span class="material-icons-outlined" style="font-size:1rem;">print</span> 인쇄
+            </button>
+        </div>
+    </div>
+
+    <div class="brand-filter-bar">
+        <button type="button" class="filter-btn active" onclick="filterBrand('all', this)">전체 ({{ total_tools }})</button>
+        {% for item in brand_tools %}
+        <button type="button" class="filter-btn" onclick="filterBrand('brand-{{ item.brand.id }}', this)">
+            {{ item.brand.name }} ({{ item.count }})
+        </button>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- 브랜드별 품목 바코드 목록 -->
+{% for item in brand_tools %}
+<div class="dash-panel brand-section" id="brand-{{ item.brand.id }}">
+    <div class="dash-panel-header">
+        <span class="dash-panel-title">■ {{ item.brand.name }}</span>
+        <span class="text-muted">{{ item.count }}개 품목</span>
+    </div>
+    <div class="barcode-grid">
+        {% for tool in item.tools %}
+        <div class="tool-item" data-model="{{ tool.model_name|lower }}" data-brand="{{ item.brand.name|lower }}">
+            <div class="tool-name">{{ tool.model_name }}</div>
+            <div class="barcode-box">
+                <svg class="tool-barcode-svg barcode"
+                     data-value="TOOL-{{ item.brand.id }}-{{ tool.id }}"></svg>
+            </div>
+            <div class="tool-code">TOOL-{{ item.brand.id }}-{{ tool.id }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% empty %}
+<div class="dash-panel" style="text-align: center; padding: 2.5rem 1rem;">
+    <span class="text-muted">등록된 품목 데이터가 없습니다.</span>
+</div>
+{% endfor %}
+
+<script>
+    let currentBrandFilter = 'all';
+
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll(".barcode").forEach(function(el) {
+            const val = el.getAttribute("data-value");
+            try {
+                JsBarcode(el, val, {
+                    format: "CODE128",
+                    width: 1.4,
+                    height: 40,
+                    displayValue: false,
+                    margin: 2,
+                    background: "#ffffff",
+                    lineColor: "#000000"
+                });
+            } catch (err) {
+                console.error("Barcode render error:", val, err);
+            }
+        });
+    });
+
+    function applyFilters() {
+        const query = (document.getElementById('tool-search-input')?.value || '').trim().toLowerCase();
+        const sections = document.querySelectorAll('.brand-section');
+
+        sections.forEach(section => {
+            const matchesBrand = (currentBrandFilter === 'all' || section.id === currentBrandFilter);
+            if (!matchesBrand) {
+                section.style.display = 'none';
+                return;
+            }
+
+            const items = section.querySelectorAll('.tool-item');
+            let visibleCount = 0;
+            items.forEach(item => {
+                const modelName = item.getAttribute('data-model') || '';
+                const brandName = item.getAttribute('data-brand') || '';
+                if (!query || modelName.includes(query) || brandName.includes(query)) {
+                    item.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            section.style.display = visibleCount > 0 ? 'block' : 'none';
+        });
+    }
+
+    function filterBrand(brandId, btnEl) {
+        currentBrandFilter = brandId;
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        if (btnEl) btnEl.classList.add('active');
+        applyFilters();
+    }
+
+    function filterBySearch() {
+        applyFilters();
+    }
+</script>
+{% endblock %}

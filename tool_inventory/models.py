@@ -184,19 +184,51 @@ class Inventory(models.Model):
         # 같은 tool + serial 조합은 신규 데이터(is_legacy=False) 내에서만 재고 상태일 때 중복 불가
         # (DB 레벨 unique 제약은 걸지 않고, clean()에서 소프트 검증)
 
+    # ── 시리얼 정규화 (모든 저장 경로 공통) ──
+    @staticmethod
+    def normalize_serial(raw: str | None) -> str | None:
+        """앞뒤 공백·쉼표 제거 + 대문자화. 빈 값이면 None."""
+        if raw is None:
+            return None
+        cleaned = raw.strip().strip(",").strip().upper()
+        return cleaned or None
+
+    @classmethod
+    def split_serials(cls, raw: str | None) -> list[str]:
+        """'A, B, , C,' -> ['A', 'B', 'C'] (입력 순서 유지, 중복 제거)"""
+        if not raw:
+            return []
+        result: list[str] = []
+        for token in raw.split(","):
+            sn = cls.normalize_serial(token)
+            if sn and sn not in result:
+                result.append(sn)
+        return result
+
+    @classmethod
+    def find_in_stock(cls, serial: str | None):
+        """해당 시리얼이 현재 '재고' 상태인 신규 데이터 레코드 반환 (툴 무관, 1시리얼=1장비)"""
+        sn = cls.normalize_serial(serial)
+        if not sn:
+            return None
+        return (
+            cls.all_objects.filter(serial__iexact=sn, status='재고', is_legacy=False)
+            .select_related('tool', 'tool__brand')
+            .first()
+        )
+
+    def save(self, *args, **kwargs):
+        self.serial = self.normalize_serial(self.serial)
+        super().save(*args, **kwargs)
+
     def clean(self):
-        """중복 시리얼 검증 — 신규 데이터에서 재고 상태 동일 시리얼 중복 방지"""
-        if self.serial and self.tool_id and not self.is_legacy:
-            dup_qs = Inventory.all_objects.filter(
-                tool=self.tool,
-                serial=self.serial,
-                status='재고',
-                is_legacy=False,
-            ).exclude(pk=self.pk)
-            if dup_qs.exists():
+        """중복 시리얼 검증 — 툴 종류와 무관하게 '재고' 상태 동일 시리얼 중복 방지"""
+        sn = self.normalize_serial(self.serial)
+        if sn and "," not in sn and not self.is_legacy:
+            dup = Inventory.find_in_stock(sn)
+            if dup and dup.pk != self.pk:
                 raise ValidationError(
-                    {"serial": f"해당 시리얼 번호({self.serial})는 이미 '재고' 상태로 등록되어 있습니다. "
-                                "중복 입고를 확인해 주세요."}
+                    {"serial": f"이미 '재고' 상태인 시리얼입니다 — 출고 등록 대상: {sn}({dup.tool.model_name})"}
                 )
 
     def __str__(self):

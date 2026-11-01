@@ -99,13 +99,17 @@ WSGI_APPLICATION = "as_project.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-_default_db_port = "5433" if os.name == "nt" else "5432"
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"postgres://postgres:123456@localhost:{_default_db_port}/as_project_db",
-        conn_max_age=600,
-    )
-}
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.config(conn_max_age=600)
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # ──────────────────────────────────────────────

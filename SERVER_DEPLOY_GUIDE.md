@@ -9,11 +9,11 @@
 | 구분 | 로컬 개발 환경 (내 PC) | 메인 운영 서버 (라즈베리파이) |
 | :--- | :--- | :--- |
 | **운영체제** | Windows 11 | Debian GNU/Linux 13 (Pi-Server) |
-| **실행 위치** | `C:\Users\rlao1\AS_APP` | `/home/cheng/AS_APP` |
-| **가상환경** | `.\venv\Scripts\python.exe` | `source venv/bin/activate` |
-| **PostgreSQL 포트** | **`5433`** (OS 자동 판별) | **`5432`** (OS 자동 판별) |
+| **실행 위치** | `C:\Users\rlao1\AS_APP` (단일 통합 본진) | `/home/cheng/AS_APP` |
+| **가상환경** | `.\venv\Scripts\python.exe` (Python 3.12) | `source venv/bin/activate` |
+| **데이터베이스** | **SQLite (`db.sqlite3`)** / `DATABASE_URL` 설정 시 PostgreSQL | **PostgreSQL** (`5432`) |
 | **웹 접속 주소** | `http://127.0.0.1:8001/` (로컬 테스트용) | **`https://cheng-1.com`** (실서비스 운영용) |
-| **외부 터널** | Cloudflare Tunnel (임시 테스트용) | Cloudflare Tunnel (고정 도메인 연결) |
+| **원클릭 실행** | `run_local.bat` 더블 클릭 | 백그라운드 서비스 자동 구동 |
 
 ---
 

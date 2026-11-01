@@ -2,9 +2,27 @@ document.addEventListener("DOMContentLoaded", function () {
   /**
    * 인라인 폼셋에서 "브랜드 선택 -> 툴 목록 갱신" 
    * "툴 선택 -> 재고(시리얼) 목록 & 현재 재고(수량) 갱신"
+   * "바코드 스캔 -> 시리얼 체크박스 자동 선택 & 수량 자동 카운트"
    */
 
-  function updateToolOptions(row, brandId) {
+  let audioCtx = null;
+  function playBeep(freq = 1500, duration = 0.08) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    } catch (e) {}
+  }
+
+  function updateToolOptions(row, brandId, targetToolId = null, onComplete = null) {
     const toolSelect = row.querySelector("select[name$='-tool']");
     if (!toolSelect) return;
 
@@ -16,7 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
     fetch(`/api/tools-by-brand/?brand_id=${brandId}`)
       .then((response) => response.json())
       .then((data) => {
-        const currentToolId = toolSelect.value;
+        const currentToolId = targetToolId || toolSelect.value;
         toolSelect.innerHTML = '<option value="">---------</option>';
 
         data.tools.forEach((tool) => {
@@ -28,25 +46,28 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           toolSelect.appendChild(option);
         });
+
+        if (targetToolId) {
+          toolSelect.value = targetToolId;
+        }
+
+        if (onComplete) onComplete();
       })
       .catch((err) => console.error("Error fetching tools:", err));
   }
 
-  function updateInventoryOptions(row, toolId) {
-    // CheckboxSelectMultiple 위젯이 있는 컨테이너 찾기
+  function updateInventoryOptions(row, toolId, targetSerial = null) {
     const inventoryTd = row.querySelector(".field-inventories");
     if (!inventoryTd) return;
 
     const currentStockInput = row.querySelector("input[name$='-current_stock']");
 
-    // 행의 prefix 파악 (e.g. "tickets-0")
     let rowPrefix = "";
     if (row.id) {
       rowPrefix = row.id;
     }
 
     if (!toolId) {
-      // 선택된 대상 장비가 없으면 재고 목록도 비움
       Array.from(inventoryTd.querySelectorAll('input[type="checkbox"]')).forEach(cb => {
         const wrapperDiv = cb.closest('div');
         if (wrapperDiv) wrapperDiv.remove();
@@ -59,11 +80,9 @@ document.addEventListener("DOMContentLoaded", function () {
     fetch(`/api/inventory-by-tool/?tool_id=${toolId}`)
       .then((response) => response.json())
       .then((data) => {
-        // 기존에 선택된게 있다면 값 기억하기
         const existingCheckboxes = Array.from(inventoryTd.querySelectorAll('input[type="checkbox"]'));
         const checkedValues = existingCheckboxes.filter(cb => cb.checked).map(cb => cb.value);
 
-        // 기존 렌더링된 체크박스 모두 삭제
         existingCheckboxes.forEach(cb => {
           const wrapperDiv = cb.closest('div');
           if (wrapperDiv) wrapperDiv.remove();
@@ -72,8 +91,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const count = data.inventory.length;
         if (currentStockInput) currentStockInput.value = count;
 
-        // 컨테이너가 복잡하게 래핑되어 있을 수 있으므로 찾아서 넣는다
-        // 안쪽 빈 공간에 넣기 위해 div를 하나 만들어서 append 한다
         let container = inventoryTd.querySelector('.dynamic-checkbox-container');
         if (!container) {
           container = document.createElement('div');
@@ -91,22 +108,29 @@ document.addEventListener("DOMContentLoaded", function () {
           wrapper.style.display = "flex";
           wrapper.style.alignItems = "center";
           wrapper.style.marginBottom = "4px";
+          wrapper.style.padding = "2px 4px";
+          wrapper.style.borderRadius = "4px";
+          wrapper.style.transition = "background-color 0.3s ease";
 
           const cb = document.createElement("input");
           cb.type = "checkbox";
           cb.name = rowPrefix + "-inventories";
           cb.value = inv.id;
           cb.id = rowPrefix + "-inventories_" + index;
+          cb.setAttribute('data-serial', (inv.serial || '').trim());
 
-          if (checkedValues.includes(String(inv.id))) {
+          // 기존 체크 상태 복원 또는 타겟 시리얼 자동 체크
+          if (checkedValues.includes(String(inv.id)) || (targetSerial && inv.serial && inv.serial.trim() === targetSerial.trim())) {
             cb.checked = true;
+            wrapper.style.backgroundColor = "rgba(16, 185, 129, 0.2)";
           }
 
           const lbl = document.createElement("label");
           lbl.htmlFor = cb.id;
-          lbl.textContent = inv.serial ? ` S/N: ${inv.serial}` : ` S/N: 없음 (${inv.id.substring(0, 8)}...)`;
+          // [피드백 반영] 품목명은 이미 선택되어 있으므로 시리얼 번호만 깔끔하게 노출
+          lbl.textContent = inv.serial ? ` ${inv.serial}` : ` S/N: 없음 (${inv.id.substring(0, 8)}...)`;
           lbl.style.marginLeft = "8px";
-          lbl.style.fontSize = "0.875rem"; // tailwind text-sm
+          lbl.style.fontSize = "0.875rem";
           lbl.style.cursor = "pointer";
 
           wrapper.appendChild(cb);
@@ -115,6 +139,10 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         updateQuantityLogic(row);
+
+        if (targetSerial) {
+          playBeep(1800, 0.12);
+        }
       })
       .catch((err) => console.error("Error fetching inventory:", err));
   }
@@ -123,7 +151,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const quantityInput = row.querySelector("input[name$='-quantity']");
     if (!quantityInput) return;
 
-    // 현재 목록에 진짜 시리얼이 있는지 확인 ("S/N: 없음"이 아닌 레이블 존재 여부)
     let hasSerial = false;
     let hasItems = false;
     const allLabels = row.querySelectorAll(".field-inventories label");
@@ -136,22 +163,18 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
-    // 체크된 체크박스 개수 세기
     const checkedBoxes = row.querySelectorAll("input[type='checkbox'][name$='-inventories']:checked");
     const selectedCount = checkedBoxes.length;
 
-    // 공통: 하얗게 변하는 현상(inline style) 완전 제거하여 주변 디자인과 통일
-    quantityInput.style.backgroundColor = 'transparent'; // 다른 필드와 같은 색상 유지
+    quantityInput.style.backgroundColor = 'transparent';
     quantityInput.style.color = 'inherit';
 
     if (!hasItems || hasSerial) {
-      // 1. 선택된 툴이 없거나 시리얼이 있는 품목: 클릭 및 입력 원천 불가 (선택된 박스 수로만 제어)
       quantityInput.readOnly = true;
       quantityInput.style.pointerEvents = 'none';
       quantityInput.style.opacity = '0.5';
 
       if (hasSerial) {
-        // 시리얼이 있는 품목은 체크박스 활성화
         row.querySelectorAll("input[type='checkbox'][name$='-inventories']").forEach(cb => {
           cb.disabled = false;
         });
@@ -160,73 +183,177 @@ document.addEventListener("DOMContentLoaded", function () {
       if (selectedCount > 0) {
         quantityInput.value = selectedCount;
       } else {
-        if (!quantityInput.value || quantityInput.value === '0') {
-          quantityInput.value = 1; // 기본값
-        }
+        quantityInput.value = 1;
       }
     } else {
-      // 2. 시리얼이 없는 품목: 수동 입력 활성화 및 체크박스 잠금
       quantityInput.readOnly = false;
       quantityInput.style.pointerEvents = 'auto';
       quantityInput.style.opacity = '1';
 
-      // 시리얼이 없는 품목은 체크박스 선택 불가토록 강제 잠금 및 해제
       row.querySelectorAll("input[type='checkbox'][name$='-inventories']").forEach(cb => {
-        cb.checked = false;
         cb.disabled = true;
+        cb.checked = false;
       });
-
-      if (!quantityInput.value || quantityInput.value === '0') {
-        quantityInput.value = selectedCount > 0 ? selectedCount : 1;
-      }
     }
   }
 
-  // 초기 렌더링 검사
-  document.querySelectorAll(".field-inventories").forEach(td => {
-    const row = td.closest("tr");
-    if (row && !row.classList.contains('empty-form')) {
-      // 이미 Django 폼에서 렌더링된 체크박스들에 대해 이벤트 붙이기 위함
-      const toolSelect = row.querySelector("select[name$='-tool']");
-      if (toolSelect && toolSelect.value) {
-        updateInventoryOptions(row, toolSelect.value);
+  // ── 🚀 바코드 스캔 처리 핵심 함수 ──
+  function handleScannedSerial(serial) {
+    serial = serial.trim();
+    if (!serial) return;
+
+    // 1. 현재 화면에 이미 렌더링된 체크박스 중 시리얼 일치 항목 검색
+    const allCbs = Array.from(document.querySelectorAll("input[type='checkbox'][name$='-inventories']"));
+    const matchedCb = allCbs.find(cb => {
+      const s = cb.getAttribute('data-serial');
+      if (s && s.toLowerCase() === serial.toLowerCase()) return true;
+      const lbl = document.querySelector(`label[for='${cb.id}']`);
+      return lbl && lbl.textContent.trim().toLowerCase() === serial.toLowerCase();
+    });
+
+    if (matchedCb) {
+      matchedCb.checked = true;
+      const row = matchedCb.closest("tr");
+      if (row) updateQuantityLogic(row);
+
+      const wrapper = matchedCb.closest("div");
+      if (wrapper) {
+        wrapper.style.backgroundColor = "rgba(16, 185, 129, 0.25)";
+        wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
-      updateQuantityLogic(row);
+      playBeep(1800, 0.1);
+      return;
+    }
+
+    // 2. 화면에 없다면 -> API로 품목 정보 조회 후 인라인 자동 세팅
+    fetch(`/inventory/barcode-api/lookup/?serial=${encodeURIComponent(serial)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success || !data.found) {
+          playBeep(300, 0.25);
+          if (confirm(`시리얼 [${serial}]은 미등록 장비입니다.\n[입고 등록] 화면으로 이동하여 신규 입고하시겠습니까?`)) {
+            window.location.href = `/inventory/tool_inventory/inventorybatch/add/?serial=${encodeURIComponent(serial)}`;
+          }
+          return;
+        }
+
+        if (!data.is_stock) {
+          playBeep(300, 0.25);
+          alert(`시리얼 [${serial}]은 이미 '${data.status}' 처리된 장비입니다.`);
+          return;
+        }
+
+        // 비어있는 행 찾기
+        const rows = Array.from(document.querySelectorAll("tr.form-row:not(.empty-form)"));
+        let targetRow = rows.find(r => {
+          const toolSel = r.querySelector("select[name$='-tool']");
+          return toolSel && !toolSel.value;
+        });
+
+        if (!targetRow && rows.length > 0) {
+          targetRow = rows[rows.length - 1];
+        }
+
+        if (targetRow) {
+          const brandSelect = targetRow.querySelector("select[name$='-brand']");
+          if (brandSelect && data.brand_id) {
+            brandSelect.value = data.brand_id;
+            updateToolOptions(targetRow, data.brand_id, data.tool_id, () => {
+              updateInventoryOptions(targetRow, data.tool_id, serial);
+            });
+          } else {
+            updateInventoryOptions(targetRow, data.tool_id, serial);
+          }
+        }
+      })
+      .catch(err => console.error("Error looking up scanned serial:", err));
+  }
+
+  // URL 파라미터(?serial=...) 처리
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialSerial = urlParams.get('serial');
+  if (initialSerial) {
+    setTimeout(() => {
+      handleScannedSerial(initialSerial);
+    }, 400);
+  }
+
+  // ── [출고날짜 오염 방어] 페이지 진입 시 release_date 자동 포커스 해제 ──
+  const releaseDateInput = document.querySelector("input[name='release_date']");
+  if (releaseDateInput && document.activeElement === releaseDateInput) {
+    releaseDateInput.blur();
+  }
+  let initialReleaseDate = releaseDateInput ? releaseDateInput.value : "";
+
+  // 글로벌 바코드 스캐너 리스너 (40ms 이하 스캔)
+  let scanBuffer = [];
+  let lastKeyTime = 0;
+  const SCAN_INTERVAL = 40;
+
+  window.addEventListener("keydown", function(e) {
+    const activeEl = document.activeElement;
+    if (activeEl && ['TEXTAREA'].includes(activeEl.tagName)) return;
+
+    const now = performance.now();
+    const gap = now - lastKeyTime;
+    lastKeyTime = now;
+
+    if (e.key === "Enter") {
+      if (scanBuffer.length >= 4) {
+        const scanned = scanBuffer.join("").trim();
+        scanBuffer = [];
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 출고날짜(release_date) 필드에 바코드 찌꺼기가 들어갔다면 즉시 복원
+        if (releaseDateInput && releaseDateInput.value !== initialReleaseDate) {
+          releaseDateInput.value = initialReleaseDate;
+        }
+
+        handleScannedSerial(scanned);
+      } else {
+        scanBuffer = [];
+      }
+    } else if (e.key.length === 1) {
+      if (gap <= SCAN_INTERVAL) {
+        // 스캐너 고속 스트림 중: 포커스된 인풋(특히 release_date)에 문자가 찍히는 것을 원천 차단!
+        if (activeEl && activeEl.matches && activeEl.matches("input[name='release_date'], input[type='text'], input[type='search']")) {
+          e.preventDefault();
+        }
+        scanBuffer.push(e.key);
+      } else {
+        // 새로운 입력 시작
+        scanBuffer = [e.key];
+      }
     }
   });
 
+  // 이벤트 위임
   document.body.addEventListener("change", function (e) {
-    // 브랜드를 선택하면 툴 초기화, 재고 목록 초기화
     if (e.target.matches("select[name$='-brand']")) {
       const row = e.target.closest("tr");
       const toolSelect = row.querySelector("select[name$='-tool']");
-
       if (toolSelect) toolSelect.value = "";
-
       updateToolOptions(row, e.target.value);
       updateInventoryOptions(row, null);
     }
 
-    // 대장 장비(툴)를 선택하면 재고 목록 갱신
     if (e.target.matches("select[name$='-tool']")) {
       const row = e.target.closest("tr");
       updateInventoryOptions(row, e.target.value);
     }
 
-    // 아무 체크박스나 클릭하면 수량 계산 다시
     if (e.target.matches("input[type='checkbox'][name$='-inventories']")) {
       const row = e.target.closest("tr");
       updateQuantityLogic(row);
     }
 
-    // 수량 입력값 제한 (현재 재고 초과 방지)
     if (e.target.matches("input[name$='-quantity']")) {
       const row = e.target.closest("tr");
       const currentStockInput = row.querySelector("input[name$='-current_stock']");
       if (currentStockInput && currentStockInput.value) {
         const maxStock = parseInt(currentStockInput.value, 10) || 0;
         let val = parseInt(e.target.value, 10);
-
         if (!isNaN(val) && maxStock > 0 && val > maxStock) {
           e.target.value = maxStock;
           alert("입력한 수량이 현재 재고(" + maxStock + "개)를 초과하여 자동 조정되었습니다.");
@@ -235,7 +362,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // input 이벤트에서도 즉시 체크하여 위/아래 방향키나 타이핑 시 바로 방어
   document.body.addEventListener("input", function (e) {
     if (e.target.matches("input[name$='-quantity']")) {
       const row = e.target.closest("tr");
@@ -243,7 +369,6 @@ document.addEventListener("DOMContentLoaded", function () {
       if (currentStockInput && currentStockInput.value) {
         const maxStock = parseInt(currentStockInput.value, 10) || 0;
         let val = parseInt(e.target.value, 10);
-
         if (!isNaN(val) && maxStock > 0 && val > maxStock) {
           e.target.value = maxStock;
         }

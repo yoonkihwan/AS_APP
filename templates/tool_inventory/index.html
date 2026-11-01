@@ -495,6 +495,20 @@
                 </button>
             </form>
         </div>
+
+        <!-- 툴 바코드 시트 인쇄 -->
+        <div class="kpi-card"
+            style="cursor:pointer; flex-direction:row; gap:0.75rem; padding:1rem 1.25rem; align-items:center;"
+            onclick="window.location.href='{% url 'tool_admin:barcode_sheet' %}'">
+            <div class="kpi-icon"
+                style="background: linear-gradient(135deg, #2563eb, #1d4ed8); width:40px; height:40px;">
+                <span class="material-icons-outlined" style="font-size:20px;">qr_code_scanner</span>
+            </div>
+            <div class="kpi-info" style="gap:0.2rem;">
+                <span class="kpi-label">퀵 리포트</span>
+                <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-color, #111827);">품목 바코드 출력</span>
+            </div>
+        </div>
     </div>
 
 </div>
@@ -707,6 +721,89 @@
                     else item.style.opacity = '1';
                 })
                 .catch(() => { item.style.opacity = '1'; });
+        });
+    })();
+
+    // ── 대시보드 전역 바코드 자동 라우팅 (스캐너 입력 시 현재 탭에서 즉시 입고/출고 폼 직행) ──
+    (function () {
+        let scanBuffer = [];
+        let lastKeyTime = 0;
+        const SCAN_INTERVAL = 50;
+
+        const CHO = ['r', 'R', 's', 'e', 'E', 'f', 'a', 'q', 'Q', 't', 'T', 'd', 'w', 'W', 'c', 'z', 'x', 'v', 'g'];
+        const JUNG = ['k', 'o', 'i', 'O', 'j', 'p', 'u', 'P', 'h', 'hk', 'ho', 'hl', 'y', 'n', 'nj', 'np', 'nl', 'b', 'm', 'ml', 'l'];
+        const JONG = ['', 'r', 'R', 'rt', 's', 'sw', 'sg', 'e', 'f', 'fr', 'fa', 'fq', 'ft', 'fx', 'fv', 'fg', 'a', 'q', 'qt', 't', 'T', 'd', 'w', 'c', 'z', 'x', 'v', 'g'];
+        const JAMO = {'ㄱ': 'r', 'ㄲ': 'R', 'ㄴ': 's', 'ㄷ': 'e', 'ㄸ': 'E', 'ㄹ': 'f', 'ㅁ': 'a', 'ㅂ': 'q', 'ㅃ': 'Q', 'ㅅ': 't', 'ㅆ': 'T', 'ㅇ': 'd', 'ㅈ': 'w', 'ㅉ': 'W', 'ㅊ': 'c', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅍ': 'v', 'ㅎ': 'g', 'ㅏ': 'k', 'ㅐ': 'o', 'ㅑ': 'i', 'ㅒ': 'O', 'ㅓ': 'j', 'ㅔ': 'p', 'ㅕ': 'u', 'ㅖ': 'P', 'ㅗ': 'h', 'ㅘ': 'hk', 'ㅙ': 'ho', 'ㅚ': 'hl', 'ㅛ': 'y', 'ㅜ': 'n', 'ㅝ': 'nj', 'ㅞ': 'np', 'ㅟ': 'nl', 'ㅠ': 'b', 'ㅡ': 'm', 'ㅢ': 'ml', 'ㅣ': 'l'};
+
+        function toEng(str) {
+            if (!str) return '';
+            let res = '';
+            for (let i = 0; i < str.length; i++) {
+                const c = str.charCodeAt(i);
+                if (c >= 0xAC00 && c <= 0xD7A3) {
+                    const off = c - 0xAC00;
+                    res += CHO[Math.floor(off / 588)] + JUNG[Math.floor((off % 588) / 28)] + JONG[off % 28];
+                } else if (JAMO[str[i]]) {
+                    res += JAMO[str[i]];
+                } else {
+                    res += str[i];
+                }
+            }
+            return res.toUpperCase();
+        }
+
+        window.addEventListener("keydown", function (e) {
+            const activeEl = document.activeElement;
+            if (activeEl && activeEl.id === 'todo-input') {
+                return; // 투두리스트 직접 타이핑 시에는 제외
+            }
+
+            const now = performance.now();
+            const gap = now - lastKeyTime;
+            lastKeyTime = now;
+
+            if (e.key === "Enter") {
+                if (scanBuffer.length >= 3) {
+                    const raw = scanBuffer.join("").trim();
+                    scanBuffer = [];
+                    const code = toEng(raw).trim();
+                    if (!code) return;
+
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // 1) 툴 마스터 바코드인 경우 -> [입고 등록]으로 직행하여 툴 자동 선택
+                    const norm = code.replace(/[;_\-]/g, ':');
+                    if (norm.startsWith("TOOL:") || norm.startsWith("OOL:")) {
+                        window.location.href = `/inventory/tool_inventory/inventorybatch/add/?initial_master=` + encodeURIComponent(code);
+                        return;
+                    }
+
+                    // 2) 일반 시리얼 번호인 경우 -> API로 재고 유무 판별 후 즉시 이동!
+                    fetch(`/inventory/barcode-api/lookup/?serial=${encodeURIComponent(code)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.found && data.is_stock) {
+                                // 현재 재고 상태 -> 바로 [출고 등록]으로 이동!
+                                window.location.href = `/inventory/tool_inventory/outboundbatch/add/?serial=${encodeURIComponent(code)}`;
+                            } else {
+                                // 미등록 신규 상태 -> 바로 [입고 등록]으로 이동!
+                                window.location.href = `/inventory/tool_inventory/inventorybatch/add/?serial=${encodeURIComponent(code)}`;
+                            }
+                        })
+                        .catch(() => {
+                            window.location.href = `/inventory/tool_inventory/inventorybatch/add/?serial=${encodeURIComponent(code)}`;
+                        });
+                } else {
+                    scanBuffer = [];
+                }
+            } else if (e.key.length === 1) {
+                if (gap <= SCAN_INTERVAL || scanBuffer.length === 0) {
+                    scanBuffer.push(e.key);
+                } else {
+                    scanBuffer = [e.key];
+                }
+            }
         });
     })();
 </script>
