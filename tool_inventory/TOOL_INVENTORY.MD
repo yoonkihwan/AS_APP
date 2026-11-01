@@ -225,3 +225,10 @@ elease_date 등 폼 필드로의 텍스트 침투 원천 차단.
             - 상단 Unfold 브랜딩 블록(`unfold/helpers/site_branding.html`) 및 아이콘 폰트를 로드하여 상단 헤더 깨짐 현상 수정.
             - 이모지(`📋`, `⚡`, `🖨️`, `🏷️`), 녹색 가이드 박스, 카드마다 반복되던 보라색 브랜드 배지 등 과도한 장식 요소를 전부 제거하고 대시보드의 `.dash-panel` 스타일로 통일.
             - 상단에 `품목명 검색` 입력창 및 브랜드 필터 버튼을 배치하고, 다크 모드에서도 바코드 스캔이 가능하도록 바코드 영역 배경을 흰색(`#ffffff`)으로 고정.
+
+---
+
+      19. **Git 원격 저장소(`origin/main`) 통합 배포 완료 (2026-11-01) ✅:**
+         - 불필요한 가상환경/백업 DB(`.runenv/`, `db.sqlite3.*`, `staticfiles/`, `scripts/scripts/`) `.gitignore` 제외 및 Git 인덱스 정리 완료.
+         - 운영 서버(Linux/Raspberry Pi) 배포 시 PostgreSQL(`localhost:5432/as_project_db`) 자동 연결 및 로컬(Windows) SQLite 분기 안전장치 적용.
+         - `origin/main` 최신 커밋 동기화 및 Push 완료.

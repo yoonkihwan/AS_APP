@@ -108,8 +108,8 @@ else:
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+        } if os.name == "nt" else dj_database_url.config(default="postgres://postgres:123456@localhost:5432/as_project_db", conn_max_age=600)
+    } #
 
 
 # ──────────────────────────────────────────────
